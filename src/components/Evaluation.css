@@ -1,0 +1,168 @@
+.evaluation {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.evaluation-config {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.evaluation-config textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 1rem;
+  resize: vertical;
+}
+
+.evaluation-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.comparison-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+
+.comparison-panel {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.comparison-panel h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.content-box {
+  padding: 1rem;
+  border-radius: 4px;
+  min-height: 200px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.content-box.before {
+  background-color: #fff3e0;
+  border-left: 3px solid #ff9800;
+}
+
+.content-box.after {
+  background-color: #e8f5e9;
+  border-left: 3px solid #4caf50;
+}
+
+.metrics-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.metrics-section h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.metric-card {
+  padding: 1rem;
+  background: #f9f9f9;
+  border-radius: 4px;
+}
+
+.metric-label {
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #646cff;
+  margin-bottom: 0.5rem;
+}
+
+.metric-bar {
+  width: 100%;
+  height: 8px;
+  background-color: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.metric-fill {
+  height: 100%;
+  background-color: #646cff;
+  transition: width 0.3s ease;
+}
+
+.export-section {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.export-section h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.export-buttons {
+  display: flex;
+  gap: 1rem;
+}
+
+.export-buttons button {
+  padding: 0.75rem 1.5rem;
+  background-color: #646cff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.export-buttons button:hover {
+  background-color: #535bf2;
+}
+
+@media (prefers-color-scheme: dark) {
+  .evaluation-config,
+  .comparison-panel,
+  .metrics-section,
+  .export-section {
+    background-color: #2f2f2f;
+    color: #f6f6f6;
+  }
+
+  .content-box.before {
+    background-color: #3e2723;
+  }
+
+  .content-box.after {
+    background-color: #1b5e20;
+  }
+
+  .metric-card {
+    background-color: #333;
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "app": {
+    "title": "PrivateTune Pro",
+    "startingBackend": "正在启动后端..."
+  },
+  "nav": {
+    "dashboard": "仪表盘",
+    "dataCenter": "数据中心",
+    "trainingLab": "训练实验室",
+    "productionTuning": "生产调优",
+    "evaluation": "效果评测",
+    "privacyCenter": "隐私中心"
+  },
+  "dashboard": {
+    "title": "仪表盘",
+    "totalDocuments": "文档总数",
+    "totalJobs": "任务总数",
+    "activeJobs": "活跃任务",
+    "completedJobs": "已完成任务",
+    "totalCost": "总费用",
+    "recentJobs": "最近的微调任务",
+    "recentDocuments": "最近的文档",
+    "noJobs": "暂无任务",
+    "noDocuments": "暂无文档",
+    "jobId": "任务ID",
+    "platform": "平台",
+    "model": "模型",
+    "status": "状态",
+    "progress": "进度",
+    "cost": "费用",
+    "type": "类型",
+    "uploadTime": "上传时间",
+    "processed": "已处理",
+    "pending": "待处理"
+  },
+  "dataCenter": {
+    "title": "知识仓储",
+    "selectAndUpload": "选择并上传文档",
+    "processing": "处理中...",
+    "documentProcessed": "文档处理成功！",
+    "documents": "文档",
+    "noDocuments": "尚未上传文档",
+    "filename": "文件名",
+    "fileType": "类型",
+    "uploadTime": "上传时间",
+    "status": "状态",
+    "actions": "操作",
+    "delete": "删除",
+    "deleting": "删除中...",
+    "confirmDelete": "确定要删除此文档吗？",
+    "deleteFailed": "删除文档失败"
+  },
+  "trainingLab": {
+    "title": "智能标注助手",
+    "apiKey": "API密钥",
+    "enterApiKey": "输入API密钥",
+    "model": "模型",
+    "generateInstructionPairs": "生成指令对",
+    "generating": "生成中...",
+    "exportJSONL": "导出JSONL",
+    "items": "项",
+    "availableKnowledgePoints": "可用知识点",
+    "annotations": "标注",
+    "noAnnotations": "尚未生成标注",
+    "instruction": "指令",
+    "response": "响应",
+    "score": "评分 (1-5)",
+    "pleaseEnterApiKey": "请输入API密钥",
+    "noKnowledgePoints": "没有可用的知识点。请先上传文档。",
+    "failedToGenerate": "生成标注失败"
+  },
+  "productionTuning": {
+    "title": "微调引擎",
+    "configureJob": "配置微调任务",
+    "platform": "平台",
+    "model": "模型",
+    "datasetSize": "数据集大小",
+    "apiKey": "API密钥",
+    "enterApiKey": "输入API密钥",
+    "estimatedCost": "预估费用",
+    "startFineTuning": "开始微调",
+    "submitting": "提交中...",
+    "jobs": "微调任务",
+    "noJobs": "暂无微调任务",
+    "pleaseEnterApiKey": "请输入API密钥"
+  },
+  "evaluation": {
+    "title": "效果评测与内容生成",
+    "template": "模板",
+    "customPrompt": "自定义提示词",
+    "enterCustomPrompt": "输入您的自定义提示词...",
+    "prompt": "提示词",
+    "generateAndCompare": "生成并对比",
+    "generating": "生成中...",
+    "beforeFineTuning": "微调前",
+    "afterFineTuning": "微调后",
+    "evaluationMetrics": "评估指标",
+    "similarity": "相似度",
+    "quality": "质量",
+    "relevance": "相关性",
+    "export": "导出",
+    "exportAsWord": "导出为Word",
+    "exportAsPDF": "导出为PDF",
+    "pleaseEnterPrompt": "请输入提示词"
+  },
+  "privacyCenter": {
+    "title": "隐私中心",
+    "apiKeysManagement": "API密钥管理",
+    "platform": "平台",
+    "selectPlatform": "选择平台",
+    "apiKey": "API密钥",
+    "enterApiKey": "输入API密钥",
+    "saveApiKey": "保存API密钥",
+    "storedApiKeys": "已存储的API密钥",
+    "noApiKeys": "未存储API密钥",
+    "encrypted": "已加密",
+    "notEncrypted": "未加密",
+    "dataDesensitization": "数据脱敏",
+    "autoDesensitization": "所有上传的文档在处理前都会自动脱敏。",
+    "viewDesensitizationLog": "查看脱敏日志",
+    "auditLog": "审计日志",
+    "viewAuditLog": "查看审计日志"
+  },
+  "wizard": {
+    "welcome": {
+      "title": "欢迎使用 PrivateTune Pro",
+      "description": "此向导将引导您完成第一个微调项目的设置。",
+      "intro": "PrivateTune Pro 帮助您将专业文档转换为微调语言模型。",
+      "steps": "按照以下简单步骤开始：",
+      "step1": "上传您的文档",
+      "step2": "生成训练数据",
+      "step3": "配置微调",
+      "step4": "开始训练"
+    },
+    "upload": {
+      "title": "上传文档",
+      "description": "上传包含您领域知识的PDF、Word、Markdown或图像文件。",
+      "instruction": "点击下面的按钮选择并上传您的文档。",
+      "goToDataCenter": "前往数据中心"
+    },
+    "generate": {
+      "title": "生成训练数据",
+      "description": "使用AI自动从您的文档生成指令-响应对。",
+      "instruction": "上传文档后，前往训练实验室生成标注。",
+      "goToTrainingLab": "前往训练实验室"
+    },
+    "configure": {
+      "title": "配置微调",
+      "description": "选择您的平台、模型并查看费用估算。",
+      "instruction": "在生产调优中配置您的微调任务。",
+      "goToProductionTuning": "前往生产调优"
+    },
+    "complete": {
+      "title": "设置完成！",
+      "description": "您已准备好开始微调模型。",
+      "documentsUploaded": "文档已上传",
+      "trainingDataGenerated": "训练数据已生成",
+      "fineTuningConfigured": "微调已配置",
+      "instruction": "您现在可以从生产调优开始您的微调任务。"
+    },
+    "previous": "上一步",
+    "skipWizard": "跳过向导",
+    "next": "下一步",
+    "finish": "完成"
+  },
+  "common": {
+    "language": "语言",
+    "english": "English",
+    "chinese": "中文"
+  }
+}

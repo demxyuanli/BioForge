@@ -1,0 +1,171 @@
+{
+  "app": {
+    "title": "PrivateTune Pro",
+    "startingBackend": "Starting backend..."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "dataCenter": "Data Center",
+    "trainingLab": "Training Lab",
+    "productionTuning": "Production Tuning",
+    "evaluation": "Evaluation",
+    "privacyCenter": "Privacy Center"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "totalDocuments": "Total Documents",
+    "totalJobs": "Total Jobs",
+    "activeJobs": "Active Jobs",
+    "completedJobs": "Completed Jobs",
+    "totalCost": "Total Cost",
+    "recentJobs": "Recent Fine-tuning Jobs",
+    "recentDocuments": "Recent Documents",
+    "noJobs": "No jobs yet",
+    "noDocuments": "No documents yet",
+    "jobId": "Job ID",
+    "platform": "Platform",
+    "model": "Model",
+    "status": "Status",
+    "progress": "Progress",
+    "cost": "Cost",
+    "type": "Type",
+    "uploadTime": "Upload Time",
+    "processed": "Processed",
+    "pending": "Pending"
+  },
+  "dataCenter": {
+    "title": "Knowledge Repository",
+    "selectAndUpload": "Select and Upload Document",
+    "processing": "Processing...",
+    "documentProcessed": "Document processed successfully!",
+    "documents": "Documents",
+    "noDocuments": "No documents uploaded yet",
+    "filename": "Filename",
+    "fileType": "Type",
+    "uploadTime": "Upload Time",
+    "status": "Status",
+    "actions": "Actions",
+    "delete": "Delete",
+    "deleting": "Deleting...",
+    "confirmDelete": "Are you sure you want to delete this document?",
+    "deleteFailed": "Failed to delete document"
+  },
+  "trainingLab": {
+    "title": "Smart Annotation Assistant",
+    "apiKey": "API Key",
+    "enterApiKey": "Enter API key",
+    "model": "Model",
+    "generateInstructionPairs": "Generate Instruction Pairs",
+    "generating": "Generating...",
+    "exportJSONL": "Export JSONL",
+    "items": "items",
+    "availableKnowledgePoints": "Available knowledge points",
+    "annotations": "Annotations",
+    "noAnnotations": "No annotations generated yet",
+    "instruction": "Instruction",
+    "response": "Response",
+    "score": "Score (1-5)",
+    "pleaseEnterApiKey": "Please enter API key",
+    "noKnowledgePoints": "No knowledge points available. Please upload documents first.",
+    "failedToGenerate": "Failed to generate annotations"
+  },
+  "productionTuning": {
+    "title": "Fine-tuning Engine",
+    "configureJob": "Configure Fine-tuning Job",
+    "platform": "Platform",
+    "model": "Model",
+    "datasetSize": "Dataset Size",
+    "apiKey": "API Key",
+    "enterApiKey": "Enter API key",
+    "estimatedCost": "Estimated Cost",
+    "startFineTuning": "Start Fine-tuning",
+    "submitting": "Submitting...",
+    "jobs": "Fine-tuning Jobs",
+    "noJobs": "No fine-tuning jobs yet",
+    "pleaseEnterApiKey": "Please enter API key"
+  },
+  "evaluation": {
+    "title": "Evaluation & Content Generation",
+    "template": "Template",
+    "customPrompt": "Custom Prompt",
+    "enterCustomPrompt": "Enter your custom prompt...",
+    "prompt": "Prompt",
+    "generateAndCompare": "Generate & Compare",
+    "generating": "Generating...",
+    "beforeFineTuning": "Before Fine-tuning",
+    "afterFineTuning": "After Fine-tuning",
+    "evaluationMetrics": "Evaluation Metrics",
+    "similarity": "Similarity",
+    "quality": "Quality",
+    "relevance": "Relevance",
+    "export": "Export",
+    "exportAsWord": "Export as Word",
+    "exportAsPDF": "Export as PDF",
+    "pleaseEnterPrompt": "Please enter a prompt"
+  },
+  "privacyCenter": {
+    "title": "Privacy Center",
+    "apiKeysManagement": "API Keys Management",
+    "platform": "Platform",
+    "selectPlatform": "Select platform",
+    "apiKey": "API Key",
+    "enterApiKey": "Enter API key",
+    "saveApiKey": "Save API Key",
+    "storedApiKeys": "Stored API Keys",
+    "noApiKeys": "No API keys stored",
+    "encrypted": "Encrypted",
+    "notEncrypted": "Not encrypted",
+    "dataDesensitization": "Data Desensitization",
+    "autoDesensitization": "All uploaded documents are automatically desensitized before processing.",
+    "viewDesensitizationLog": "View Desensitization Log",
+    "auditLog": "Audit Log",
+    "viewAuditLog": "View Audit Log"
+  },
+  "wizard": {
+    "welcome": {
+      "title": "Welcome to PrivateTune Pro",
+      "description": "This wizard will guide you through setting up your first fine-tuning project.",
+      "intro": "PrivateTune Pro helps you transform your professional documents into a fine-tuned language model.",
+      "steps": "Follow these simple steps to get started:",
+      "step1": "Upload your documents",
+      "step2": "Generate training data",
+      "step3": "Configure fine-tuning",
+      "step4": "Start training"
+    },
+    "upload": {
+      "title": "Upload Documents",
+      "description": "Upload PDF, Word, Markdown, or image files containing your domain knowledge.",
+      "instruction": "Click the button below to select and upload your documents.",
+      "goToDataCenter": "Go to Data Center"
+    },
+    "generate": {
+      "title": "Generate Training Data",
+      "description": "Use AI to automatically generate instruction-response pairs from your documents.",
+      "instruction": "After uploading documents, go to Training Lab to generate annotations.",
+      "goToTrainingLab": "Go to Training Lab"
+    },
+    "configure": {
+      "title": "Configure Fine-tuning",
+      "description": "Select your platform, model, and review cost estimates.",
+      "instruction": "Configure your fine-tuning job in Production Tuning.",
+      "goToProductionTuning": "Go to Production Tuning"
+    },
+    "complete": {
+      "title": "Setup Complete!",
+      "description": "You're ready to start fine-tuning your model.",
+      "documentsUploaded": "Documents uploaded",
+      "trainingDataGenerated": "Training data generated",
+      "fineTuningConfigured": "Fine-tuning configured",
+      "instruction": "You can now start your fine-tuning job from Production Tuning."
+    },
+    "previous": "Previous",
+    "skipWizard": "Skip Wizard",
+    "next": "Next",
+    "finish": "Finish"
+  },
+  "common": {
+    "language": "Language",
+    "english": "English",
+    "chinese": "中文"
+  }
+}
