@@ -1,0 +1,885 @@
+/* VS Style Layout - Dark Theme */
+
+/* Main Layout Container */
+.vs-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: #1e1e1e;
+  color: #cccccc;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* Title Bar */
+.vs-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  background-color: #323233;
+  border-bottom: 1px solid #252526;
+  padding: 0;
+  user-select: none;
+  cursor: default;
+}
+
+.vs-titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 10px;
+}
+
+.vs-app-icon {
+  font-size: 16px;
+  color: #007acc;
+}
+
+.vs-app-title {
+  font-size: 12px;
+  color: #cccccc;
+  font-weight: 400;
+}
+
+.vs-titlebar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.vs-menu-items {
+  display: flex;
+  gap: 4px;
+}
+
+.vs-menu-item {
+  padding: 4px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.vs-menu-item:hover {
+  background-color: #505050;
+}
+
+.vs-titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vs-language-select {
+  padding: 2px 6px;
+  background-color: #3c3c3c;
+  border: 1px solid #5a5a5a;
+  color: #cccccc;
+  border-radius: 3px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.vs-language-select:hover {
+  border-color: #007acc;
+}
+
+.vs-window-controls {
+  display: flex;
+  height: 100%;
+}
+
+.vs-window-btn {
+  width: 46px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: #cccccc;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.1s;
+}
+
+.vs-window-btn:hover {
+  background-color: #4d4d4d;
+}
+
+.vs-window-btn.vs-close:hover {
+  background-color: #e81123;
+  color: white;
+}
+
+.vs-window-btn:active {
+  background-color: #3a3a3a;
+}
+
+.vs-window-btn.vs-close:active {
+  background-color: #c41017;
+}
+
+/* Main Container */
+.vs-main-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Activity Bar (leftmost icon bar) */
+.vs-activity-bar {
+  width: 48px;
+  background-color: #333333;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border-right: 1px solid #252526;
+}
+
+.vs-activity-top,
+.vs-activity-bottom {
+  display: flex;
+  flex-direction: column;
+}
+
+.vs-activity-item {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #858585;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+}
+
+.vs-activity-item:hover {
+  color: #ffffff;
+}
+
+.vs-activity-item.active {
+  color: #ffffff;
+}
+
+.vs-activity-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: #007acc;
+}
+
+.vs-activity-icon {
+  font-size: 22px;
+}
+
+/* Left Sidebar */
+.vs-sidebar {
+  background-color: #252526;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border-right: 1px solid #1e1e1e;
+}
+
+.vs-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background-color: #252526;
+  border-bottom: 1px solid #1e1e1e;
+  min-height: 35px;
+}
+
+.vs-sidebar-title {
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #bbbbbb;
+}
+
+.vs-sidebar-close {
+  background: transparent;
+  border: none;
+  color: #858585;
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
+.vs-sidebar-close:hover {
+  color: #ffffff;
+  background-color: #404040;
+}
+
+.vs-sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Center Area */
+.vs-center-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background-color: #1e1e1e;
+}
+
+/* Editor Area (Top) */
+.vs-editor-area {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vs-editor-tabs {
+  display: flex;
+  background-color: #252526;
+  border-bottom: 1px solid #1e1e1e;
+  min-height: 35px;
+  overflow-x: auto;
+}
+
+.vs-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: #2d2d2d;
+  border-right: 1px solid #252526;
+  cursor: pointer;
+  min-width: 120px;
+  max-width: 200px;
+}
+
+.vs-tab:hover {
+  background-color: #3c3c3c;
+}
+
+.vs-tab.vs-tab-active {
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #1e1e1e;
+  margin-bottom: -1px;
+}
+
+.vs-tab-icon {
+  font-size: 14px;
+}
+
+.vs-tab-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.vs-tab-close {
+  background: transparent;
+  border: none;
+  color: transparent;
+  cursor: pointer;
+  padding: 2px 4px;
+  font-size: 10px;
+  border-radius: 3px;
+}
+
+.vs-tab:hover .vs-tab-close {
+  color: #858585;
+}
+
+.vs-tab-close:hover {
+  background-color: #505050;
+  color: #ffffff !important;
+}
+
+.vs-editor-content {
+  flex: 1;
+  overflow-y: auto;
+  background-color: #1e1e1e;
+  padding: 16px;
+}
+
+/* Bottom Panel */
+.vs-bottom-panel {
+  background-color: #1e1e1e;
+  border-top: 1px solid #007acc;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Right Panel */
+.vs-right-panel {
+  background-color: #252526;
+  border-left: 1px solid #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Panel Container (shared by bottom and right panels) */
+.vs-panel-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.vs-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: #252526;
+  border-bottom: 1px solid #1e1e1e;
+  min-height: 35px;
+  padding: 0 8px;
+}
+
+.vs-panel-tabs {
+  display: flex;
+  gap: 2px;
+}
+
+.vs-panel-tab {
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  color: #858585;
+  cursor: pointer;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.vs-panel-tab:hover {
+  color: #cccccc;
+}
+
+.vs-panel-tab.active {
+  color: #ffffff;
+  border-bottom-color: #007acc;
+}
+
+.vs-panel-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.vs-panel-action {
+  background: transparent;
+  border: none;
+  color: #858585;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 3px;
+}
+
+.vs-panel-action:hover {
+  background-color: #404040;
+  color: #ffffff;
+}
+
+.vs-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.vs-panel-placeholder {
+  color: #858585;
+}
+
+.vs-output-line {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.vs-output-time {
+  color: #569cd6;
+}
+
+.vs-output-text {
+  color: #cccccc;
+}
+
+/* Right Panel Properties */
+.vs-right-panel-container {
+  border-left: 1px solid #1e1e1e;
+}
+
+.vs-properties-list {
+  padding: 0;
+}
+
+.vs-property-group {
+  margin-bottom: 16px;
+}
+
+.vs-property-group-header {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #bbbbbb;
+  padding: 8px 0;
+  border-bottom: 1px solid #3c3c3c;
+  margin-bottom: 8px;
+}
+
+.vs-property-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #2d2d2d;
+}
+
+.vs-property-label {
+  color: #9cdcfe;
+  font-size: 12px;
+}
+
+.vs-property-value {
+  color: #ce9178;
+  font-size: 12px;
+}
+
+/* Resize Handles */
+.vs-resize-handle {
+  position: absolute;
+  background: transparent;
+  z-index: 10;
+}
+
+.vs-resize-horizontal {
+  width: 4px;
+  height: 100%;
+  right: 0;
+  top: 0;
+  cursor: ew-resize;
+}
+
+.vs-resize-horizontal:hover {
+  background-color: #007acc;
+}
+
+.vs-resize-horizontal-left {
+  width: 4px;
+  height: 100%;
+  left: 0;
+  top: 0;
+  cursor: ew-resize;
+}
+
+.vs-resize-horizontal-left:hover {
+  background-color: #007acc;
+}
+
+.vs-resize-vertical {
+  width: 100%;
+  height: 4px;
+  left: 0;
+  top: 0;
+  cursor: ns-resize;
+}
+
+.vs-resize-vertical:hover {
+  background-color: #007acc;
+}
+
+/* Status Bar */
+.vs-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 22px;
+  background-color: #007acc;
+  color: #ffffff;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.vs-statusbar-left,
+.vs-statusbar-right {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.vs-status-item {
+  padding: 0 8px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vs-status-btn {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.vs-status-btn:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
+.vs-status-btn.active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.vs-status-branch {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+.vs-icon {
+  font-size: 14px;
+}
+
+/* Scrollbar Styling */
+.vs-layout ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.vs-layout ::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.vs-layout ::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 5px;
+}
+
+.vs-layout ::-webkit-scrollbar-thumb:hover {
+  background: #4f4f4f;
+}
+
+/* Content Area Overrides for existing components */
+.vs-editor-content .dashboard,
+.vs-editor-content .data-center,
+.vs-editor-content .training-lab,
+.vs-editor-content .production-tuning,
+.vs-editor-content .privacy-center,
+.vs-editor-content .evaluation {
+  max-width: 100%;
+  margin: 0;
+  background: transparent;
+}
+
+.vs-editor-content h2 {
+  color: #e6e6e6;
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.vs-editor-content h3 {
+  color: #cccccc;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 16px 0 8px 0;
+}
+
+/* Cards and Sections in VS style */
+.vs-editor-content .upload-section,
+.vs-editor-content .documents-list,
+.vs-editor-content .knowledge-points-list,
+.vs-editor-content .annotations-list,
+.vs-editor-content .jobs-list,
+.vs-editor-content .api-keys-section,
+.vs-editor-content .desensitization-section,
+.vs-editor-content .audit-log-section,
+.vs-editor-content .config-section,
+.vs-editor-content .training-lab-usage,
+.vs-editor-content .stats-grid,
+.vs-editor-content .recent-jobs,
+.vs-editor-content .recent-documents {
+  background-color: #252526;
+  border: 1px solid #3c3c3c;
+  border-radius: 4px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+/* Table Styling */
+.vs-editor-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.vs-editor-content table th {
+  background-color: #2d2d2d;
+  color: #cccccc;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 500;
+  border-bottom: 1px solid #3c3c3c;
+}
+
+.vs-editor-content table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #2d2d2d;
+  color: #cccccc;
+}
+
+.vs-editor-content table tr:hover {
+  background-color: #2a2d2e;
+}
+
+/* Button Styling */
+.vs-editor-content button {
+  padding: 6px 14px;
+  background-color: #0e639c;
+  color: #ffffff;
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  font-size: 13px;
+  font-family: inherit;
+  transition: background-color 0.15s;
+}
+
+.vs-editor-content button:hover {
+  background-color: #1177bb;
+}
+
+.vs-editor-content button:disabled {
+  background-color: #3c3c3c;
+  color: #858585;
+  cursor: not-allowed;
+}
+
+.vs-editor-content button.delete-btn {
+  background-color: #d73a49;
+}
+
+.vs-editor-content button.delete-btn:hover {
+  background-color: #cb2431;
+}
+
+/* Form Elements */
+.vs-editor-content input,
+.vs-editor-content select,
+.vs-editor-content textarea {
+  background-color: #3c3c3c;
+  border: 1px solid #5a5a5a;
+  color: #cccccc;
+  padding: 6px 10px;
+  border-radius: 2px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.vs-editor-content input:focus,
+.vs-editor-content select:focus,
+.vs-editor-content textarea:focus {
+  outline: none;
+  border-color: #007acc;
+}
+
+.vs-editor-content input::placeholder {
+  color: #858585;
+}
+
+/* Form Group */
+.vs-editor-content .form-group {
+  margin-bottom: 12px;
+}
+
+.vs-editor-content .form-group label {
+  display: block;
+  color: #9cdcfe;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+/* Actions */
+.vs-editor-content .actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* Stats Grid */
+.vs-editor-content .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+
+.vs-editor-content .stat-card {
+  background-color: #2d2d2d;
+  padding: 16px;
+  border-radius: 4px;
+  border-left: 3px solid #007acc;
+}
+
+.vs-editor-content .stat-label {
+  font-size: 11px;
+  color: #858585;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.vs-editor-content .stat-value {
+  font-size: 24px;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+/* Dashboard Sections */
+.vs-editor-content .dashboard-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .vs-editor-content .dashboard-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Job and Document Cards */
+.vs-editor-content .job-card,
+.vs-editor-content .document-card {
+  background-color: #2d2d2d;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  border-left: 3px solid #3794ff;
+}
+
+.vs-editor-content .job-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.vs-editor-content .job-status {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+.vs-editor-content .job-status-running {
+  background-color: #0e639c;
+  color: #ffffff;
+}
+
+.vs-editor-content .job-status-completed {
+  background-color: #388a34;
+  color: #ffffff;
+}
+
+.vs-editor-content .job-status-failed {
+  background-color: #d73a49;
+  color: #ffffff;
+}
+
+.vs-editor-content .job-status-submitted {
+  background-color: #856404;
+  color: #ffffff;
+}
+
+.vs-editor-content .progress-bar {
+  height: 4px;
+  background-color: #3c3c3c;
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.vs-editor-content .progress-fill {
+  height: 100%;
+  background-color: #0e639c;
+  transition: width 0.3s;
+}
+
+/* Annotation Items */
+.vs-editor-content .annotation-item {
+  background-color: #2d2d2d;
+  padding: 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  border-left: 3px solid #6a9955;
+}
+
+.vs-editor-content .annotation-item .instruction,
+.vs-editor-content .annotation-item .response {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.vs-editor-content .training-lab-usage h4 {
+  color: #cccccc;
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0 0 8px 0;
+}
+
+.vs-editor-content .training-lab-usage-steps {
+  margin: 0;
+  padding-left: 20px;
+  color: #cccccc;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.vs-editor-content .training-lab-usage-steps li {
+  margin-bottom: 4px;
+}
+
+.vs-editor-content .annotation-item strong {
+  color: #9cdcfe;
+}
+
+.vs-editor-content .knowledge-points-header h3 {
+  margin: 0;
+}
+
+.vs-editor-content .knowledge-point-item {
+  border-bottom-color: #3c3c3c;
+}
+
+.vs-editor-content .kp-index {
+  color: #858585;
+}
+
+.vs-editor-content .kp-content {
+  color: #cccccc;
+}
+
+/* Info Section */
+.vs-editor-content .info-section {
+  background-color: #063b49;
+  border: 1px solid #007acc;
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  color: #9cdcfe;
+}

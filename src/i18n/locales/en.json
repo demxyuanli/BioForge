@@ -11,6 +11,57 @@
     "evaluation": "Evaluation",
     "privacyCenter": "Privacy Center"
   },
+  "menu": {
+    "file": "File",
+    "edit": "Edit",
+    "view": "View",
+    "tools": "Tools",
+    "help": "Help"
+  },
+  "panel": {
+    "output": "Output",
+    "logs": "Logs",
+    "problems": "Problems",
+    "properties": "Properties",
+    "details": "Details",
+    "help": "Help",
+    "toggleSidebar": "Toggle Sidebar",
+    "settings": "Settings",
+    "clear": "Clear",
+    "maximize": "Maximize",
+    "close": "Close",
+    "noOutput": "Ready. No output.",
+    "generalProperties": "General",
+    "name": "Name",
+    "type": "Type",
+    "status": "Status",
+    "currentView": "Current View",
+    "statistics": "Statistics",
+    "totalDocuments": "Total Documents",
+    "processedDocuments": "Processed",
+    "totalJobs": "Total Jobs",
+    "activeJobs": "Active Jobs"
+  },
+  "sidebar": {
+    "quickStats": "Quick Stats",
+    "documents": "Documents",
+    "jobs": "Jobs",
+    "activeJobs": "Active Jobs",
+    "recentDocuments": "Recent Documents",
+    "noDocuments": "No documents uploaded",
+    "finetuningJobs": "Fine-tuning Jobs",
+    "noJobs": "No jobs yet",
+    "selectActivity": "Select an activity"
+  },
+  "status": {
+    "ready": "Ready",
+    "loading": "Loading..."
+  },
+  "logs": {
+    "backendStarted": "Backend started successfully",
+    "backendAlreadyRunning": "Backend is already running",
+    "wizardCompleted": "Setup wizard completed"
+  },
   "dashboard": {
     "title": "Dashboard",
     "totalDocuments": "Total Documents",
@@ -48,10 +99,19 @@
     "delete": "Delete",
     "deleting": "Deleting...",
     "confirmDelete": "Are you sure you want to delete this document?",
-    "deleteFailed": "Failed to delete document"
+    "deleteFailed": "Failed to delete document",
+    "knowledgePointsList": "Knowledge points",
+    "noKnowledgePoints": "No knowledge points yet. Upload and process documents first.",
+    "refreshKnowledgePoints": "Refresh knowledge points"
   },
   "trainingLab": {
     "title": "Smart Annotation Assistant",
+    "howToUse": "How to use",
+    "usageStep1": "Upload documents in Data Center; knowledge points are extracted after processing.",
+    "usageStep2": "Enter your DeepSeek API key (api.deepseek.com) and select a model below.",
+    "usageStep3": "Click \"Refresh knowledge points\" to load points from processed documents.",
+    "usageStep4": "Click \"Generate Instruction Pairs\"; the assistant calls the cloud AI to generate instruction-response pairs from each knowledge point.",
+    "usageStep5": "Review and score annotations, then \"Save for fine-tuning\" or \"Export JSONL\".",
     "apiKey": "API Key",
     "enterApiKey": "Enter API key",
     "model": "Model",
@@ -67,7 +127,11 @@
     "score": "Score (1-5)",
     "pleaseEnterApiKey": "Please enter API key",
     "noKnowledgePoints": "No knowledge points available. Please upload documents first.",
-    "failedToGenerate": "Failed to generate annotations"
+    "failedToGenerate": "Failed to generate annotations",
+    "refreshKnowledgePoints": "Refresh knowledge points",
+    "saveForFinetuning": "Save for fine-tuning",
+    "saving": "Saving...",
+    "savedForFinetuning": "Saved. You can submit from Production Tuning."
   },
   "productionTuning": {
     "title": "Fine-tuning Engine",
@@ -82,7 +146,11 @@
     "submitting": "Submitting...",
     "jobs": "Fine-tuning Jobs",
     "noJobs": "No fine-tuning jobs yet",
-    "pleaseEnterApiKey": "Please enter API key"
+    "pleaseEnterApiKey": "Please enter API key",
+    "noTrainingData": "No training data. Save annotations in Training Lab first.",
+    "usingSaved": "Using saved",
+    "estimatedTime": "Estimated time remaining",
+    "logs": "Logs"
   },
   "evaluation": {
     "title": "Evaluation & Content Generation",
@@ -119,7 +187,8 @@
     "autoDesensitization": "All uploaded documents are automatically desensitized before processing.",
     "viewDesensitizationLog": "View Desensitization Log",
     "auditLog": "Audit Log",
-    "viewAuditLog": "View Audit Log"
+    "viewAuditLog": "View Audit Log",
+    "noEntries": "No entries yet"
   },
   "wizard": {
     "welcome": {
@@ -166,6 +235,7 @@
   "common": {
     "language": "Language",
     "english": "English",
-    "chinese": "中文"
+    "chinese": "Chinese",
+    "close": "Close"
   }
 }

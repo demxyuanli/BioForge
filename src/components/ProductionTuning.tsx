@@ -4,6 +4,9 @@ import {
   estimateFinetuningCost, 
   submitFinetuningJob, 
   getFinetuningJobs,
+  getTrainingSet,
+  getJobLogs,
+  getJobStatus,
   FinetuningJob,
   Annotation
 } from '../services/api';
@@ -11,15 +14,20 @@ import {
 const ProductionTuning: React.FC = () => {
   const { t } = useTranslation();
   const [jobs, setJobs] = useState<FinetuningJob[]>([]);
-  const [selectedPlatform, setSelectedPlatform] = useState('qwen3');
-  const [selectedModel, setSelectedModel] = useState('qwen-plus');
+  const [savedAnnotations, setSavedAnnotations] = useState<Annotation[]>([]);
+  const [selectedPlatform, setSelectedPlatform] = useState('deepseek');
+  const [selectedModel, setSelectedModel] = useState('deepseek-chat');
   const [apiKey, setApiKey] = useState('');
   const [datasetSize, setDatasetSize] = useState(100);
   const [costEstimate, setCostEstimate] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [jobLogs, setJobLogs] = useState<any[]>([]);
+  const [jobStatusDetail, setJobStatusDetail] = useState<any>(null);
 
   useEffect(() => {
     loadJobs();
+    loadTrainingSet();
   }, []);
 
   useEffect(() => {
@@ -28,12 +36,44 @@ const ProductionTuning: React.FC = () => {
     }
   }, [datasetSize, selectedModel, selectedPlatform]);
 
+  const loadTrainingSet = async () => {
+    try {
+      const { annotations, count } = await getTrainingSet();
+      setSavedAnnotations(annotations);
+      if (count > 0) setDatasetSize(count);
+    } catch (error) {
+      console.error('Failed to load training set:', error);
+    }
+  };
+
   const loadJobs = async () => {
     try {
       const jobList = await getFinetuningJobs();
       setJobs(jobList);
     } catch (error) {
       console.error('Failed to load jobs:', error);
+    }
+  };
+
+  const handleExpandJob = async (jobId: string) => {
+    if (expandedJobId === jobId) {
+      setExpandedJobId(null);
+      setJobLogs([]);
+      setJobStatusDetail(null);
+      return;
+    }
+    setExpandedJobId(jobId);
+    try {
+      const [logsResp, statusResp] = await Promise.all([
+        getJobLogs(jobId, 50),
+        getJobStatus(jobId)
+      ]);
+      setJobLogs(Array.isArray(logsResp) ? logsResp : []);
+      setJobStatusDetail(statusResp);
+    } catch (error) {
+      console.error('Failed to load job details:', error);
+      setJobLogs([]);
+      setJobStatusDetail(null);
     }
   };
 
@@ -56,23 +96,29 @@ const ProductionTuning: React.FC = () => {
       return;
     }
 
+    const annotationsToSubmit = savedAnnotations.length > 0
+      ? savedAnnotations
+      : Array.from({ length: Math.min(datasetSize, 100) }, (_, i) => ({
+          instruction: `Instruction ${i + 1}`,
+          response: `Response ${i + 1}`
+        } as Annotation));
+
+    if (annotationsToSubmit.length === 0) {
+      alert(t('productionTuning.noTrainingData'));
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const mockAnnotations: Annotation[] = Array.from({ length: datasetSize }, (_, i) => ({
-        instruction: `Instruction ${i + 1}`,
-        response: `Response ${i + 1}`
-      }));
-
       const job = await submitFinetuningJob(
-        mockAnnotations,
+        annotationsToSubmit,
         selectedPlatform,
         selectedModel,
         apiKey,
         'sft'
       );
-      
       await loadJobs();
-      alert(`Fine-tuning job submitted: ${job.id}`);
+      alert(`Fine-tuning job submitted: ${job.id ?? (job as any).job_id ?? '-'}`);
     } catch (error) {
       console.error('Fine-tuning error:', error);
       alert(`Failed to submit job: ${error}`);
@@ -82,12 +128,8 @@ const ProductionTuning: React.FC = () => {
   };
 
   const platforms = {
-    qwen3: {
-      name: 'Alibaba Cloud DashScope',
-      models: ['qwen-plus', 'qwen-max']
-    },
     deepseek: {
-      name: 'Fireworks.ai / Together AI',
+      name: 'DeepSeek (api.deepseek.com)',
       models: ['deepseek-chat', 'deepseek-r1']
     }
   };
@@ -122,6 +164,9 @@ const ProductionTuning: React.FC = () => {
             value={datasetSize}
             onChange={(e) => setDatasetSize(parseInt(e.target.value) || 0)}
           />
+          {savedAnnotations.length > 0 && (
+            <span className="saved-count">({t('productionTuning.usingSaved')}: {savedAnnotations.length})</span>
+          )}
         </div>
         <div className="form-group">
           <label>{t('productionTuning.apiKey')}:</label>
@@ -150,12 +195,34 @@ const ProductionTuning: React.FC = () => {
           <div className="jobs">
             {jobs.map((job) => (
               <div key={job.id} className="job-item">
-                <div>{t('dashboard.jobId')}: {job.id}</div>
+                <div className="job-item-header" onClick={() => handleExpandJob(job.id)}>
+                  <span>{t('dashboard.jobId')}: {job.id}</span>
+                  <span>{job.status} / {job.progress}%</span>
+                </div>
                 <div>{t('dashboard.platform')}: {job.platform}</div>
                 <div>{t('dashboard.model')}: {job.model}</div>
-                <div>{t('dashboard.status')}: {job.status}</div>
-                <div>{t('dashboard.progress')}: {job.progress}%</div>
-                {job.costUsd && <div>{t('dashboard.cost')}: ${job.costUsd.toFixed(2)}</div>}
+                {job.costUsd != null && <div>{t('dashboard.cost')}: ${job.costUsd.toFixed(2)}</div>}
+                {expandedJobId === job.id && (
+                  <div className="job-detail">
+                    {jobStatusDetail && (
+                      <div className="job-status-detail">
+                        <div>{t('dashboard.status')}: {jobStatusDetail.status}</div>
+                        {jobStatusDetail.estimated_time_remaining != null && (
+                          <div>{t('productionTuning.estimatedTime')}: {jobStatusDetail.estimated_time_remaining}</div>
+                        )}
+                        {jobStatusDetail.cost_tracking && (
+                          <div>{t('dashboard.cost')}: {JSON.stringify(jobStatusDetail.cost_tracking)}</div>
+                        )}
+                      </div>
+                    )}
+                    <div className="job-logs">
+                      <strong>{t('productionTuning.logs')}:</strong>
+                      {jobLogs.length === 0 ? <p>{t('privacyCenter.noEntries')}</p> : (
+                        <pre>{jobLogs.map((e: any) => typeof e === 'object' ? JSON.stringify(e) : String(e)).join('\n')}</pre>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

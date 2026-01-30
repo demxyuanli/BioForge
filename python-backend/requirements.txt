@@ -14,9 +14,8 @@ python-docx>=1.1.0
 pillow>=11.0.0
 pytesseract>=0.3.13
 
-# LLM and AI services
+# LLM and AI services (DeepSeek uses OpenAI-compatible API)
 openai>=1.50.0
-litellm>=1.50.0
 langchain>=0.3.0
 langchain-community>=0.3.0
 llama-index>=0.12.0

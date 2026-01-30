@@ -40,7 +40,7 @@ If bulk installation fails, install critical dependencies first:
 ```bash
 pip install fastapi uvicorn pydantic sqlalchemy
 pip install pypdf2 python-docx pillow
-pip install openai litellm
+pip install openai
 pip install langchain langchain-community
 pip install chromadb
 ```

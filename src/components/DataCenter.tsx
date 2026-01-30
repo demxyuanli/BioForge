@@ -1,17 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { selectFile, uploadDocument, getDocuments, deleteDocument, Document } from '../services/api';
+import { selectFile, uploadDocument, getDocuments, deleteDocument, getKnowledgePoints, Document } from '../services/api';
 import './DataCenter.css';
 
 const DataCenter: React.FC = () => {
   const { t } = useTranslation();
   const [documents, setDocuments] = useState<Document[]>([]);
+  const [knowledgePoints, setKnowledgePoints] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     loadDocuments();
+    loadKnowledgePoints();
   }, []);
 
   const loadDocuments = async () => {
@@ -20,6 +22,15 @@ const DataCenter: React.FC = () => {
       setDocuments(docs);
     } catch (error) {
       console.error('Failed to load documents:', error);
+    }
+  };
+
+  const loadKnowledgePoints = async () => {
+    try {
+      const points = await getKnowledgePoints();
+      setKnowledgePoints(points);
+    } catch (error) {
+      console.error('Failed to load knowledge points:', error);
     }
   };
 
@@ -34,7 +45,8 @@ const DataCenter: React.FC = () => {
       await uploadDocument(filePath);
       setUploadProgress(t('dataCenter.documentProcessed'));
       await loadDocuments();
-      
+      await loadKnowledgePoints();
+
       setTimeout(() => {
         setUploadProgress('');
       }, 3000);
@@ -55,6 +67,7 @@ const DataCenter: React.FC = () => {
     try {
       await deleteDocument(documentId);
       await loadDocuments();
+      await loadKnowledgePoints();
     } catch (error) {
       console.error('Delete error:', error);
       alert(`${t('dataCenter.deleteFailed')}: ${error}`);
@@ -109,6 +122,27 @@ const DataCenter: React.FC = () => {
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      <div className="knowledge-points-list">
+        <div className="knowledge-points-header">
+          <h3>{t('dataCenter.knowledgePointsList')} ({knowledgePoints.length})</h3>
+          <button type="button" className="refresh-kp-btn" onClick={loadKnowledgePoints}>
+            {t('dataCenter.refreshKnowledgePoints')}
+          </button>
+        </div>
+        {knowledgePoints.length === 0 ? (
+          <p>{t('dataCenter.noKnowledgePoints')}</p>
+        ) : (
+          <ul className="knowledge-points-items">
+            {knowledgePoints.map((content, index) => (
+              <li key={index} className="knowledge-point-item">
+                <span className="kp-index">{index + 1}.</span>
+                <span className="kp-content">{content}</span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

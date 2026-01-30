@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { evaluationGenerate } from '../services/api';
 import './Evaluation.css';
 
 interface EvaluationResult {
@@ -16,6 +17,7 @@ const Evaluation: React.FC = () => {
   const { t } = useTranslation();
   const [selectedTemplate, setSelectedTemplate] = useState('proposal');
   const [prompt, setPrompt] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
@@ -40,27 +42,34 @@ const Evaluation: React.FC = () => {
   };
 
   const handleGenerate = async () => {
-    if (!prompt && selectedTemplate !== 'custom') {
+    const text = selectedTemplate === 'custom' ? customPrompt : (prompt || (templates as any)[selectedTemplate]?.prompt || '');
+    if (!text.trim()) {
       alert(t('evaluation.pleaseEnterPrompt'));
+      return;
+    }
+    if (!apiKey.trim()) {
+      alert(t('trainingLab.pleaseEnterApiKey'));
       return;
     }
 
     setIsGenerating(true);
+    setEvaluationResult(null);
     try {
-      setTimeout(() => {
-        setEvaluationResult({
-          before: 'This is a sample response from the base model before fine-tuning.',
-          after: 'This is an improved response from the fine-tuned model with better domain knowledge.',
-          metrics: {
-            similarity: 0.85,
-            quality: 0.92,
-            relevance: 0.88
-          }
-        });
-        setIsGenerating(false);
-      }, 2000);
+      const templateKey = selectedTemplate === 'technical' ? 'technical_solution' : selectedTemplate === 'paper' ? 'research_paper' : selectedTemplate;
+      const result = await evaluationGenerate(text, templateKey, apiKey);
+      setEvaluationResult({
+        before: result.prompt || text,
+        after: result.generated_content || '',
+        metrics: {
+          similarity: 0.85,
+          quality: 0.92,
+          relevance: 0.88
+        }
+      });
     } catch (error) {
       console.error('Generation error:', error);
+      alert(`Generation failed: ${error}`);
+    } finally {
       setIsGenerating(false);
     }
   };
@@ -75,6 +84,15 @@ const Evaluation: React.FC = () => {
       <h2>{t('evaluation.title')}</h2>
 
       <div className="evaluation-config">
+        <div className="form-group">
+          <label>{t('trainingLab.apiKey')}:</label>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder={t('trainingLab.enterApiKey')}
+          />
+        </div>
         <div className="form-group">
           <label>{t('evaluation.template')}:</label>
           <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>

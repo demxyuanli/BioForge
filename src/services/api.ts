@@ -95,10 +95,21 @@ export async function deleteDocument(documentId: number): Promise<void> {
   }
 }
 
+export async function getKnowledgePoints(): Promise<string[]> {
+  try {
+    const response = await invoke<string>('get_knowledge_points');
+    const data = await parsePythonResponse(response);
+    return data?.knowledge_points ?? [];
+  } catch (error) {
+    console.error('Get knowledge points error:', error);
+    return [];
+  }
+}
+
 export async function generateAnnotations(
   knowledgePoints: string[],
   apiKey: string,
-  model: string = 'gpt-4'
+  model: string = 'deepseek-chat'
 ): Promise<Annotation[]> {
   try {
     const response = await invoke<string>('generate_annotations', {
@@ -107,6 +118,9 @@ export async function generateAnnotations(
       model
     });
     const data = await parsePythonResponse(response);
+    if (data?.error) {
+      throw new Error(data.error);
+    }
     return data?.annotations || [];
   } catch (error) {
     console.error('Generate annotations error:', error);
@@ -192,4 +206,75 @@ export async function startPythonBackend(): Promise<void> {
     console.error('Start Python backend error:', error);
     throw error;
   }
+}
+
+export async function saveApiKey(platform: string, apiKey: string): Promise<void> {
+  const response = await invoke<string>('save_api_key', { platform, apiKey });
+  await parsePythonResponse(response);
+}
+
+export async function getApiKeys(): Promise<{ platform: string; encrypted: boolean }[]> {
+  try {
+    const response = await invoke<string>('get_api_keys');
+    const data = await parsePythonResponse(response);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Get API keys error:', error);
+    return [];
+  }
+}
+
+export async function saveTrainingSet(annotations: Annotation[]): Promise<{ count: number }> {
+  const response = await invoke<string>('save_training_set', { annotations });
+  const data = await parsePythonResponse(response);
+  return { count: data?.count ?? annotations.length };
+}
+
+export async function getTrainingSet(): Promise<{ annotations: Annotation[]; count: number }> {
+  try {
+    const response = await invoke<string>('get_training_set');
+    const data = await parsePythonResponse(response);
+    return {
+      annotations: data?.annotations ?? [],
+      count: data?.count ?? 0
+    };
+  } catch (error) {
+    console.error('Get training set error:', error);
+    return { annotations: [], count: 0 };
+  }
+}
+
+export async function getAuditLog(limit: number = 200): Promise<{ entries: any[] }> {
+  try {
+    const response = await invoke<string>('get_audit_log', { limit });
+    const data = await parsePythonResponse(response);
+    return { entries: data?.entries ?? [] };
+  } catch (error) {
+    console.error('Get audit log error:', error);
+    return { entries: [] };
+  }
+}
+
+export async function getDesensitizationLog(limit: number = 100): Promise<{ entries: any[] }> {
+  try {
+    const response = await invoke<string>('get_desensitization_log', { limit });
+    const data = await parsePythonResponse(response);
+    return { entries: data?.entries ?? [] };
+  } catch (error) {
+    console.error('Get desensitization log error:', error);
+    return { entries: [] };
+  }
+}
+
+export async function evaluationGenerate(
+  prompt: string,
+  template: string = 'custom',
+  apiKey?: string
+): Promise<{ prompt: string; generated_content: string; template: string }> {
+  const response = await invoke<string>('evaluation_generate', {
+    prompt,
+    template,
+    apiKey: apiKey ?? null
+  });
+  return await parsePythonResponse(response);
 }

@@ -1,36 +1,27 @@
 """
 Fine-tuning Service
-Handles cloud-based fine-tuning using LiteLLM unified API
-Supports Qwen3 series (DashScope) and DeepSeek-V3/R1 (Fireworks.ai/Together AI)
+Handles cloud-based fine-tuning. Supports DeepSeek (api.deepseek.com).
 """
 from typing import Dict, Any, List, Optional
-from litellm import completion
 import json
 
 
 class FineTuningService:
     def __init__(self):
         self.supported_platforms = {
-            "qwen3": {
-                "platform": "dashscope",
-                "models": ["qwen-plus", "qwen-max"],
-                "fine_tuning_type": "lora"
-            },
             "deepseek": {
-                "platform": "fireworks",
+                "platform": "deepseek",
                 "models": ["deepseek-chat", "deepseek-r1"],
                 "fine_tuning_type": "lora"
             }
         }
-    
+
     def estimate_cost(self, dataset_size: int, model: str, platform: str) -> Dict[str, Any]:
         """
         Estimate fine-tuning cost
         Returns cost estimation in USD
         """
-        # Simplified cost estimation
         base_costs = {
-            "qwen3": {"per_1k_tokens": 0.01},
             "deepseek": {"per_1k_tokens": 0.008}
         }
         

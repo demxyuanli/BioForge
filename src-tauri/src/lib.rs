@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use std::process::Command;
 use std::path::PathBuf;
+use std::time::Duration;
 
 #[tauri::command]
 async fn upload_document(file_path: String) -> Result<String, String> {
@@ -56,13 +57,19 @@ except Exception as e:
 
 #[tauri::command]
 async fn generate_annotations(knowledge_points: Vec<String>, api_key: String, model: String) -> Result<String, String> {
+    let kp_json = serde_json::to_string(&knowledge_points).unwrap_or_else(|_| "[]".to_string());
+    let kp_escaped = kp_json.replace('\\', "\\\\").replace('"', "\\\"");
+    let api_key_escaped = api_key.replace('\\', "\\\\").replace('"', "\\\"");
+    let model_escaped = model.replace('\\', "\\\\").replace('"', "\\\"");
+
     let python_script = format!(
         r#"
 import sys
 import requests
 import json
 
-knowledge_points = {}
+kp_json = "{}"
+knowledge_points = json.loads(kp_json) if kp_json else []
 api_key = "{}"
 model = "{}"
 
@@ -90,9 +97,9 @@ except Exception as e:
     }}
     print(json.dumps(result))
 "#,
-        serde_json::to_string(&knowledge_points).unwrap(),
-        api_key,
-        model
+        kp_escaped,
+        api_key_escaped,
+        model_escaped
     );
 
     let output = Command::new("python")
@@ -286,6 +293,40 @@ except Exception as e:
 }
 
 #[tauri::command]
+async fn get_knowledge_points() -> Result<String, String> {
+    let python_script = r#"
+import sys
+import requests
+import json
+
+try:
+    response = requests.get('http://127.0.0.1:8778/documents/knowledge-points')
+    result = {
+        "success": response.status_code == 200,
+        "data": response.json() if response.status_code == 200 else None,
+        "error": None if response.status_code == 200 else response.text
+    }
+    print(json.dumps(result))
+except Exception as e:
+    result = {
+        "success": False,
+        "data": None,
+        "error": str(e)
+    }
+    print(json.dumps(result))
+"#;
+
+    let output = Command::new("python")
+        .arg("-c")
+        .arg(python_script)
+        .output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    Ok(output_str.to_string())
+}
+
+#[tauri::command]
 async fn get_finetuning_jobs() -> Result<String, String> {
     let python_script = r#"
 import sys
@@ -399,9 +440,170 @@ except Exception as e:
 }
 
 #[tauri::command]
+async fn save_api_key(platform: String, api_key: String) -> Result<String, String> {
+    let payload = serde_json::json!({"platform": platform, "api_key": api_key});
+    let payload_str = payload.to_string();
+    let python_script = r#"
+import sys
+import requests
+import json
+try:
+    payload = json.loads(sys.argv[1])
+    r = requests.post('http://127.0.0.1:8778/api-keys', json=payload)
+    out = {"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({"success": False, "data": None, "error": str(e)}))
+"#;
+    let output = Command::new("python").arg("-c").arg(python_script).arg(&payload_str).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn get_api_keys() -> Result<String, String> {
+    let python_script = r#"
+import sys
+import requests
+import json
+try:
+    r = requests.get('http://127.0.0.1:8778/api-keys')
+    out = {"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({"success": False, "data": None, "error": str(e)}))
+"#;
+    let output = Command::new("python").arg("-c").arg(python_script).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn save_training_set(annotations: Vec<serde_json::Value>) -> Result<String, String> {
+    let annotations_str = serde_json::to_string(&annotations).unwrap_or_else(|_| "[]".to_string());
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+try:
+    annotations = {}
+    r = requests.post('http://127.0.0.1:8778/training-set', json={{"annotations": annotations}})
+    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
+"#,
+        annotations_str
+    );
+    let output = Command::new("python").arg("-c").arg(&python_script).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn get_training_set() -> Result<String, String> {
+    let python_script = r#"
+import sys
+import requests
+import json
+try:
+    r = requests.get('http://127.0.0.1:8778/training-set')
+    out = {"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({"success": False, "data": None, "error": str(e)}))
+"#;
+    let output = Command::new("python").arg("-c").arg(python_script).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn get_audit_log(limit: i32) -> Result<String, String> {
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+try:
+    r = requests.get('http://127.0.0.1:8778/audit-log', params={{"limit": {}}})
+    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
+"#,
+        limit
+    );
+    let output = Command::new("python").arg("-c").arg(&python_script).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn get_desensitization_log(limit: i32) -> Result<String, String> {
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+try:
+    r = requests.get('http://127.0.0.1:8778/desensitization-log', params={{"limit": {}}})
+    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
+"#,
+        limit
+    );
+    let output = Command::new("python").arg("-c").arg(&python_script).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn evaluation_generate(prompt: String, template: String, api_key: Option<String>) -> Result<String, String> {
+    let payload = serde_json::json!({
+        "prompt": prompt,
+        "template": template,
+        "api_key": api_key.unwrap_or_default()
+    });
+    let payload_str = payload.to_string();
+    let python_script = r#"
+import sys
+import requests
+import json
+try:
+    payload = json.loads(sys.argv[1])
+    r = requests.post('http://127.0.0.1:8778/evaluation/generate', json=payload)
+    out = {"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({"success": False, "data": None, "error": str(e)}))
+"#;
+    let output = Command::new("python").arg("-c").arg(python_script).arg(&payload_str).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
 async fn start_python_backend() -> Result<String, String> {
+    const BACKEND_PORT: u16 = 8778;
+    let health_url = format!("http://127.0.0.1:{}/health", BACKEND_PORT);
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(2))
+        .build()
+        .unwrap_or_else(|_| reqwest::Client::new());
+
+    if let Ok(resp) = client.get(&health_url).send().await {
+        if resp.status().is_success() {
+            return Ok("Python backend already running".to_string());
+        }
+    }
+
     let mut python_path: Option<PathBuf> = None;
-    
+
     // First try current directory (development)
     if let Ok(current_dir) = std::env::current_dir() {
         let dev_path = current_dir.join("python-backend").join("main.py");
@@ -458,9 +660,17 @@ pub fn run() {
             submit_finetuning_job,
             get_documents,
             delete_document,
+            get_knowledge_points,
             get_finetuning_jobs,
             get_job_logs,
             get_job_status,
+            save_api_key,
+            get_api_keys,
+            save_training_set,
+            get_training_set,
+            get_audit_log,
+            get_desensitization_log,
+            evaluation_generate,
             start_python_backend
         ])
         .run(tauri::generate_context!())

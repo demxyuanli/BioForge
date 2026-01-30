@@ -70,3 +70,52 @@
   background-color: #6c757d;
   cursor: not-allowed;
 }
+
+.knowledge-points-list {
+  margin-top: 24px;
+}
+
+.knowledge-points-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.knowledge-points-header h3 {
+  margin: 0;
+}
+
+.knowledge-points-list .refresh-kp-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.knowledge-points-items {
+  margin: 0;
+  padding-left: 24px;
+  list-style: none;
+}
+
+.knowledge-point-item {
+  padding: 8px 0;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.knowledge-point-item:last-child {
+  border-bottom: none;
+}
+
+.kp-index {
+  flex-shrink: 0;
+  color: #666;
+  font-weight: 500;
+}
+
+.kp-content {
+  flex: 1;
+  word-break: break-word;
+}

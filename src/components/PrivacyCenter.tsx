@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { invoke } from '@tauri-apps/api/core';
+import { saveApiKey, getApiKeys, getAuditLog, getDesensitizationLog } from '../services/api';
 
 interface APIKey {
   platform: string;
@@ -12,24 +12,28 @@ const PrivacyCenter: React.FC = () => {
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [apiKeyValue, setApiKeyValue] = useState('');
+  const [auditLogEntries, setAuditLogEntries] = useState<any[]>([]);
+  const [desensitizationEntries, setDesensitizationEntries] = useState<any[]>([]);
+  const [showAuditLog, setShowAuditLog] = useState(false);
+  const [showDesensitizationLog, setShowDesensitizationLog] = useState(false);
 
   useEffect(() => {
     loadAPIKeys();
   }, []);
 
   const loadAPIKeys = async () => {
-    setApiKeys([]);
+    try {
+      const list = await getApiKeys();
+      setApiKeys(list);
+    } catch (error) {
+      console.error('Load API keys error:', error);
+    }
   };
 
   const handleSaveAPIKey = async () => {
     if (!selectedPlatform || !apiKeyValue) return;
-    
     try {
-      const response = await invoke('save_api_key', {
-        platform: selectedPlatform,
-        apiKey: apiKeyValue
-      });
-      console.log('API key saved:', response);
+      await saveApiKey(selectedPlatform, apiKeyValue);
       setApiKeyValue('');
       await loadAPIKeys();
     } catch (error) {
@@ -38,7 +42,31 @@ const PrivacyCenter: React.FC = () => {
     }
   };
 
-  const platforms = ['dashscope', 'fireworks', 'together', 'openai'];
+  const handleShowAuditLog = async () => {
+    try {
+      const { entries } = await getAuditLog(200);
+      setAuditLogEntries(entries);
+      setShowAuditLog(true);
+    } catch (error) {
+      console.error('Load audit log error:', error);
+      setAuditLogEntries([]);
+      setShowAuditLog(true);
+    }
+  };
+
+  const handleShowDesensitizationLog = async () => {
+    try {
+      const { entries } = await getDesensitizationLog(100);
+      setDesensitizationEntries(entries);
+      setShowDesensitizationLog(true);
+    } catch (error) {
+      console.error('Load desensitization log error:', error);
+      setDesensitizationEntries([]);
+      setShowDesensitizationLog(true);
+    }
+  };
+
+  const platforms = ['deepseek', 'fireworks', 'together', 'openai'];
 
   return (
     <div className="privacy-center">
@@ -85,13 +113,45 @@ const PrivacyCenter: React.FC = () => {
       <div className="desensitization-section">
         <h3>{t('privacyCenter.dataDesensitization')}</h3>
         <p>{t('privacyCenter.autoDesensitization')}</p>
-        <button>{t('privacyCenter.viewDesensitizationLog')}</button>
+        <button onClick={handleShowDesensitizationLog}>{t('privacyCenter.viewDesensitizationLog')}</button>
       </div>
 
       <div className="audit-log-section">
         <h3>{t('privacyCenter.auditLog')}</h3>
-        <button>{t('privacyCenter.viewAuditLog')}</button>
+        <button onClick={handleShowAuditLog}>{t('privacyCenter.viewAuditLog')}</button>
       </div>
+
+      {showAuditLog && (
+        <div className="log-modal">
+          <div className="log-modal-content">
+            <h3>{t('privacyCenter.auditLog')}</h3>
+            <pre className="log-entries">
+              {auditLogEntries.length === 0
+                ? t('privacyCenter.noEntries')
+                : auditLogEntries.map((e, i) => (
+                    <div key={i}>{typeof e === 'object' ? JSON.stringify(e, null, 2) : String(e)}</div>
+                  ))}
+            </pre>
+            <button onClick={() => setShowAuditLog(false)}>{t('common.close')}</button>
+          </div>
+        </div>
+      )}
+
+      {showDesensitizationLog && (
+        <div className="log-modal">
+          <div className="log-modal-content">
+            <h3>{t('privacyCenter.viewDesensitizationLog')}</h3>
+            <pre className="log-entries">
+              {desensitizationEntries.length === 0
+                ? t('privacyCenter.noEntries')
+                : desensitizationEntries.map((e, i) => (
+                    <div key={i}>{typeof e === 'object' ? JSON.stringify(e, null, 2) : String(e)}</div>
+                  ))}
+            </pre>
+            <button onClick={() => setShowDesensitizationLog(false)}>{t('common.close')}</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
