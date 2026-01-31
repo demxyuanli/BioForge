@@ -237,5 +237,12 @@
     "english": "English",
     "chinese": "Chinese",
     "close": "Close"
+  },
+  "chat": {
+    "welcome": "How can I help you today?",
+    "placeholder": "Type a message...",
+    "send": "Send",
+    "sources": "Sources",
+    "error": "Sorry, I encountered an error processing your request."
   }
 }

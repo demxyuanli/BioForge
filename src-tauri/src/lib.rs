@@ -56,11 +56,13 @@ except Exception as e:
 }
 
 #[tauri::command]
-async fn generate_annotations(knowledge_points: Vec<String>, api_key: String, model: String) -> Result<String, String> {
+async fn generate_annotations(knowledge_points: Vec<String>, api_key: String, model: String, base_url: Option<String>) -> Result<String, String> {
     let kp_json = serde_json::to_string(&knowledge_points).unwrap_or_else(|_| "[]".to_string());
     let kp_escaped = kp_json.replace('\\', "\\\\").replace('"', "\\\"");
     let api_key_escaped = api_key.replace('\\', "\\\\").replace('"', "\\\"");
     let model_escaped = model.replace('\\', "\\\\").replace('"', "\\\"");
+    let base_url_val = base_url.unwrap_or_default();
+    let base_url_escaped = base_url_val.replace('\\', "\\\\").replace('"', "\\\"");
 
     let python_script = format!(
         r#"
@@ -72,6 +74,7 @@ kp_json = "{}"
 knowledge_points = json.loads(kp_json) if kp_json else []
 api_key = "{}"
 model = "{}"
+base_url = "{}"
 
 try:
     response = requests.post(
@@ -79,7 +82,8 @@ try:
         json={{
             "knowledge_points": knowledge_points,
             "api_key": api_key,
-            "model": model
+            "model": model,
+            "base_url": base_url if base_url else None
         }}
     )
     
@@ -99,7 +103,8 @@ except Exception as e:
 "#,
         kp_escaped,
         api_key_escaped,
-        model_escaped
+        model_escaped,
+        base_url_escaped
     );
 
     let output = Command::new("python")
@@ -293,28 +298,40 @@ except Exception as e:
 }
 
 #[tauri::command]
-async fn get_knowledge_points() -> Result<String, String> {
-    let python_script = r#"
+async fn get_knowledge_points(page: Option<i32>, page_size: Option<i32>, document_id: Option<i32>) -> Result<String, String> {
+    let page_val = page.unwrap_or(1);
+    let page_size_val = page_size.unwrap_or(50);
+    
+    let mut url = format!("http://127.0.0.1:8778/documents/knowledge-points?page={}&page_size={}", page_val, page_size_val);
+    
+    if let Some(doc_id) = document_id {
+        url.push_str(&format!("&document_id={}", doc_id));
+    }
+
+    let python_script = format!(
+        r#"
 import sys
 import requests
 import json
 
 try:
-    response = requests.get('http://127.0.0.1:8778/documents/knowledge-points')
-    result = {
+    response = requests.get('{}')
+    result = {{
         "success": response.status_code == 200,
         "data": response.json() if response.status_code == 200 else None,
         "error": None if response.status_code == 200 else response.text
-    }
+    }}
     print(json.dumps(result))
 except Exception as e:
-    result = {
+    result = {{
         "success": False,
         "data": None,
         "error": str(e)
-    }
+    }}
     print(json.dumps(result))
-"#;
+"#,
+        url
+    );
 
     let output = Command::new("python")
         .arg("-c")
@@ -587,6 +604,204 @@ except Exception as e:
 }
 
 #[tauri::command]
+async fn chat_query(query: String, api_key: Option<String>, model: Option<String>, base_url: Option<String>) -> Result<String, String> {
+    let payload = serde_json::json!({
+        "query": query,
+        "api_key": api_key.unwrap_or_default(),
+        "model": model.unwrap_or("deepseek-chat".to_string()),
+        "base_url": base_url.unwrap_or_default()
+    });
+    let payload_str = payload.to_string();
+    let python_script = r#"
+import sys
+import requests
+import json
+try:
+    payload = json.loads(sys.argv[1])
+    r = requests.post('http://127.0.0.1:8778/chat/query', json=payload)
+    out = {"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({"success": False, "data": None, "error": str(e)}))
+"#;
+    let output = Command::new("python").arg("-c").arg(python_script).arg(&payload_str).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+
+#[tauri::command]
+async fn get_directories() -> Result<String, String> {
+    let python_script = r#"
+import sys
+import requests
+import json
+
+try:
+    response = requests.get('http://127.0.0.1:8778/directories')
+    result = {
+        "success": response.status_code == 200,
+        "data": response.json() if response.status_code == 200 else None,
+        "error": None if response.status_code == 200 else response.text
+    }
+    print(json.dumps(result))
+except Exception as e:
+    result = {
+        "success": False,
+        "data": None,
+        "error": str(e)
+    }
+    print(json.dumps(result))
+"#;
+
+    let output = Command::new("python")
+        .arg("-c")
+        .arg(python_script)
+        .output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    Ok(output_str.to_string())
+}
+
+#[tauri::command]
+async fn create_directory(name: String, parent_id: Option<i32>) -> Result<String, String> {
+    let payload = serde_json::json!({
+        "name": name,
+        "parent_id": parent_id
+    });
+    let payload_str = payload.to_string();
+    let python_script = r#"
+import sys
+import requests
+import json
+try:
+    payload = json.loads(sys.argv[1])
+    r = requests.post('http://127.0.0.1:8778/directories', json=payload)
+    out = {"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({"success": False, "data": None, "error": str(e)}))
+"#;
+    let output = Command::new("python").arg("-c").arg(python_script).arg(&payload_str).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn move_document(document_id: i32, directory_id: Option<i32>) -> Result<String, String> {
+    let payload = serde_json::json!({
+        "directory_id": directory_id
+    });
+    let payload_str = payload.to_string();
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+try:
+    payload = json.loads(sys.argv[1])
+    r = requests.put('http://127.0.0.1:8778/documents/{}/move', json=payload)
+    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
+"#,
+        document_id
+    );
+    let output = Command::new("python").arg("-c").arg(python_script).arg(&payload_str).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn move_directory(directory_id: i32, parent_id: Option<i32>) -> Result<String, String> {
+    let payload = serde_json::json!({
+        "parent_id": parent_id
+    });
+    let payload_str = payload.to_string();
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+try:
+    payload = json.loads(sys.argv[1])
+    r = requests.put('http://127.0.0.1:8778/directories/{}/move', json=payload)
+    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
+"#,
+        directory_id
+    );
+    let output = Command::new("python").arg("-c").arg(python_script).arg(&payload_str).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn delete_directory(directory_id: i32) -> Result<String, String> {
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+try:
+    r = requests.delete('http://127.0.0.1:8778/directories/{}')
+    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
+"#,
+        directory_id
+    );
+    let output = Command::new("python").arg("-c").arg(python_script).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn get_local_models(base_url: Option<String>) -> Result<String, String> {
+    let base_url_val = base_url.unwrap_or("http://localhost:11434".to_string());
+    // Escape base_url to prevent injection/errors in python script
+    let base_url_escaped = base_url_val.replace('\\', "\\\\").replace('"', "\\\"");
+    
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+try:
+    response = requests.get('http://127.0.0.1:8778/models/local', params={{"base_url": "{}"}})
+    result = {{
+        "success": response.status_code == 200,
+        "data": response.json() if response.status_code == 200 else None,
+        "error": None if response.status_code == 200 else response.text
+    }}
+    print(json.dumps(result))
+except Exception as e:
+    result = {{
+        "success": False,
+        "data": None,
+        "error": str(e)
+    }}
+    print(json.dumps(result))
+"#,
+        base_url_escaped
+    );
+
+    let output = Command::new("python")
+        .arg("-c")
+        .arg(&python_script)
+        .output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    Ok(output_str.to_string())
+}
+
+#[tauri::command]
 async fn start_python_backend() -> Result<String, String> {
     const BACKEND_PORT: u16 = 8778;
     let health_url = format!("http://127.0.0.1:{}/health", BACKEND_PORT);
@@ -671,6 +886,13 @@ pub fn run() {
             get_audit_log,
             get_desensitization_log,
             evaluation_generate,
+            chat_query,
+            get_local_models,
+            get_directories,
+            create_directory,
+            move_document,
+            move_directory,
+            delete_directory,
             start_python_backend
         ])
         .run(tauri::generate_context!())

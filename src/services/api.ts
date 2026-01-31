@@ -7,6 +7,8 @@ export interface Document {
   fileType: string;
   uploadTime: string;
   processed: boolean;
+  processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+  processingMessage?: string;
   textContent?: string;
   chunks?: string[];
 }
@@ -31,7 +33,51 @@ export interface FinetuningJob {
   createdAt?: string;
 }
 
-async function parsePythonResponse(response: string): Promise<any> {
+export interface DirectoryNode {
+  id: number;
+  name: string;
+  type: 'directory' | 'file';
+  fileType?: string;
+  processed?: boolean;
+  uploadTime?: string;
+  children?: DirectoryNode[];
+  parentId?: number | null;
+  directoryId?: number | null;
+}
+
+export async function getDirectories(): Promise<DirectoryNode[]> {
+  try {
+    const response = await invoke<string>('get_directories');
+    const data = await parsePythonResponse(response);
+    return data?.tree ?? [];
+  } catch (error) {
+    console.error('Get directories error:', error);
+    return [];
+  }
+}
+
+export async function createDirectory(name: string, parentId?: number): Promise<{ id: number }> {
+  const response = await invoke<string>('create_directory', { name, parentId: parentId ?? null });
+  const data = await parsePythonResponse(response);
+  return data;
+}
+
+export async function moveDocument(documentId: number, directoryId?: number): Promise<void> {
+  const response = await invoke<string>('move_document', { documentId, directoryId: directoryId ?? null });
+  await parsePythonResponse(response);
+}
+
+export async function moveDirectory(directoryId: number, parentId?: number): Promise<void> {
+  const response = await invoke<string>('move_directory', { directoryId, parentId: parentId ?? null });
+  await parsePythonResponse(response);
+}
+
+export async function deleteDirectory(directoryId: number): Promise<void> {
+  const response = await invoke<string>('delete_directory', { directoryId });
+  await parsePythonResponse(response);
+}
+
+export async function parsePythonResponse(response: string): Promise<any> {
   try {
     const result = JSON.parse(response.trim());
     if (result.success) {
@@ -95,27 +141,57 @@ export async function deleteDocument(documentId: number): Promise<void> {
   }
 }
 
-export async function getKnowledgePoints(): Promise<string[]> {
+export interface KnowledgePoint {
+  content: string;
+  document_id: number;
+  document_name: string;
+  chunk_index: number;
+}
+
+export interface PaginatedResponse<T> {
+  knowledge_points: T[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export async function getKnowledgePoints(page: number = 1, pageSize: number = 50, documentId?: number): Promise<PaginatedResponse<KnowledgePoint>> {
   try {
-    const response = await invoke<string>('get_knowledge_points');
+    const response = await invoke<string>('get_knowledge_points', {
+        page,
+        pageSize,
+        documentId: documentId ?? null
+    });
     const data = await parsePythonResponse(response);
-    return data?.knowledge_points ?? [];
+    return {
+        knowledge_points: data?.knowledge_points ?? [],
+        total: data?.total ?? 0,
+        page: data?.page ?? 1,
+        page_size: data?.page_size ?? 50
+    };
   } catch (error) {
     console.error('Get knowledge points error:', error);
-    return [];
+    return { knowledge_points: [], total: 0, page: 1, page_size: 50 };
   }
 }
 
 export async function generateAnnotations(
-  knowledgePoints: string[],
+  knowledgePoints: string[] | KnowledgePoint[],
   apiKey: string,
-  model: string = 'deepseek-chat'
+  model: string = 'deepseek-chat',
+  baseUrl?: string
 ): Promise<Annotation[]> {
+  // Extract content string if input is KnowledgePoint object
+  const kpContents = knowledgePoints.map(kp => 
+    typeof kp === 'string' ? kp : kp.content
+  );
+  
   try {
     const response = await invoke<string>('generate_annotations', {
-      knowledgePoints,
+      knowledgePoints: kpContents,
       apiKey,
-      model
+      model,
+      baseUrl: baseUrl ?? null
     });
     const data = await parsePythonResponse(response);
     if (data?.error) {
@@ -278,3 +354,30 @@ export async function evaluationGenerate(
   });
   return await parsePythonResponse(response);
 }
+
+export async function getLocalModels(baseUrl?: string): Promise<string[]> {
+  try {
+    const response = await invoke<string>('get_local_models', { baseUrl: baseUrl ?? null });
+    const data = await parsePythonResponse(response);
+    return data?.models ?? [];
+  } catch (error) {
+    console.error('Get local models error:', error);
+    return [];
+  }
+}
+
+export async function chatQuery(
+  query: string,
+  apiKey?: string,
+  model: string = 'deepseek-chat',
+  baseUrl?: string
+): Promise<{ answer: string; context: string; sources: any[] }> {
+  const response = await invoke<string>('chat_query', {
+    query,
+    apiKey: apiKey ?? null,
+    model,
+    baseUrl: baseUrl ?? null
+  });
+  return await parsePythonResponse(response);
+}
+

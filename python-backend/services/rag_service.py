@@ -83,7 +83,7 @@ class RAGService:
         
         return chunks
     
-    def add_to_vector_store(self, knowledge_points: List[Dict[str, Any]], collection_name: str):
+    def add_to_vector_store(self, knowledge_points: List[Dict[str, Any]], collection_name: str = "global_knowledge_base"):
         """Add knowledge points to Chroma vector store"""
         if not self.client:
             return  # Skip if chromadb not available
@@ -93,7 +93,17 @@ class RAGService:
             
             ids = [kp["id"] for kp in knowledge_points]
             documents = [kp["content"] for kp in knowledge_points]
-            metadatas = [{"chunk_index": kp["chunk_index"]} for kp in knowledge_points]
+            # Add document_id to metadata for filtering/deletion
+            metadatas = []
+            for kp in knowledge_points:
+                # Extract document_id from kp["id"] which is f"{document_id}_chunk_{i}"
+                # But better to pass it explicitly or parse it. 
+                # In structure_document, id is f"{document_id}_chunk_{i}"
+                doc_id_str = kp["id"].split("_chunk_")[0]
+                metadatas.append({
+                    "chunk_index": kp["chunk_index"],
+                    "document_id": doc_id_str
+                })
             
             collection.add(
                 ids=ids,
@@ -102,8 +112,22 @@ class RAGService:
             )
         except Exception as e:
             print(f"Warning: Failed to add to vector store: {e}")
+
+    def delete_document(self, document_id: str, collection_name: str = "global_knowledge_base"):
+        """Delete all chunks for a document from vector store"""
+        if not self.client:
+            return
+            
+        try:
+            collection = self.client.get_collection(name=collection_name)
+            # Delete where document_id matches
+            collection.delete(
+                where={"document_id": str(document_id)}
+            )
+        except Exception as e:
+            print(f"Warning: Failed to delete document from vector store: {e}")
     
-    def search_similar(self, query: str, collection_name: str, n_results: int = 5) -> List[Dict[str, Any]]:
+    def search_similar(self, query: str, collection_name: str = "global_knowledge_base", n_results: int = 5) -> List[Dict[str, Any]]:
         """Search for similar knowledge points"""
         if not self.client:
             return []
@@ -114,7 +138,18 @@ class RAGService:
                 query_texts=[query],
                 n_results=n_results
             )
-            return results
+            
+            # Format results
+            formatted_results = []
+            if results and results['documents']:
+                for i, doc in enumerate(results['documents'][0]):
+                    formatted_results.append({
+                        "content": doc,
+                        "metadata": results['metadatas'][0][i] if results['metadatas'] else {},
+                        "id": results['ids'][0][i] if results['ids'] else ""
+                    })
+            
+            return formatted_results
         except Exception as e:
             print(f"Warning: Failed to search vector store: {e}")
             return []

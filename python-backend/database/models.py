@@ -10,6 +10,18 @@ from datetime import datetime
 Base = declarative_base()
 
 
+class Directory(Base):
+    __tablename__ = "directories"
+    
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    parent_id = Column(Integer, ForeignKey("directories.id", ondelete="CASCADE"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    parent = relationship("Directory", remote_side=[id], backref="children")
+    documents = relationship("Document", back_populates="directory")
+
+
 class Document(Base):
     __tablename__ = "documents"
     
@@ -17,10 +29,15 @@ class Document(Base):
     filename = Column(String(255), nullable=False)
     file_path = Column(String(500))
     file_type = Column(String(50))
+    directory_id = Column(Integer, ForeignKey("directories.id", ondelete="SET NULL"), nullable=True)
     upload_time = Column(DateTime, default=datetime.utcnow)
     processed = Column(Boolean, default=False)
+    # processing_status: 'pending', 'processing', 'completed', 'failed'
+    processing_status = Column(String(50), default='pending') 
+    processing_message = Column(Text) # Error message or progress details
     text_content = Column(Text)
     
+    directory = relationship("Directory", back_populates="documents")
     knowledge_points = relationship("KnowledgePoint", back_populates="document")
     annotations = relationship("Annotation", back_populates="document")
 

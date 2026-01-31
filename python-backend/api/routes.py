@@ -2,7 +2,7 @@
 API Routes for Python Backend
 FastAPI routes for document processing, annotation, and fine-tuning
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Body
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Body, BackgroundTasks
 from typing import List, Dict, Any
 import os
 import json
@@ -11,7 +11,7 @@ import tempfile
 
 logger = logging.getLogger(__name__)
 from datetime import datetime
-from database.models import Document, KnowledgePoint, Annotation as AnnotationModel, FinetuningJob, APIKey, init_database
+from database.models import Document, KnowledgePoint, Annotation as AnnotationModel, FinetuningJob, APIKey, Directory, init_database
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 
@@ -34,9 +34,166 @@ DESENSITIZATION_LOG_PATH = os.path.join(BACKEND_DIR, "desensitization.log")
 def get_db_session():
     return Session(engine)
 
+@router.get("/directories")
+async def list_directories():
+    """List all directories and files in tree structure"""
+    db = get_db_session()
+    try:
+        directories = db.query(Directory).all()
+        documents = db.query(Document).all()
+        
+        # Build tree
+        dir_map = {}
+        root_dirs = []
+        
+        # 1. Create directory nodes
+        for d in directories:
+            dir_map[d.id] = {
+                "id": d.id,
+                "name": d.name,
+                "type": "directory",
+                "children": [],
+                "parentId": d.parent_id
+            }
+            
+        # 2. Add files to directory nodes
+        root_files = []
+        for doc in documents:
+            file_node = {
+                "id": doc.id,
+                "name": doc.filename,
+                "type": "file",
+                "fileType": doc.file_type,
+                "processed": doc.processed,
+                "uploadTime": doc.upload_time.isoformat() if doc.upload_time else None,
+                "directoryId": doc.directory_id
+            }
+            if doc.directory_id and doc.directory_id in dir_map:
+                dir_map[doc.directory_id]["children"].append(file_node)
+            else:
+                root_files.append(file_node)
+                
+        # 3. Assemble directory tree
+        for d_id, node in dir_map.items():
+            if node["parentId"] and node["parentId"] in dir_map:
+                dir_map[node["parentId"]]["children"].append(node)
+            else:
+                root_dirs.append(node)
+                
+        return {"tree": root_dirs + root_files}
+    finally:
+        db.close()
+
+@router.post("/directories")
+async def create_directory(body: Dict[str, Any] = Body(...)):
+    """Create a new directory"""
+    name = body.get("name")
+    parent_id = body.get("parent_id")
+    
+    if not name:
+        raise HTTPException(status_code=400, detail="Name required")
+        
+    db = get_db_session()
+    try:
+        new_dir = Directory(name=name, parent_id=parent_id)
+        db.add(new_dir)
+        db.commit()
+        return {"success": True, "id": new_dir.id}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@router.put("/documents/{document_id}/move")
+async def move_document(document_id: int, body: Dict[str, Any] = Body(...)):
+    """Move document to a directory"""
+    directory_id = body.get("directory_id") # None means root
+    
+    db = get_db_session()
+    try:
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if not doc:
+            raise HTTPException(status_code=404, detail="Document not found")
+            
+        doc.directory_id = directory_id
+        db.commit()
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+@router.put("/directories/{directory_id}/move")
+async def move_directory(directory_id: int, body: Dict[str, Any] = Body(...)):
+    """Move directory to another directory"""
+    parent_id = body.get("parent_id") # None means root
+    
+    if directory_id == parent_id:
+        raise HTTPException(status_code=400, detail="Cannot move directory into itself")
+    
+    db = get_db_session()
+    try:
+        # Check for circular dependency
+        if parent_id:
+            current = parent_id
+            while current:
+                if current == directory_id:
+                     raise HTTPException(status_code=400, detail="Circular dependency detected")
+                parent = db.query(Directory).filter(Directory.id == current).first()
+                current = parent.parent_id if parent else None
+
+        dir_obj = db.query(Directory).filter(Directory.id == directory_id).first()
+        if not dir_obj:
+            raise HTTPException(status_code=404, detail="Directory not found")
+            
+        dir_obj.parent_id = parent_id
+        db.commit()
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+        
+@router.delete("/directories/{directory_id}")
+async def delete_directory(directory_id: int):
+    """Delete a directory (cascade delete is handled by DB)"""
+    db = get_db_session()
+    try:
+        dir_obj = db.query(Directory).filter(Directory.id == directory_id).first()
+        if not dir_obj:
+            # Check if directory exists before trying to delete
+            # If not found, maybe it was already deleted, so we can return success or 404
+            # Returning 404 is more standard
+            raise HTTPException(status_code=404, detail="Directory not found")
+        
+        # Note: Actual file deletion for documents inside needs to be handled if we want to delete physical files
+        # For now, let's just delete the DB entries. 
+        # Ideally, we should iterate and delete physical files for all documents in this tree.
+        # But since SQLite cascade delete might not trigger python logic, we might leave orphan files.
+        # A simple approach is to rely on a periodic cleanup task or just keep files.
+        # Or recursively delete here.
+        
+        db.delete(dir_obj)
+        db.commit()
+        return {"success": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
 @router.post("/documents/upload")
-async def upload_document(file: UploadFile = File(...)):
-    """Upload and process a document"""
+async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Upload a document and start processing in background"""
     tmp_path = None
     db = None
     try:
@@ -51,92 +208,106 @@ async def upload_document(file: UploadFile = File(...)):
             content = await file.read()
             f.write(content)
         
-        # Process document
-        from services.document_processor import DocumentProcessor
-        processor = DocumentProcessor()
         file_type = os.path.splitext(file.filename)[1][1:].lower()
-        result = processor.process_document(tmp_path, file_type)
         
-        # Check if processing was successful
-        if "error" in result:
-            if tmp_path and os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except:
-                    pass
-            raise HTTPException(status_code=400, detail=f"Document processing failed: {result.get('error', 'Unknown error')}")
-        
-        # Validate that we have text content
-        cleaned_text = result.get("cleaned_text", "")
-        if not cleaned_text or len(cleaned_text.strip()) == 0:
-            if tmp_path and os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except:
-                    pass
-            raise HTTPException(status_code=400, detail="Document processing resulted in empty content. The file may be corrupted or unsupported.")
-        
-        # Save to database
+        # Save to database with status 'pending'
         db = get_db_session()
         try:
             doc = Document(
                 filename=file.filename,
                 file_path=tmp_path,
                 file_type=file_type,
-                text_content=cleaned_text,
-                processed=True
+                processing_status='pending',
+                processing_message='Waiting for processing...',
+                processed=False
             )
             db.add(doc)
-            db.flush()  # Flush to get the ID without committing
-            
-            # Save knowledge points
-            from services.rag_service import RAGService
-            rag = RAGService()
-            knowledge_points = rag.structure_document(cleaned_text, str(doc.id))
-            
-            # Only add to vector store if we have valid knowledge points
-            if knowledge_points and len(knowledge_points) > 0:
-                rag.add_to_vector_store(knowledge_points, f"doc_{doc.id}")
-            
-            for kp in knowledge_points:
-                kp_db = KnowledgePoint(
-                    document_id=doc.id,
-                    content=kp["content"],
-                    chunk_index=kp["chunk_index"],
-                    tags="[]"
-                )
-                db.add(kp_db)
-            
             db.commit()
             
-            result["document_id"] = doc.id
-            result["knowledge_points_count"] = len(knowledge_points)
+            # Start background processing
+            background_tasks.add_task(process_document_background, doc.id, tmp_path, file_type)
             
-            return result
-        except HTTPException:
-            raise
+            return {"document_id": doc.id, "status": "pending", "message": "Document uploaded and processing started"}
         except Exception as e:
             db.rollback()
-            # Clean up file if database save failed
             if tmp_path and os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except:
-                    pass
+                os.remove(tmp_path)
             raise HTTPException(status_code=500, detail=f"Failed to save document to database: {str(e)}")
         finally:
-            if db:
-                db.close()
+            db.close()
     except HTTPException:
         raise
     except Exception as e:
-        # Clean up file on any error
         if tmp_path and os.path.exists(tmp_path):
-            try:
-                os.remove(tmp_path)
-            except:
-                pass
+            os.remove(tmp_path)
         raise HTTPException(status_code=500, detail=str(e))
+
+def process_document_background(document_id: int, file_path: str, file_type: str):
+    """Background task to process document"""
+    db = get_db_session()
+    try:
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if not doc:
+            return
+            
+        doc.processing_status = 'processing'
+        doc.processing_message = 'Extracting text...'
+        db.commit()
+        
+        # Process document
+        from services.document_processor import DocumentProcessor
+        processor = DocumentProcessor()
+        result = processor.process_document(file_path, file_type)
+        
+        if "error" in result:
+            doc.processing_status = 'failed'
+            doc.processing_message = result.get("error", "Unknown error")
+            db.commit()
+            return
+            
+        cleaned_text = result.get("cleaned_text", "")
+        if not cleaned_text or len(cleaned_text.strip()) == 0:
+            doc.processing_status = 'failed'
+            doc.processing_message = "Empty content extracted"
+            db.commit()
+            return
+            
+        doc.text_content = cleaned_text
+        doc.processing_message = 'Generating knowledge points...'
+        db.commit()
+        
+        # Generate knowledge points
+        from services.rag_service import RAGService
+        rag = RAGService()
+        knowledge_points = rag.structure_document(cleaned_text, str(doc.id))
+        
+        if knowledge_points and len(knowledge_points) > 0:
+            rag.add_to_vector_store(knowledge_points, f"doc_{doc.id}")
+        
+        for kp in knowledge_points:
+            kp_db = KnowledgePoint(
+                document_id=doc.id,
+                content=kp["content"],
+                chunk_index=kp["chunk_index"],
+                tags="[]"
+            )
+            db.add(kp_db)
+        
+        doc.processed = True
+        doc.processing_status = 'completed'
+        doc.processing_message = f"Processed successfully. {len(knowledge_points)} knowledge points generated."
+        db.commit()
+        
+    except Exception as e:
+        logger.error(f"Background processing failed for doc {document_id}: {e}")
+        try:
+            doc.processing_status = 'failed'
+            doc.processing_message = str(e)
+            db.commit()
+        except:
+            pass
+    finally:
+        db.close()
 
 @router.get("/documents")
 async def list_documents():
@@ -151,7 +322,9 @@ async def list_documents():
                 "filename": doc.filename,
                 "fileType": doc.file_type,
                 "uploadTime": doc.upload_time.isoformat() if doc.upload_time else None,
-                "processed": doc.processed
+                "processed": doc.processed,
+                "processingStatus": doc.processing_status,
+                "processingMessage": doc.processing_message
             }
             for doc in documents
         ]
@@ -163,15 +336,39 @@ async def list_documents():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/documents/knowledge-points")
-async def list_knowledge_points():
-    """List all knowledge points from all documents (for Training Lab)"""
+async def list_knowledge_points(page: int = 1, page_size: int = 50, document_id: int = None):
+    """List knowledge points with pagination"""
     db = None
     try:
         db = get_db_session()
-        points = db.query(KnowledgePoint).order_by(KnowledgePoint.document_id, KnowledgePoint.chunk_index).all()
-        result = [kp.content for kp in points if kp.content]
+        query = db.query(KnowledgePoint, Document).join(Document, KnowledgePoint.document_id == Document.id)
+        
+        if document_id:
+            query = query.filter(KnowledgePoint.document_id == document_id)
+            
+        total = query.count()
+        points = query.order_by(KnowledgePoint.document_id, KnowledgePoint.chunk_index)\
+                      .offset((page - 1) * page_size)\
+                      .limit(page_size)\
+                      .all()
+        
+        result = []
+        for kp, doc in points:
+            if kp.content:
+                result.append({
+                    "content": kp.content,
+                    "document_id": doc.id,
+                    "document_name": doc.filename,
+                    "chunk_index": kp.chunk_index
+                })
+                
         db.close()
-        return {"knowledge_points": result}
+        return {
+            "knowledge_points": result,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
     except Exception as e:
         if db:
             db.close()
@@ -251,13 +448,14 @@ async def generate_annotations(body: Dict[str, Any] = Body(...)):
             knowledge_points = []
     api_key = body.get("api_key", "")
     model = body.get("model", "deepseek-chat")
+    base_url = body.get("base_url")
 
     logger.info(
         "annotations/generate: request received, knowledge_points_count=%d, model=%s, api_key_set=%s",
         len(knowledge_points), model, bool(api_key),
     )
 
-    service = AnnotationService(api_key=api_key, model=model)
+    service = AnnotationService(api_key=api_key, model=model, base_url=base_url)
 
     annotations = []
     errors = []
@@ -582,3 +780,89 @@ async def evaluation_generate(body: Dict[str, Any] = Body(...)):
     if "error" in result:
         raise HTTPException(status_code=500, detail=result["error"])
     return result
+
+@router.get("/models/local")
+async def list_local_models(base_url: str = "http://localhost:11434"):
+    """List available local models from Ollama"""
+    import requests
+    try:
+        # Clean up base_url to ensure it doesn't end with /v1 if we are hitting /api/tags
+        # Ollama standard API is at /api/tags. OpenAI compatible is /v1/models
+        # Let's try /api/tags first as it gives more info usually, or /v1/models
+        
+        target_url = base_url.rstrip("/")
+        if target_url.endswith("/v1"):
+            target_url = target_url[:-3]
+            
+        # Try /api/tags (Ollama native)
+        try:
+            resp = requests.get(f"{target_url}/api/tags", timeout=2)
+            if resp.status_code == 200:
+                models = resp.json().get("models", [])
+                return {"models": [m["name"] for m in models]}
+        except:
+            pass
+            
+        # Try /v1/models (OpenAI compatible)
+        try:
+            resp = requests.get(f"{target_url}/v1/models", timeout=2)
+            if resp.status_code == 200:
+                data = resp.json()
+                # OpenAI format: {"data": [{"id": "model-name", ...}]}
+                return {"models": [m["id"] for m in data.get("data", [])]}
+        except:
+            pass
+            
+        return {"models": []}
+    except Exception as e:
+        logger.error(f"Failed to list local models: {e}")
+        return {"models": [], "error": str(e)}
+
+@router.post("/chat/query")
+async def chat_query(body: Dict[str, Any] = Body(...)):
+    """Chat with the knowledge base"""
+    query = body.get("query", "")
+    api_key = body.get("api_key", "")
+    model = body.get("model", "deepseek-chat")
+    base_url = body.get("base_url")
+    
+    if not query:
+        raise HTTPException(status_code=400, detail="Query is required")
+
+    try:
+        # 1. Search Knowledge Base
+        from services.rag_service import RAGService
+        rag = RAGService()
+        
+        # Search global collection
+        search_results = rag.search_similar(query, n_results=5)
+        
+        context = ""
+        if search_results:
+            context = "\n\n".join([f"Document chunk {i+1}:\n{r['content']}" for i, r in enumerate(search_results)])
+        else:
+            context = "No specific documents found in knowledge base."
+
+        # 2. Generate Answer
+        from services.annotation_service import AnnotationService
+        # Use provided api_key or fallback to None (service might use env var or default)
+        service = AnnotationService(api_key=api_key if api_key else None, model=model, base_url=base_url)
+        
+        # Use generate_qa_pair logic but adapted for chat
+        # generate_qa_pair takes (context, question) and returns {question, answer}
+        # We can just use the answer part.
+        
+        result = service.generate_qa_pair(context=context, question=query)
+        
+        if "error" in result:
+             # Fallback or error
+             return {"answer": f"Error generating response: {result['error']}", "context": context}
+             
+        return {
+            "answer": result.get("answer", "No answer generated."),
+            "context": context, # Optional: return context for UI reference
+            "sources": [r.get("metadata", {}) for r in search_results]
+        }
+    except Exception as e:
+        logger.error(f"Chat query error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

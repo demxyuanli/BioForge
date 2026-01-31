@@ -8,7 +8,7 @@ import './VSLayout.css';
 
 export type ActivityType = 'dashboard' | 'datacenter' | 'training' | 'production' | 'evaluation' | 'privacy';
 export type BottomPanelTab = 'output' | 'logs' | 'problems';
-export type RightPanelTab = 'properties' | 'details' | 'help';
+export type RightPanelTab = 'properties' | 'details' | 'help' | 'chat';
 
 interface VSLayoutProps {
   children: ReactNode;
@@ -286,6 +286,7 @@ const VSLayout: React.FC<VSLayoutProps> = ({
               onTabChange={setRightPanelTab}
               onClose={() => setRightPanelVisible(false)}
               content={rightPanelContent}
+              activeActivity={activeActivity}
             />
           </div>
         )}

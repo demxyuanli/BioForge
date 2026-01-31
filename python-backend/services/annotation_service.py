@@ -5,24 +5,35 @@ Handles automatic generation of instruction pairs and Q&A pairs via DeepSeek API
 import logging
 from typing import List, Dict, Any
 from openai import OpenAI
-
+import requests
+import json
 
 DEEPSEEK_BASE_URL = "https://api.deepseek.com"
 logger = logging.getLogger(__name__)
 
 
 class AnnotationService:
-    def __init__(self, api_key: str = None, model: str = "deepseek-chat"):
+    def __init__(self, api_key: str = None, model: str = "deepseek-chat", base_url: str = None):
         self.api_key = api_key
         self.model = model
+        self.base_url = base_url
         self._client = None
+        # self._is_ollama flag is removed in favor of direct base_url check
 
     def _get_client(self) -> OpenAI:
         if self._client is None:
-            self._client = OpenAI(
-                api_key=self.api_key or "",
-                base_url=DEEPSEEK_BASE_URL,
-            )
+            if self.base_url and self.base_url.strip():
+                # Use provided base_url (Ollama, vLLM, local, etc.)
+                self._client = OpenAI(
+                    api_key=self.api_key or "ollama", # Many local servers need non-empty key
+                    base_url=self.base_url,
+                )
+            else:
+                # Default to DeepSeek Cloud
+                self._client = OpenAI(
+                    api_key=self.api_key or "",
+                    base_url=DEEPSEEK_BASE_URL,
+                )
         return self._client
 
     def generate_instruction_pair(self, knowledge_point: str) -> Dict[str, Any]:
@@ -31,6 +42,7 @@ class AnnotationService:
         Returns dict with 'instruction' and 'response' fields
         """
         prompt = f"""Based on the following knowledge point, generate a high-quality instruction-response pair for fine-tuning.
+The output MUST be in Chinese (Simplified).
 
 Knowledge Point:
 {knowledge_point}
@@ -38,8 +50,8 @@ Knowledge Point:
 Generate an instruction that would help a model learn this knowledge, and provide an appropriate response.
 
 Format:
-Instruction: [instruction text]
-Response: [response text]"""
+Instruction: [instruction text in Chinese]
+Response: [response text in Chinese]"""
 
         kp_preview = (knowledge_point[:60] + "...") if len(knowledge_point) > 60 else knowledge_point
         logger.info("AnnotationService: calling DeepSeek API, model=%s, kp_preview=%r", self.model, kp_preview)
@@ -49,7 +61,7 @@ Response: [response text]"""
             response = client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "system", "content": "You are a helpful assistant. You must output in Chinese."},
                     {"role": "user", "content": prompt},
                 ],
                 stream=False,
@@ -71,30 +83,51 @@ Response: [response text]"""
 
 Question: {question}
 
-Generate a comprehensive answer based on the context."""
+Generate a comprehensive answer based on the context. The answer MUST be in Chinese (Simplified)."""
+            try:
+                client = self._get_client()
+                response = client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant. You must output in Chinese."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    stream=False,
+                )
+                content = response.choices[0].message.content
+                return {
+                    "question": question,
+                    "answer": content.strip()
+                }
+            except Exception as e:
+                return {"error": str(e)}
         else:
             prompt = f"""Based on the following context, generate a question-answer pair.
+The output MUST be in Chinese (Simplified).
 
 Context:
 {context}
 
-Generate a relevant question and provide a detailed answer."""
+Generate a relevant question and provide a detailed answer.
 
-        try:
-            client = self._get_client()
-            response = client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt},
-                ],
-                stream=False,
-            )
-            content = response.choices[0].message.content
-            qa_pair = self._parse_qa_pair(content)
-            return qa_pair
-        except Exception as e:
-            return {"error": str(e)}
+Format:
+Question: [question text in Chinese]
+Answer: [answer text in Chinese]"""
+            try:
+                client = self._get_client()
+                response = client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": "You are a helpful assistant. You must output in Chinese."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    stream=False,
+                )
+                content = response.choices[0].message.content
+                qa_pair = self._parse_qa_pair(content)
+                return qa_pair
+            except Exception as e:
+                return {"error": str(e)}
 
     def generate_dpo_format(self, instruction: str, chosen_response: str, rejected_response: str) -> Dict[str, Any]:
         """

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { generateAnnotations, Annotation, getKnowledgePoints, saveTrainingSet } from '../services/api';
+import { generateAnnotations, Annotation, getKnowledgePoints, saveTrainingSet, getLocalModels } from '../services/api';
 
 const TrainingLab: React.FC = () => {
   const { t } = useTranslation();
@@ -8,12 +8,41 @@ const TrainingLab: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [selectedModel, setSelectedModel] = useState('deepseek-chat');
+  const [localModelName, setLocalModelName] = useState('qwen2.5:7b');
+  const [localBaseUrl, setLocalBaseUrl] = useState('http://localhost:11434/v1');
+  const [useLocalModel, setUseLocalModel] = useState(false);
+  const [availableLocalModels, setAvailableLocalModels] = useState<string[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [knowledgePoints, setKnowledgePoints] = useState<string[]>([]);
   const [savingForFinetuning, setSavingForFinetuning] = useState(false);
 
   useEffect(() => {
     loadKnowledgePoints();
   }, []);
+
+  useEffect(() => {
+    if (useLocalModel) {
+      fetchLocalModels();
+    }
+  }, [useLocalModel]);
+
+  const fetchLocalModels = async () => {
+    setIsFetchingModels(true);
+    try {
+      const models = await getLocalModels(localBaseUrl);
+      setAvailableLocalModels(models);
+      if (models.length > 0 && !models.includes(localModelName)) {
+        // If current name is default and not in list, switch to first available
+        if (localModelName === 'qwen2.5:7b') {
+             setLocalModelName(models[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch local models:', error);
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
 
   const loadKnowledgePoints = async () => {
     try {
@@ -25,7 +54,7 @@ const TrainingLab: React.FC = () => {
   };
 
   const handleGenerateAnnotations = async () => {
-    if (!apiKey) {
+    if (!useLocalModel && !apiKey) {
       alert(t('trainingLab.pleaseEnterApiKey'));
       return;
     }
@@ -39,8 +68,9 @@ const TrainingLab: React.FC = () => {
     try {
       const generated = await generateAnnotations(
         knowledgePoints.slice(0, 10),
-        apiKey,
-        selectedModel
+        useLocalModel ? 'ollama' : apiKey,
+        useLocalModel ? localModelName : selectedModel,
+        useLocalModel ? localBaseUrl : undefined
       );
       setAnnotations(generated);
     } catch (error) {
@@ -104,29 +134,82 @@ const TrainingLab: React.FC = () => {
       </div>
 
       <div className="config-section">
-        <div className="form-group">
-          <label>{t('trainingLab.apiKey')}:</label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder={t('trainingLab.enterApiKey')}
-          />
+        <div className="form-group" style={{ marginBottom: '16px' }}>
+          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={useLocalModel}
+              onChange={(e) => setUseLocalModel(e.target.checked)}
+              style={{ marginRight: '8px' }}
+            />
+            {t('trainingLab.useLocalModel') || 'Use Local Model (Ollama)'}
+          </label>
         </div>
-        <div className="form-group">
-          <label>{t('trainingLab.model')}:</label>
-          <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
-            <option value="deepseek-chat">DeepSeek Chat</option>
-            <option value="deepseek-r1">DeepSeek R1</option>
-          </select>
-        </div>
+
+        {!useLocalModel ? (
+          <>
+            <div className="form-group">
+              <label>{t('trainingLab.apiKey')}:</label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={t('trainingLab.enterApiKey')}
+              />
+            </div>
+            <div className="form-group">
+              <label>{t('trainingLab.model')}:</label>
+              <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
+                <option value="deepseek-chat">DeepSeek Chat</option>
+                <option value="deepseek-r1">DeepSeek R1</option>
+              </select>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="form-group">
+              <label>{t('trainingLab.localModelName') || 'Local Model Name'}:</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  list="local-models-list"
+                  type="text"
+                  value={localModelName}
+                  onChange={(e) => setLocalModelName(e.target.value)}
+                  placeholder="e.g., qwen2.5:7b"
+                  style={{ flex: 1 }}
+                />
+                <datalist id="local-models-list">
+                  {availableLocalModels.map(m => <option key={m} value={m} />)}
+                </datalist>
+                <button 
+                  onClick={fetchLocalModels} 
+                  title="Refresh Models"
+                  style={{ padding: '0 8px', minWidth: '32px' }}
+                  disabled={isFetchingModels}
+                >
+                  {isFetchingModels ? '...' : '\u21bb'}
+                </button>
+              </div>
+            </div>
+            <div className="form-group">
+              <label>{t('trainingLab.localBaseUrl') || 'Local Base URL'}:</label>
+              <input
+                type="text"
+                value={localBaseUrl}
+                onChange={(e) => setLocalBaseUrl(e.target.value)}
+                onBlur={() => { if(useLocalModel) fetchLocalModels(); }}
+                placeholder="e.g., http://localhost:11434/v1"
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="actions">
         <button onClick={loadKnowledgePoints}>
           {t('trainingLab.refreshKnowledgePoints')}
         </button>
-        <button onClick={handleGenerateAnnotations} disabled={isGenerating || !apiKey}>
+        <button onClick={handleGenerateAnnotations} disabled={isGenerating || (!useLocalModel && !apiKey)}>
           {isGenerating ? t('trainingLab.generating') : t('trainingLab.generateInstructionPairs')}
         </button>
         <button onClick={handleSaveForFinetuning} disabled={annotations.length === 0 || savingForFinetuning}>
