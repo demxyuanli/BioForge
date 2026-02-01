@@ -2,28 +2,40 @@
 API Routes for Python Backend
 FastAPI routes for document processing, annotation, and fine-tuning
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Body, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Body, BackgroundTasks, Query
+from fastapi.responses import Response
 from typing import List, Dict, Any
 import os
 import json
 import logging
 import tempfile
+import random
+import shutil
 
 logger = logging.getLogger(__name__)
 from datetime import datetime
-from database.models import Document, KnowledgePoint, Annotation as AnnotationModel, FinetuningJob, APIKey, Directory, init_database
+from database.models import Document, KnowledgePoint, Annotation as AnnotationModel, FinetuningJob, APIKey, Directory, MountPoint, MountPointFileMeta, init_database
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
+from services.libreoffice_parser import is_office_extension, convert_to_pdf
 
 router = APIRouter()
 
-# Initialize database
+# Initialize database and documents dir from config or defaults
 BACKEND_DIR = os.path.join(os.path.dirname(__file__), "..")
-db_path = os.path.join(BACKEND_DIR, "privatetune.db")
+db_path = os.getenv("BIOFORGER_DB_PATH") or os.path.join(BACKEND_DIR, "privatetune.db")
 engine = init_database(db_path)
 
-# Documents storage directory
-DOCUMENTS_DIR = os.path.join(BACKEND_DIR, "documents")
+# Documents storage directory (multi-dir random storage to avoid single-dir file count limits)
+DOCUMENTS_DIR = os.getenv("BIOFORGER_DOCUMENTS_DIR") or os.path.join(BACKEND_DIR, "documents")
+STORAGE_SUBDIR_COUNT = 256
+
+def _get_random_storage_dir() -> str:
+    subdir = format(random.randint(0, STORAGE_SUBDIR_COUNT - 1), "02x")
+    path = os.path.join(DOCUMENTS_DIR, subdir)
+    os.makedirs(path, exist_ok=True)
+    return path
+
 os.makedirs(DOCUMENTS_DIR, exist_ok=True)
 
 # Training set and log paths
@@ -84,6 +96,411 @@ async def list_directories():
     finally:
         db.close()
 
+@router.get("/mount-points")
+async def list_mount_points():
+    """List all mount points (OS directories attached to the system). Deduplicated by path."""
+    db = get_db_session()
+    try:
+        points = db.query(MountPoint).order_by(MountPoint.created_at.desc()).all()
+        seen_paths = set()
+        result = []
+        for mp in points:
+            norm = _normalize_path(mp.path)
+            if norm and norm not in seen_paths:
+                seen_paths.add(norm)
+                result.append({
+                    "id": mp.id,
+                    "path": mp.path,
+                    "name": mp.name or "",
+                    "description": mp.description or "",
+                    "created_at": mp.created_at.isoformat() if mp.created_at else None,
+                })
+        return result
+    finally:
+        db.close()
+
+
+def _normalize_path(p: str) -> str:
+    return (p or "").replace("\\", "/").rstrip("/").lower()
+
+def _dirname_from_path(p: str) -> str:
+    """Last path segment as display name (mount point name = directory name)."""
+    p = (p or "").replace("\\", "/").rstrip("/")
+    if not p:
+        return ""
+    return p.split("/")[-1] or ""
+
+
+@router.post("/mount-points")
+async def create_mount_point(body: Dict[str, Any] = Body(...)):
+    """Add a mount point: an OS filesystem directory path attached to the system. Path is unique; duplicate returns existing. Name defaults to directory name."""
+    path = (body.get("path") or "").strip()
+    description = (body.get("description") or "").strip() or None
+    if not path:
+        raise HTTPException(status_code=400, detail="path is required")
+    name = _dirname_from_path(path) or None
+    db = get_db_session()
+    try:
+        norm = _normalize_path(path)
+        all_mp = db.query(MountPoint).all()
+        existing = next((mp for mp in all_mp if _normalize_path(mp.path) == norm), None)
+        if existing:
+            db.close()
+            return {
+                "id": existing.id,
+                "path": existing.path,
+                "name": existing.name or "",
+                "description": existing.description or "",
+                "created_at": existing.created_at.isoformat() if existing.created_at else None,
+            }
+        mp = MountPoint(path=path, name=name, description=description)
+        db.add(mp)
+        db.commit()
+        db.refresh(mp)
+        return {
+            "id": mp.id,
+            "path": mp.path,
+            "name": mp.name or "",
+            "description": mp.description or "",
+            "created_at": mp.created_at.isoformat() if mp.created_at else None,
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+DOC_EXTENSIONS = frozenset([
+    "pdf", "doc", "docx", "md", "txt", "jpg", "jpeg", "png",
+    "ppt", "pptx", "wps", "rtf"
+])
+
+# Filename prefixes that indicate temp/hidden files (excluded from mount point listing)
+TEMP_FILENAME_PREFIXES = ("~", "$", ".~", "~$")
+
+
+def _is_temp_or_hidden_file(basename: str) -> bool:
+    """Return True if basename looks like a temp or hidden file (e.g. ~, $, .~lock)."""
+    if not basename or not basename.strip():
+        return True
+    n = basename.strip()
+    if n.startswith("."):
+        return True
+    for p in TEMP_FILENAME_PREFIXES:
+        if n.startswith(p):
+            return True
+    return False
+
+
+RECENT_ANNOTATED_LIMIT = 10
+
+@router.get("/mount-points/recent-annotated-files")
+async def get_recent_annotated_files():
+    """Return mount point files that have a note, ordered by updated_at desc, limit 10. Not knowledge-base files."""
+    db = get_db_session()
+    try:
+        rows = (
+            db.query(MountPointFileMeta, MountPoint)
+            .join(MountPoint, MountPointFileMeta.mount_point_id == MountPoint.id)
+            .filter(MountPointFileMeta.note.isnot(None))
+            .filter(MountPointFileMeta.note != "")
+            .order_by(MountPointFileMeta.updated_at.desc())
+            .limit(RECENT_ANNOTATED_LIMIT)
+            .all()
+        )
+        out = []
+        for meta, mp in rows:
+            rel = (meta.relative_path or "").replace("\\", "/")
+            filename = rel.split("/")[-1] if rel else ""
+            out.append({
+                "mount_point_id": mp.id,
+                "mount_point_name": (mp.name or mp.path or "").strip(),
+                "relative_path": rel,
+                "filename": filename,
+                "note": (meta.note or "").strip(),
+                "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
+            })
+        db.close()
+        return {"items": out}
+    except Exception as e:
+        if db:
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/mount-points/{mp_id}/document-stats")
+async def get_mount_point_document_stats(mp_id: int):
+    """Return document counts inside the mount point (root + all subdirectories recursively). By type for registered extensions."""
+    db = get_db_session()
+    try:
+        mp = db.query(MountPoint).filter(MountPoint.id == mp_id).first()
+        if not mp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Mount point not found")
+        path = (mp.path or "").strip()
+        db.close()
+        if not path or not os.path.isdir(path):
+            return {"total": 0, "by_type": {}}
+        by_type = {}
+        total = 0
+        try:
+            for root, dirs, files in os.walk(path, topdown=True):
+                for f in files:
+                    if _is_temp_or_hidden_file(f):
+                        continue
+                    ext = os.path.splitext(f)[1]
+                    if ext:
+                        ext = ext[1:].lower()
+                    if ext not in DOC_EXTENSIONS:
+                        continue
+                    if ext == "jpeg":
+                        ext = "jpg"
+                    by_type[ext] = by_type.get(ext, 0) + 1
+                    total += 1
+        except (OSError, PermissionError):
+            pass
+        return {"total": total, "by_type": by_type}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/mount-points/{mp_id}/files")
+async def get_mount_point_files(mp_id: int):
+    """Return document file paths inside the mount point, grouped by extension (by_type: ext -> list of relative paths)."""
+    db = get_db_session()
+    try:
+        mp = db.query(MountPoint).filter(MountPoint.id == mp_id).first()
+        if not mp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Mount point not found")
+        path = (mp.path or "").strip()
+        if not path or not os.path.isdir(path):
+            file_meta = {}
+            meta_list = db.query(MountPointFileMeta).filter(MountPointFileMeta.mount_point_id == mp_id).all()
+            for m in meta_list:
+                file_meta[m.relative_path] = {"weight": getattr(m, "weight", 1.0), "note": m.note or ""}
+            db.close()
+            return {"by_type": {}, "file_meta": file_meta}
+        path_rstrip = path.rstrip(os.sep)
+        by_type = {}
+        try:
+            for root, dirs, files in os.walk(path, topdown=True):
+                for f in files:
+                    if _is_temp_or_hidden_file(f):
+                        continue
+                    ext = os.path.splitext(f)[1]
+                    if ext:
+                        ext = ext[1:].lower()
+                    if ext not in DOC_EXTENSIONS:
+                        continue
+                    if ext == "jpeg":
+                        ext = "jpg"
+                    full = os.path.join(root, f)
+                    try:
+                        rel = os.path.relpath(full, path_rstrip)
+                    except ValueError:
+                        rel = full
+                    by_type.setdefault(ext, []).append(rel.replace("\\", "/"))
+        except (OSError, PermissionError):
+            pass
+        file_meta = {}
+        meta_list = db.query(MountPointFileMeta).filter(MountPointFileMeta.mount_point_id == mp_id).all()
+        for m in meta_list:
+            file_meta[m.relative_path] = {"weight": getattr(m, "weight", 1.0), "note": m.note or ""}
+        db.close()
+        return {"by_type": by_type, "file_meta": file_meta}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/mount-points/{mp_id}/files/meta")
+async def update_mount_point_file_meta(mp_id: int, body: Dict[str, Any] = Body(...)):
+    """Upsert weight/note for one file in the mount point. Body: relative_path (required), weight (0-5 optional), note (optional)."""
+    db = get_db_session()
+    try:
+        mp = db.query(MountPoint).filter(MountPoint.id == mp_id).first()
+        if not mp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Mount point not found")
+        rel = (body.get("relative_path") or "").strip()
+        if not rel:
+            db.close()
+            raise HTTPException(status_code=400, detail="relative_path is required")
+        rel = rel.replace("\\", "/")
+        meta = db.query(MountPointFileMeta).filter(
+            MountPointFileMeta.mount_point_id == mp_id,
+            MountPointFileMeta.relative_path == rel,
+        ).first()
+        if meta is None:
+            meta = MountPointFileMeta(mount_point_id=mp_id, relative_path=rel, weight=1.0, note=None)
+            db.add(meta)
+        if "weight" in body and body["weight"] is not None:
+            w = body["weight"]
+            if isinstance(w, (int, float)):
+                w = max(0.0, min(5.0, float(w)))
+                meta.weight = w
+        if "note" in body:
+            meta.note = (body["note"] or "").strip() or None
+        db.commit()
+        db.refresh(meta)
+        out = {"relative_path": meta.relative_path, "weight": meta.weight, "note": meta.note or ""}
+        db.close()
+        return out
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.rollback()
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/mount-points/document-summary")
+async def get_document_summary(mp_id: int = Query(..., alias="mp_id"), relative_path: str = Query(..., alias="relative_path")):
+    """Placeholder for local AI document summary. Returns empty summary (reserved for future)."""
+    db = get_db_session()
+    try:
+        mp = db.query(MountPoint).filter(MountPoint.id == mp_id).first()
+        if not mp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Mount point not found")
+        full_path = os.path.normpath(os.path.join((mp.path or "").strip(), relative_path.replace("/", os.sep)))
+        if not os.path.isfile(full_path):
+            db.close()
+            raise HTTPException(status_code=404, detail="File not found")
+        db.close()
+        return {"summary": ""}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/mount-points/document-preview")
+async def get_document_preview(mp_id: int = Query(..., alias="mp_id"), relative_path: str = Query(..., alias="relative_path")):
+    """Generate document preview via LibreOffice (PDF). Returns PDF file or 404 if unsupported."""
+    db = get_db_session()
+    try:
+        mp = db.query(MountPoint).filter(MountPoint.id == mp_id).first()
+        if not mp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Mount point not found")
+        full_path = os.path.normpath(os.path.join((mp.path or "").strip(), relative_path.replace("/", os.sep)))
+        if not os.path.isfile(full_path):
+            db.close()
+            raise HTTPException(status_code=404, detail="File not found")
+        ext = (os.path.splitext(relative_path)[1] or "").lstrip(".").lower()
+        if ext == "jpeg":
+            ext = "jpg"
+        if ext == "pdf":
+            with open(full_path, "rb") as f:
+                data = f.read()
+            db.close()
+            return Response(content=data, media_type="application/pdf")
+        if not is_office_extension(ext):
+            db.close()
+            raise HTTPException(status_code=400, detail="Preview not supported for this file type")
+        out_dir = tempfile.mkdtemp()
+        try:
+            pdf_path = convert_to_pdf(full_path, out_dir)
+            if not pdf_path or not os.path.isfile(pdf_path):
+                raise HTTPException(status_code=502, detail="LibreOffice conversion failed")
+            with open(pdf_path, "rb") as f:
+                data = f.read()
+            return Response(content=data, media_type="application/pdf")
+        finally:
+            try:
+                shutil.rmtree(out_dir, ignore_errors=True)
+            except OSError:
+                pass
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/mount-points/{mp_id}")
+async def update_mount_point(mp_id: int, body: Dict[str, Any] = Body(...)):
+    """Update mount point name or description. Path is immutable (unique key)."""
+    db = get_db_session()
+    try:
+        mp = db.query(MountPoint).filter(MountPoint.id == mp_id).first()
+        if not mp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Mount point not found")
+        if "path" in body and body["path"] is not None:
+            raise HTTPException(status_code=400, detail="path is immutable")
+        if "name" in body:
+            mp.name = (body["name"] or "").strip() or None
+        if "description" in body:
+            mp.description = (body["description"] or "").strip() or None
+        db.commit()
+        db.refresh(mp)
+        return {
+            "id": mp.id,
+            "path": mp.path,
+            "name": mp.name or "",
+            "description": mp.description or "",
+            "created_at": mp.created_at.isoformat() if mp.created_at else None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/mount-points/{mp_id}")
+async def delete_mount_point(mp_id: int):
+    """Remove a mount point."""
+    db = get_db_session()
+    try:
+        mp = db.query(MountPoint).filter(MountPoint.id == mp_id).first()
+        if not mp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Mount point not found")
+        db.delete(mp)
+        db.commit()
+        return {"deleted": mp_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/mount-points")
+async def delete_all_mount_points():
+    """Remove all mount points (file resource data). For reset/re-test."""
+    db = get_db_session()
+    try:
+        count = db.query(MountPoint).delete()
+        db.commit()
+        return {"deleted": count}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
 @router.post("/directories")
 async def create_directory(body: Dict[str, Any] = Body(...)):
     """Create a new directory"""
@@ -107,7 +524,7 @@ async def create_directory(body: Dict[str, Any] = Body(...)):
 
 @router.put("/documents/{document_id}/move")
 async def move_document(document_id: int, body: Dict[str, Any] = Body(...)):
-    """Move document to a directory"""
+    """Move document to a directory. Updates directory_id in DB only; no physical file movement."""
     directory_id = body.get("directory_id") # None means root
     
     db = get_db_session()
@@ -197,12 +614,13 @@ async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = 
     tmp_path = None
     db = None
     try:
-        # Save uploaded file to documents directory
+        # Save uploaded file to random subdirectory (multi-dir storage to avoid single-dir file limits)
         file_extension = os.path.splitext(file.filename)[1]
         safe_filename = "".join(c for c in file.filename if c.isalnum() or c in "._- ")
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         stored_filename = f"{timestamp}_{safe_filename}"
-        tmp_path = os.path.join(DOCUMENTS_DIR, stored_filename)
+        storage_dir = _get_random_storage_dir()
+        tmp_path = os.path.join(storage_dir, stored_filename)
         
         with open(tmp_path, 'wb') as f:
             content = await file.read()
@@ -356,10 +774,14 @@ async def list_knowledge_points(page: int = 1, page_size: int = 50, document_id:
         for kp, doc in points:
             if kp.content:
                 result.append({
+                    "id": kp.id,
                     "content": kp.content,
                     "document_id": doc.id,
                     "document_name": doc.filename,
-                    "chunk_index": kp.chunk_index
+                    "chunk_index": kp.chunk_index,
+                    "weight": getattr(kp, "weight", 1.0),
+                    "excluded": bool(getattr(kp, "excluded", False)),
+                    "is_manual": bool(getattr(kp, "is_manual", False))
                 })
                 
         db.close()
@@ -373,6 +795,127 @@ async def list_knowledge_points(page: int = 1, page_size: int = 50, document_id:
         if db:
             db.close()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/documents/knowledge-points")
+async def create_manual_knowledge_point(body: Dict[str, Any] = Body(...)):
+    """Create a manual (user-added) knowledge point for a document."""
+    document_id = body.get("document_id")
+    content = (body.get("content") or "").strip()
+    if document_id is None:
+        raise HTTPException(status_code=400, detail="document_id is required")
+    if not content:
+        raise HTTPException(status_code=400, detail="content is required")
+    db = None
+    try:
+        db = get_db_session()
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if not doc:
+            db.close()
+            raise HTTPException(status_code=404, detail="Document not found")
+        from sqlalchemy import func
+        max_idx = db.query(func.coalesce(func.max(KnowledgePoint.chunk_index), -1)).filter(
+            KnowledgePoint.document_id == document_id
+        ).scalar() or -1
+        next_index = max_idx + 1
+        kp = KnowledgePoint(
+            document_id=document_id,
+            content=content,
+            chunk_index=next_index,
+            weight=1.0,
+            excluded=False,
+            is_manual=True
+        )
+        db.add(kp)
+        db.commit()
+        db.refresh(kp)
+        out = {
+            "id": kp.id,
+            "content": kp.content,
+            "document_id": kp.document_id,
+            "document_name": doc.filename,
+            "chunk_index": kp.chunk_index,
+            "weight": getattr(kp, "weight", 1.0),
+            "excluded": bool(getattr(kp, "excluded", False)),
+            "is_manual": True
+        }
+        db.close()
+        return out
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.rollback()
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/documents/knowledge-points/batch")
+async def delete_knowledge_points_batch(body: Dict[str, Any] = Body(...)):
+    """Batch delete knowledge points by ids. Removes from DB and vector store."""
+    ids = body.get("ids", [])
+    if not ids or not isinstance(ids, list):
+        raise HTTPException(status_code=400, detail="ids must be a non-empty list")
+    db = None
+    try:
+        db = get_db_session()
+        points = db.query(KnowledgePoint).filter(KnowledgePoint.id.in_(ids)).all()
+        if not points:
+            db.close()
+            return {"deleted": 0, "message": "No matching knowledge points"}
+        doc_chunks = {}
+        for kp in points:
+            doc_id = kp.document_id
+            if doc_id not in doc_chunks:
+                doc_chunks[doc_id] = []
+            doc_chunks[doc_id].append(kp.chunk_index)
+            db.delete(kp)
+        db.commit()
+        db.close()
+        try:
+            from services.rag_service import RAGService
+            rag = RAGService()
+            for doc_id, chunk_indices in doc_chunks.items():
+                if rag.client and chunk_indices:
+                    rag.delete_chunks(doc_id, chunk_indices)
+        except Exception as e:
+            logger.warning("Failed to delete chunks from vector store: %s", e)
+        return {"deleted": len(points)}
+    except Exception as e:
+        if db:
+            db.rollback()
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/documents/knowledge-points/{kp_id}")
+async def update_knowledge_point_weight(kp_id: int, body: Dict[str, Any] = Body(...)):
+    """Update knowledge point weight."""
+    weight = body.get("weight")
+    if weight is None or not isinstance(weight, (int, float)):
+        raise HTTPException(status_code=400, detail="weight must be a number")
+    weight = float(weight)
+    if weight < 1 or weight > 5:
+        raise HTTPException(status_code=400, detail="weight must be between 1 and 5 (star rating)")
+    db = None
+    try:
+        db = get_db_session()
+        kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
+        if not kp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Knowledge point not found")
+        kp.weight = weight
+        db.commit()
+        db.close()
+        return {"id": kp_id, "weight": weight}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.rollback()
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.delete("/documents/{document_id}")
 async def delete_document(document_id: int):
@@ -446,16 +989,20 @@ async def generate_annotations(body: Dict[str, Any] = Body(...)):
         except Exception as parse_err:
             logger.warning("annotations/generate: knowledge_points parse failed: %s", parse_err)
             knowledge_points = []
-    api_key = body.get("api_key", "")
+    api_key = body.get("api_key", "").strip() or ""
+    platform = body.get("platform", "").strip().lower()
     model = body.get("model", "deepseek-chat")
     base_url = body.get("base_url")
+
+    if not api_key and platform:
+        api_key = _resolve_api_key(platform)
 
     logger.info(
         "annotations/generate: request received, knowledge_points_count=%d, model=%s, api_key_set=%s",
         len(knowledge_points), model, bool(api_key),
     )
 
-    service = AnnotationService(api_key=api_key, model=model, base_url=base_url)
+    service = AnnotationService(api_key=api_key if api_key else None, model=model, base_url=base_url)
 
     annotations = []
     errors = []
@@ -493,9 +1040,11 @@ async def submit_finetuning_job(body: Dict[str, Any] = Body(...)):
     """Submit fine-tuning job"""
     from services.finetuning_service import FineTuningService
     training_data = body.get("training_data", {})
-    platform = body.get("platform", "")
+    platform = body.get("platform", "").strip().lower()
     model = body.get("model", "")
-    api_key = body.get("api_key", "")
+    api_key = body.get("api_key", "").strip() or ""
+    if not api_key and platform:
+        api_key = _resolve_api_key(platform)
     annotations = training_data.get("annotations", [])
     format_type = training_data.get("format_type", "sft")
 
@@ -674,6 +1223,27 @@ async def list_api_keys():
     finally:
         db.close()
 
+
+def _resolve_api_key(platform: str) -> str:
+    """Resolve decrypted API key by platform from stored keys. Returns empty string if not found."""
+    if not platform or not platform.strip():
+        return ""
+    platform = platform.strip().lower()
+    db = get_db_session()
+    try:
+        row = db.query(APIKey).filter(APIKey.platform == platform).first()
+        if not row or not row.encrypted_key:
+            return ""
+        from services.security_service import SecurityService
+        key_file = os.path.join(BACKEND_DIR, ".encryption_key")
+        security = SecurityService(key_file=key_file)
+        return security.decrypt_api_key(row.encrypted_key)
+    except Exception:
+        return ""
+    finally:
+        db.close()
+
+
 # --- Training set (for Production Tuning) ---
 @router.post("/training-set")
 async def save_training_set(request: Dict[str, Any]):
@@ -741,7 +1311,10 @@ async def evaluation_generate(body: Dict[str, Any] = Body(...)):
     prompt = body.get("prompt", "").strip()
     template_name = body.get("template", "custom")
     model_endpoint = body.get("model_endpoint")
-    api_key = body.get("api_key") or ""
+    api_key = (body.get("api_key") or "").strip() or ""
+    platform = (body.get("platform") or "").strip().lower()
+    if not api_key and platform:
+        api_key = _resolve_api_key(platform)
     if not prompt:
         raise HTTPException(status_code=400, detail="prompt required")
     if not api_key:
@@ -822,10 +1395,13 @@ async def list_local_models(base_url: str = "http://localhost:11434"):
 async def chat_query(body: Dict[str, Any] = Body(...)):
     """Chat with the knowledge base"""
     query = body.get("query", "")
-    api_key = body.get("api_key", "")
+    api_key = (body.get("api_key") or "").strip() or ""
+    platform = (body.get("platform") or "").strip().lower()
+    if not api_key and platform:
+        api_key = _resolve_api_key(platform)
     model = body.get("model", "deepseek-chat")
     base_url = body.get("base_url")
-    
+
     if not query:
         raise HTTPException(status_code=400, detail="Query is required")
 

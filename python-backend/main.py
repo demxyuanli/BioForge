@@ -2,10 +2,27 @@
 PrivateTune Pro Python Backend Service
 Main entry point for the Python backend service
 """
+import json
 import logging
+import os
 import sys
 import uvicorn
 from fastapi import FastAPI
+
+# Load storage config from system config dir or local fallback before importing routes
+_CONFIG_PATH = os.environ.get("BIOFORGER_CONFIG_PATH") or os.path.join(
+    os.path.dirname(__file__), "bioforger-config.json"
+)
+if os.path.exists(_CONFIG_PATH):
+    try:
+        with open(_CONFIG_PATH, encoding="utf-8") as f:
+            config = json.load(f)
+            if config.get("dbPath"):
+                os.environ["BIOFORGER_DB_PATH"] = config["dbPath"]
+            if config.get("documentsDir"):
+                os.environ["BIOFORGER_DOCUMENTS_DIR"] = config["documentsDir"]
+    except Exception:
+        pass
 
 logging.basicConfig(
     level=logging.INFO,

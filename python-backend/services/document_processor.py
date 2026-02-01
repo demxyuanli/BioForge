@@ -1,6 +1,7 @@
 """
 Document Processing Service
-Handles document upload, OCR, text cleaning, and chunking
+Handles document upload, OCR, text cleaning, and chunking.
+Office documents (doc, odt, xls, ppt, etc.) can be parsed via LibreOffice headless.
 """
 from typing import List, Dict, Any
 import os
@@ -21,6 +22,15 @@ except ImportError:
     pytesseract = None
     Image = None
 
+try:
+    from .libreoffice_parser import (
+        extract_text_with_libreoffice,
+        is_office_extension,
+    )
+except ImportError:
+    extract_text_with_libreoffice = None
+    is_office_extension = lambda ext: False
+
 
 class DocumentProcessor:
     def __init__(self):
@@ -35,11 +45,16 @@ class DocumentProcessor:
             return {"error": "File not found"}
         
         text = ""
-        if file_type.lower() == "pdf":
+        ft = file_type.lower()
+        if ft == "pdf":
             text = self.extract_text_from_pdf(file_path)
-        elif file_type.lower() in ["doc", "docx"]:
-            text = self.extract_text_from_word(file_path)
-        elif file_type.lower() in ["md", "markdown"]:
+        elif ft in ["doc", "docx"]:
+            text = self._extract_text_word_or_libreoffice(file_path, ft)
+        elif extract_text_with_libreoffice and is_office_extension(ft):
+            text = extract_text_with_libreoffice(file_path)
+            if not text:
+                text = f"Error extracting Office document (LibreOffice not available or conversion failed)"
+        elif ft in ["md", "markdown"]:
             text = self.extract_text_from_markdown(file_path)
         elif file_type.lower() in ["jpg", "jpeg", "png", "bmp", "tiff"]:
             text = self.ocr_image(file_path)
@@ -76,8 +91,29 @@ class DocumentProcessor:
         
         return text
     
+    def _extract_text_word_or_libreoffice(self, file_path: str, file_type: str) -> str:
+        """Extract text from Word: .doc via LibreOffice, .docx via python-docx with LibreOffice fallback."""
+        ft = file_type.lower()
+        if ft == "doc":
+            if extract_text_with_libreoffice:
+                text = extract_text_with_libreoffice(file_path)
+                return text if text else "Error extracting .doc (LibreOffice not available or conversion failed)"
+            return "Error: .doc requires LibreOffice; install LibreOffice and ensure soffice is on PATH or set SOFFICE_PATH"
+        if ft == "docx" and DocxDocument:
+            text = self.extract_text_from_word(file_path)
+            if text and not text.startswith("Error"):
+                return text
+            if extract_text_with_libreoffice:
+                fallback = extract_text_with_libreoffice(file_path)
+                if fallback:
+                    return fallback
+            return text if text else "Error extracting Word document"
+        if extract_text_with_libreoffice:
+            return extract_text_with_libreoffice(file_path) or "Error extracting Word document"
+        return "Error: Word support requires python-docx or LibreOffice"
+    
     def extract_text_from_word(self, file_path: str) -> str:
-        """Extract text from Word document"""
+        """Extract text from Word document (.docx only)"""
         if DocxDocument is None:
             return ""
         

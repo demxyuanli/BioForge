@@ -4,21 +4,29 @@
 }
 
 .evaluation-config {
-  background: white;
+  background: var(--vs-panel-bg);
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   margin-bottom: 2rem;
+  border: 1px solid var(--vs-border-subtle);
 }
 
 .evaluation-config textarea {
   width: 100%;
   padding: 0.75rem;
-  border: 1px solid #ddd;
+  border: 1px solid var(--vs-border-subtle);
   border-radius: 4px;
   font-family: inherit;
   font-size: 1rem;
   resize: vertical;
+  background: var(--vs-bg);
+  color: var(--vs-fg);
+}
+
+.evaluation-config textarea:focus {
+  outline: none;
+  border-color: var(--vs-accent);
 }
 
 .evaluation-results {
@@ -34,15 +42,17 @@
 }
 
 .comparison-panel {
-  background: white;
+  background: var(--vs-panel-bg);
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid var(--vs-border-subtle);
 }
 
 .comparison-panel h3 {
   margin-top: 0;
   margin-bottom: 1rem;
+  color: var(--vs-fg);
 }
 
 .content-box {
@@ -51,28 +61,31 @@
   min-height: 200px;
   line-height: 1.6;
   white-space: pre-wrap;
+  color: var(--vs-fg);
 }
 
 .content-box.before {
-  background-color: #fff3e0;
-  border-left: 3px solid #ff9800;
+  background-color: var(--vs-warning-bg);
+  border-left: 3px solid var(--vs-warning);
 }
 
 .content-box.after {
-  background-color: #e8f5e9;
-  border-left: 3px solid #4caf50;
+  background-color: var(--vs-success-bg);
+  border-left: 3px solid var(--vs-success);
 }
 
 .metrics-section {
-  background: white;
+  background: var(--vs-panel-bg);
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid var(--vs-border-subtle);
 }
 
 .metrics-section h3 {
   margin-top: 0;
   margin-bottom: 1rem;
+  color: var(--vs-fg);
 }
 
 .metrics-grid {
@@ -83,47 +96,50 @@
 
 .metric-card {
   padding: 1rem;
-  background: #f9f9f9;
+  background: var(--vs-bg);
   border-radius: 4px;
+  border: 1px solid var(--vs-border-subtle);
 }
 
 .metric-label {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--vs-muted);
   margin-bottom: 0.5rem;
 }
 
 .metric-value {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #646cff;
+  color: var(--vs-accent);
   margin-bottom: 0.5rem;
 }
 
 .metric-bar {
   width: 100%;
   height: 8px;
-  background-color: #e0e0e0;
+  background-color: var(--vs-border-subtle);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .metric-fill {
   height: 100%;
-  background-color: #646cff;
+  background-color: var(--vs-accent);
   transition: width 0.3s ease;
 }
 
 .export-section {
-  background: white;
+  background: var(--vs-panel-bg);
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid var(--vs-border-subtle);
 }
 
 .export-section h3 {
   margin-top: 0;
   margin-bottom: 1rem;
+  color: var(--vs-fg);
 }
 
 .export-buttons {
@@ -133,8 +149,8 @@
 
 .export-buttons button {
   padding: 0.75rem 1.5rem;
-  background-color: #646cff;
-  color: white;
+  background-color: var(--vs-accent);
+  color: var(--vs-accent-fg);
   border: none;
   border-radius: 4px;
   cursor: pointer;
@@ -142,27 +158,5 @@
 }
 
 .export-buttons button:hover {
-  background-color: #535bf2;
-}
-
-@media (prefers-color-scheme: dark) {
-  .evaluation-config,
-  .comparison-panel,
-  .metrics-section,
-  .export-section {
-    background-color: #2f2f2f;
-    color: #f6f6f6;
-  }
-
-  .content-box.before {
-    background-color: #3e2723;
-  }
-
-  .content-box.after {
-    background-color: #1b5e20;
-  }
-
-  .metric-card {
-    background-color: #333;
-  }
+  background-color: var(--vs-dropdown-hover);
 }

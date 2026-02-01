@@ -126,7 +126,19 @@ class RAGService:
             )
         except Exception as e:
             print(f"Warning: Failed to delete document from vector store: {e}")
-    
+
+    def delete_chunks(self, document_id: int, chunk_indices: list):
+        """Delete specific chunks for a document from vector store by chunk indices"""
+        if not self.client or not chunk_indices:
+            return
+        try:
+            collection_name = f"doc_{document_id}"
+            collection = self.client.get_collection(name=collection_name)
+            ids_to_delete = [f"{document_id}_chunk_{i}" for i in chunk_indices]
+            collection.delete(ids=ids_to_delete)
+        except Exception as e:
+            print(f"Warning: Failed to delete chunks from vector store: {e}")
+
     def search_similar(self, query: str, collection_name: str = "global_knowledge_base", n_results: int = 5) -> List[Dict[str, Any]]:
         """Search for similar knowledge points"""
         if not self.client:

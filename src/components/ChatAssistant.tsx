@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { chatQuery, getLocalModels } from '../services/api';
+import { chatQuery } from '../services/api';
+import { getAIConfig } from '../utils/aiConfig';
 import './ChatAssistant.css';
 
 interface Message {
@@ -16,12 +17,6 @@ const ChatAssistant: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [useLocalModel, setUseLocalModel] = useState(false);
-  const [localModelName, setLocalModelName] = useState('qwen2.5:7b');
-  const [localBaseUrl, setLocalBaseUrl] = useState('http://localhost:11434/v1');
-  const [availableLocalModels, setAvailableLocalModels] = useState<string[]>([]);
-  const [isFetchingModels, setIsFetchingModels] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -31,29 +26,6 @@ const ChatAssistant: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  useEffect(() => {
-    if (useLocalModel && showSettings) {
-      fetchLocalModels();
-    }
-  }, [useLocalModel, showSettings]);
-
-  const fetchLocalModels = async () => {
-    setIsFetchingModels(true);
-    try {
-      const models = await getLocalModels(localBaseUrl);
-      setAvailableLocalModels(models);
-      if (models.length > 0 && !models.includes(localModelName)) {
-        if (localModelName === 'qwen2.5:7b') {
-             setLocalModelName(models[0]);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch local models:', error);
-    } finally {
-      setIsFetchingModels(false);
-    }
-  };
 
   const handleSendMessage = async () => {
     if (!inputValue.trim() || isLoading) return;
@@ -70,11 +42,13 @@ const ChatAssistant: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const cfg = getAIConfig();
       const response = await chatQuery(
         userMessage.content,
-        useLocalModel ? 'ollama' : undefined,
-        useLocalModel ? localModelName : undefined,
-        useLocalModel ? localBaseUrl : undefined
+        cfg.useLocalModel ? 'ollama' : undefined,
+        cfg.useLocalModel ? cfg.localModelName : cfg.defaultCloudModel,
+        cfg.useLocalModel ? cfg.localBaseUrl : undefined,
+        cfg.useLocalModel ? undefined : cfg.defaultPlatform
       );
       
       const assistantMessage: Message = {
@@ -113,87 +87,28 @@ const ChatAssistant: React.FC = () => {
         padding: '8px 16px', 
         borderBottom: '1px solid var(--vs-border)',
         display: 'flex',
-        justifyContent: 'flex-end'
+        justifyContent: 'space-between',
+        alignItems: 'center'
       }}>
-        <button 
-          className="vs-icon-btn" 
-          onClick={() => setShowSettings(!showSettings)}
-          title="Chat Settings"
-          style={{ background: 'none', border: 'none', color: 'var(--vs-text)', cursor: 'pointer' }}
-        >
-          &#9881;
-        </button>
+        <div style={{ fontSize: '12px', fontWeight: 600, color: 'var(--vs-fg)' }}>
+          {t('nav.chatAssistant') || 'Chat Assistant'}
+        </div>
+        <div style={{ fontSize: '11px', color: 'var(--vs-muted)' }}>
+          {getAIConfig().useLocalModel
+            ? `${t('trainingLab.useLocalModel')}: ${getAIConfig().localModelName}`
+            : `${getAIConfig().defaultPlatform} / ${getAIConfig().defaultCloudModel}`}
+        </div>
       </div>
       
-      {showSettings && (
-        <div className="chat-settings" style={{
-          padding: '12px',
-          borderBottom: '1px solid var(--vs-border)',
-          backgroundColor: 'var(--vs-sidebar-bg)',
-          fontSize: '12px'
-        }}>
-          <div style={{ marginBottom: '8px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={useLocalModel}
-                onChange={(e) => setUseLocalModel(e.target.checked)}
-                style={{ marginRight: '8px' }}
-              />
-              Use Local Model (Ollama)
-            </label>
-          </div>
-          {useLocalModel && (
-            <>
-              <div style={{ marginBottom: '8px' }}>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <input
-                    list="chat-local-models-list"
-                    type="text"
-                    value={localModelName}
-                    onChange={(e) => setLocalModelName(e.target.value)}
-                    placeholder="Model Name (e.g. qwen2.5:7b)"
-                    style={{ width: '100%', padding: '4px', marginTop: '4px', flex: 1 }}
-                  />
-                  <datalist id="chat-local-models-list">
-                    {availableLocalModels.map(m => <option key={m} value={m} />)}
-                  </datalist>
-                  <button 
-                    onClick={fetchLocalModels}
-                    title="Refresh"
-                    style={{ 
-                      marginTop: '4px', 
-                      padding: '0 8px', 
-                      background: 'var(--vs-button-secondary-bg)', 
-                      color: 'var(--vs-button-secondary-fg)', 
-                      border: '1px solid var(--vs-border)', 
-                      cursor: 'pointer' 
-                    }}
-                    disabled={isFetchingModels}
-                  >
-                    {isFetchingModels ? '...' : '\u21bb'}
-                  </button>
-                </div>
-              </div>
-              <div>
-                <input
-                  type="text"
-                  value={localBaseUrl}
-                  onChange={(e) => setLocalBaseUrl(e.target.value)}
-                  onBlur={() => { if(useLocalModel) fetchLocalModels(); }}
-                  placeholder="Base URL"
-                  style={{ width: '100%', padding: '4px', marginTop: '4px' }}
-                />
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
       <div className="chat-messages">
         {messages.length === 0 && (
-          <div className="chat-welcome">
+          <div className="chat-welcome" style={{ padding: '20px', textAlign: 'center', color: 'var(--vs-muted)' }}>
             <p>{t('chat.welcome') || 'How can I help you today?'}</p>
+            <p style={{ fontSize: '11px', marginTop: '8px' }}>
+              {getAIConfig().useLocalModel 
+                ? `Using Local: ${getAIConfig().localModelName}`
+                : `Using Cloud: ${getAIConfig().defaultPlatform} / ${getAIConfig().defaultCloudModel}`}
+            </p>
           </div>
         )}
         {messages.map(msg => (

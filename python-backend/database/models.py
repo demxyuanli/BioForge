@@ -2,12 +2,38 @@
 Database Models
 SQLAlchemy models for SQLite database
 """
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, DateTime, Boolean, ForeignKey
+import os
+from sqlalchemy import create_engine, Column, Integer, String, Text, Float, DateTime, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 
 Base = declarative_base()
+
+
+class MountPoint(Base):
+    """OS filesystem directory mounted into the app for reorganizing documents. Path is unique; name defaults to directory name."""
+    __tablename__ = "mount_points"
+
+    id = Column(Integer, primary_key=True)
+    path = Column(String(1000), nullable=False, unique=True)  # OS absolute path, unique
+    name = Column(String(255))  # display name, defaults to directory name
+    description = Column(Text)  # annotation/description for this mount point
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class MountPointFileMeta(Base):
+    """Per-file weight and note for files under a mount point. Key: (mount_point_id, relative_path)."""
+    __tablename__ = "mount_point_file_meta"
+    __table_args__ = (UniqueConstraint("mount_point_id", "relative_path", name="uq_mount_point_file_meta"),)
+
+    id = Column(Integer, primary_key=True)
+    mount_point_id = Column(Integer, ForeignKey("mount_points.id", ondelete="CASCADE"), nullable=False)
+    relative_path = Column(String(1000), nullable=False)  # path relative to mount root
+    weight = Column(Float, default=1.0)  # 0-5
+    note = Column(Text)  # optional user note
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class Directory(Base):
@@ -49,6 +75,9 @@ class KnowledgePoint(Base):
     document_id = Column(Integer, ForeignKey("documents.id", ondelete="CASCADE"))
     content = Column(Text, nullable=False)
     chunk_index = Column(Integer)
+    weight = Column(Float, default=1.0)
+    excluded = Column(Boolean, default=False)  # excluded from training (display-only deletion status)
+    is_manual = Column(Boolean, default=False)  # True = user-created, False = auto-extracted from document
     tags = Column(Text)  # JSON string of tags
     created_at = Column(DateTime, default=datetime.utcnow)
     
@@ -105,6 +134,27 @@ class APIKey(Base):
 
 def init_database(db_path: str = "privatetune.db"):
     """Initialize database and create tables"""
-    engine = create_engine(f"sqlite:///{db_path}")
+    db_dir = os.path.dirname(db_path)
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
+    norm_path = db_path.replace("\\", "/")
+    engine = create_engine(f"sqlite:///{norm_path}")
     Base.metadata.create_all(engine)
+    # Add weight column to knowledge_points if missing (migration)
+    from sqlalchemy import text, inspect
+    insp = inspect(engine)
+    if "knowledge_points" in insp.get_table_names():
+        cols = [c["name"] for c in insp.get_columns("knowledge_points")]
+        if "weight" not in cols:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE knowledge_points ADD COLUMN weight REAL DEFAULT 1.0"))
+                conn.commit()
+        if "excluded" not in cols:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE knowledge_points ADD COLUMN excluded INTEGER DEFAULT 0"))
+                conn.commit()
+        if "is_manual" not in cols:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE knowledge_points ADD COLUMN is_manual INTEGER DEFAULT 0"))
+                conn.commit()
     return engine

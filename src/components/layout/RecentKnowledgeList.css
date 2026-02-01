@@ -1,0 +1,60 @@
+.rkl-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.rkl-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vs-muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vs-border-subtle);
+}
+
+.rkl-loading {
+  padding: 12px;
+  font-size: 12px;
+  color: var(--vs-muted);
+}
+
+.rkl-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.rkl-item {
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: default;
+  border-bottom: none;
+}
+
+.rkl-item:hover {
+  background-color: var(--vs-list-hover);
+}
+
+.rkl-name {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vs-fg);
+}
+
+.rkl-meta {
+  display: block;
+  font-size: 11px;
+  color: var(--vs-muted);
+  margin-top: 2px;
+}
+
+.rkl-empty {
+  padding: 12px;
+  font-size: 12px;
+  color: var(--vs-muted);
+}

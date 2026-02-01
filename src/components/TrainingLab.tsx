@@ -1,19 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { generateAnnotations, Annotation, getKnowledgePoints, saveTrainingSet, getLocalModels } from '../services/api';
+import { generateAnnotations, Annotation, getKnowledgePoints, saveTrainingSet, getLocalModels, type KnowledgePoint } from '../services/api';
+import { getAIConfig } from '../utils/aiConfig';
 
 const TrainingLab: React.FC = () => {
   const { t } = useTranslation();
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [selectedModel, setSelectedModel] = useState('deepseek-chat');
-  const [localModelName, setLocalModelName] = useState('qwen2.5:7b');
-  const [localBaseUrl, setLocalBaseUrl] = useState('http://localhost:11434/v1');
-  const [useLocalModel, setUseLocalModel] = useState(false);
   const [availableLocalModels, setAvailableLocalModels] = useState<string[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
-  const [knowledgePoints, setKnowledgePoints] = useState<string[]>([]);
+  const [knowledgePoints, setKnowledgePoints] = useState<KnowledgePoint[]>([]);
   const [savingForFinetuning, setSavingForFinetuning] = useState(false);
 
   useEffect(() => {
@@ -21,22 +17,18 @@ const TrainingLab: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (useLocalModel) {
+    const cfg = getAIConfig();
+    if (cfg.useLocalModel) {
       fetchLocalModels();
     }
-  }, [useLocalModel]);
+  }, []);
 
   const fetchLocalModels = async () => {
+    const cfg = getAIConfig();
     setIsFetchingModels(true);
     try {
-      const models = await getLocalModels(localBaseUrl);
+      const models = await getLocalModels(cfg.localBaseUrl);
       setAvailableLocalModels(models);
-      if (models.length > 0 && !models.includes(localModelName)) {
-        // If current name is default and not in list, switch to first available
-        if (localModelName === 'qwen2.5:7b') {
-             setLocalModelName(models[0]);
-        }
-      }
     } catch (error) {
       console.error('Failed to fetch local models:', error);
     } finally {
@@ -46,19 +38,19 @@ const TrainingLab: React.FC = () => {
 
   const loadKnowledgePoints = async () => {
     try {
-      const points = await getKnowledgePoints();
-      setKnowledgePoints(points);
+      const resp = await getKnowledgePoints();
+      setKnowledgePoints(resp.knowledge_points || []);
     } catch (error) {
       console.error('Failed to load knowledge points:', error);
     }
   };
 
   const handleGenerateAnnotations = async () => {
-    if (!useLocalModel && !apiKey) {
-      alert(t('trainingLab.pleaseEnterApiKey'));
+    const cfg = getAIConfig();
+    if (!cfg.useLocalModel && !cfg.defaultPlatform) {
+      alert(t('trainingLab.configureInSettings'));
       return;
     }
-
     if (knowledgePoints.length === 0) {
       alert(t('trainingLab.noKnowledgePoints'));
       return;
@@ -68,9 +60,10 @@ const TrainingLab: React.FC = () => {
     try {
       const generated = await generateAnnotations(
         knowledgePoints.slice(0, 10),
-        useLocalModel ? 'ollama' : apiKey,
-        useLocalModel ? localModelName : selectedModel,
-        useLocalModel ? localBaseUrl : undefined
+        cfg.useLocalModel ? 'ollama' : '',
+        cfg.useLocalModel ? cfg.localModelName : cfg.defaultCloudModel,
+        cfg.useLocalModel ? cfg.localBaseUrl : undefined,
+        cfg.useLocalModel ? undefined : cfg.defaultPlatform
       );
       setAnnotations(generated);
     } catch (error) {
@@ -120,96 +113,39 @@ const TrainingLab: React.FC = () => {
 
   return (
     <div className="training-lab">
-      <h2>{t('trainingLab.title')}</h2>
-
-      <div className="training-lab-usage">
-        <h4>{t('trainingLab.howToUse')}</h4>
-        <ol className="training-lab-usage-steps">
-          <li>{t('trainingLab.usageStep1')}</li>
-          <li>{t('trainingLab.usageStep2')}</li>
-          <li>{t('trainingLab.usageStep3')}</li>
-          <li>{t('trainingLab.usageStep4')}</li>
-          <li>{t('trainingLab.usageStep5')}</li>
-        </ol>
-      </div>
-
+      {getAIConfig().useLocalModel && (
       <div className="config-section">
-        <div className="form-group" style={{ marginBottom: '16px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              checked={useLocalModel}
-              onChange={(e) => setUseLocalModel(e.target.checked)}
-              style={{ marginRight: '8px' }}
-            />
-            {t('trainingLab.useLocalModel') || 'Use Local Model (Ollama)'}
-          </label>
-        </div>
-
-        {!useLocalModel ? (
-          <>
-            <div className="form-group">
-              <label>{t('trainingLab.apiKey')}:</label>
+          <div className="form-group">
+            <label>{t('trainingLab.localModelName')}:</label>
+            <div style={{ display: 'flex', gap: '8px' }}>
               <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                placeholder={t('trainingLab.enterApiKey')}
-              />
-            </div>
-            <div className="form-group">
-              <label>{t('trainingLab.model')}:</label>
-              <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
-                <option value="deepseek-chat">DeepSeek Chat</option>
-                <option value="deepseek-r1">DeepSeek R1</option>
-              </select>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="form-group">
-              <label>{t('trainingLab.localModelName') || 'Local Model Name'}:</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <input
-                  list="local-models-list"
-                  type="text"
-                  value={localModelName}
-                  onChange={(e) => setLocalModelName(e.target.value)}
-                  placeholder="e.g., qwen2.5:7b"
-                  style={{ flex: 1 }}
-                />
-                <datalist id="local-models-list">
-                  {availableLocalModels.map(m => <option key={m} value={m} />)}
-                </datalist>
-                <button 
-                  onClick={fetchLocalModels} 
-                  title="Refresh Models"
-                  style={{ padding: '0 8px', minWidth: '32px' }}
-                  disabled={isFetchingModels}
-                >
-                  {isFetchingModels ? '...' : '\u21bb'}
-                </button>
-              </div>
-            </div>
-            <div className="form-group">
-              <label>{t('trainingLab.localBaseUrl') || 'Local Base URL'}:</label>
-              <input
+                list="local-models-list"
                 type="text"
-                value={localBaseUrl}
-                onChange={(e) => setLocalBaseUrl(e.target.value)}
-                onBlur={() => { if(useLocalModel) fetchLocalModels(); }}
-                placeholder="e.g., http://localhost:11434/v1"
+                value={getAIConfig().localModelName}
+                readOnly
+                style={{ flex: 1, backgroundColor: 'var(--vs-input-bg)', color: 'var(--vs-muted)' }}
               />
+              <datalist id="local-models-list">
+                {availableLocalModels.map(m => <option key={m} value={m} />)}
+              </datalist>
+              <button 
+                onClick={fetchLocalModels} 
+                title={t('trainingLab.refreshModels')}
+                style={{ padding: '0 8px', minWidth: '32px' }}
+                disabled={isFetchingModels}
+              >
+                {isFetchingModels ? '...' : '\u21bb'}
+              </button>
             </div>
-          </>
-        )}
+          </div>
       </div>
+      )}
 
       <div className="actions">
         <button onClick={loadKnowledgePoints}>
           {t('trainingLab.refreshKnowledgePoints')}
         </button>
-        <button onClick={handleGenerateAnnotations} disabled={isGenerating || (!useLocalModel && !apiKey)}>
+        <button onClick={handleGenerateAnnotations} disabled={isGenerating}>
           {isGenerating ? t('trainingLab.generating') : t('trainingLab.generateInstructionPairs')}
         </button>
         <button onClick={handleSaveForFinetuning} disabled={annotations.length === 0 || savingForFinetuning}>

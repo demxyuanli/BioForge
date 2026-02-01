@@ -1,0 +1,126 @@
+.kbt-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.kbt-loading,
+.kbt-empty {
+  padding: 16px 12px;
+  color: var(--vs-muted);
+  font-size: 12px;
+}
+
+.kbt-tree {
+  font-size: 12px;
+}
+
+.kbt-tree-node {
+  user-select: none;
+}
+
+.kbt-item,
+.kbt-doc-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  min-height: 24px;
+  border-radius: 2px;
+}
+
+.kbt-item:hover,
+.kbt-doc-item:hover {
+  background-color: var(--vs-list-hover);
+}
+
+.kbt-expand {
+  font-size: 10px;
+  width: 14px;
+  text-align: center;
+  color: var(--vs-muted);
+}
+
+.kbt-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.kbt-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vs-fg);
+}
+
+.kbt-count {
+  font-size: 10px;
+  color: var(--vs-muted);
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+
+.kbt-badge {
+  font-size: 10px;
+  color: var(--vs-success);
+  flex-shrink: 0;
+}
+
+.kbt-children {
+  margin-left: 0;
+}
+
+.kbt-root-drop {
+  min-height: 20px;
+  border-radius: 2px;
+  margin: 2px 4px;
+}
+
+.kbt-root-drop.kbt-drag-over {
+  background-color: var(--vs-drag-bg);
+  border: 1px dashed var(--vs-drag-border);
+}
+
+.kbt-item.kbt-drag-over {
+  background-color: var(--vs-drag-bg);
+  border: 1px dashed var(--vs-drag-border);
+  border-radius: 2px;
+}
+
+.kbt-point-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 8px 4px 12px;
+  cursor: default;
+  min-height: 22px;
+  border-left: 1px solid var(--vs-border-subtle);
+  margin-left: 14px;
+}
+
+.kbt-point-item:hover {
+  background-color: var(--vs-list-hover);
+}
+
+.kbt-point-icon {
+  font-size: 8px;
+  color: var(--vs-success);
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.kbt-point-content {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  color: var(--vs-code-accent);
+  font-size: 11px;
+  line-height: 1.4;
+}

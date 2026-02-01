@@ -1,6 +1,6 @@
 import React, { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RightPanelTab, ActivityType } from './VSLayout';
+import { RightPanelTab } from './VSLayout';
 import ChatAssistant from '../ChatAssistant';
 
 interface RightPanelProps {
@@ -8,7 +8,6 @@ interface RightPanelProps {
   onTabChange: (tab: RightPanelTab) => void;
   onClose: () => void;
   content?: ReactNode;
-  activeActivity: ActivityType;
 }
 
 interface TabItem {
@@ -18,58 +17,14 @@ interface TabItem {
 
 const tabs: TabItem[] = [
   { id: 'chat', titleKey: 'panel.chat' },
-  { id: 'properties', titleKey: 'panel.properties' },
-  { id: 'details', titleKey: 'panel.details' },
-  { id: 'help', titleKey: 'panel.help' }
+  { id: 'details', titleKey: 'panel.details' }
 ];
-
-const HelpContent: React.FC<{ activity: ActivityType }> = ({ activity }) => {
-  const { t } = useTranslation();
-
-  const getHelpContent = () => {
-    switch (activity) {
-      case 'training':
-        return (
-          <>
-            <p>{t('trainingLab.usageStep1')}</p>
-            <p>{t('trainingLab.usageStep2')}</p>
-            <p>{t('trainingLab.usageStep3')}</p>
-            <p>{t('trainingLab.usageStep4')}</p>
-            <p>{t('trainingLab.usageStep5')}</p>
-          </>
-        );
-      case 'datacenter':
-        return (
-          <>
-            <p>{t('wizard.upload.description')}</p>
-            <p>{t('dataCenter.noKnowledgePoints')}</p>
-          </>
-        );
-      case 'production':
-        return <p>{t('wizard.configure.description')}</p>;
-      case 'privacy':
-        return <p>{t('privacyCenter.autoDesensitization')}</p>;
-      default:
-        return <p>{t('wizard.welcome.intro')}</p>;
-    }
-  };
-
-  return (
-    <div className="vs-help-content" style={{ padding: '16px', lineHeight: '1.6', fontSize: '13px' }}>
-      <h3 style={{ marginBottom: '12px', fontSize: '14px', borderBottom: '1px solid var(--vs-border)', paddingBottom: '8px' }}>
-        {t(`nav.${activity}`)}
-      </h3>
-      {getHelpContent()}
-    </div>
-  );
-};
 
 const RightPanel: React.FC<RightPanelProps> = ({
   activeTab,
   onTabChange,
   onClose,
-  content,
-  activeActivity
+  content
 }) => {
   const { t } = useTranslation();
 
@@ -95,8 +50,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
       </div>
       <div className="vs-panel-content">
         {activeTab === 'chat' && <ChatAssistant />}
-        {activeTab === 'help' && <HelpContent activity={activeActivity} />}
-        {(activeTab === 'properties' || activeTab === 'details') && (
+        {activeTab === 'details' && (
           content ? content : (
             <div className="vs-properties-list">
               <div className="vs-property-group">

@@ -1,69 +1,100 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { 
-  selectFile, 
-  uploadDocument, 
-  getDocuments, 
-  deleteDocument, 
-  getKnowledgePoints, 
+import {
+  selectFile,
+  uploadDocument,
+  getDocuments,
+  getKnowledgePoints,
   Document,
   getDirectories,
   createDirectory,
   moveDocument,
+  deleteDocument,
   deleteDirectory,
   DirectoryNode,
-  KnowledgePoint
+  KnowledgePoint,
 } from '../services/api';
 import './DataCenter.css';
+
+function flattenFileNodes(nodes: DirectoryNode[]): DirectoryNode[] {
+  const out: DirectoryNode[] = [];
+  for (const n of nodes) {
+    if (n.type === 'file') out.push(n);
+    if (n.children) out.push(...flattenFileNodes(n.children));
+  }
+  return out;
+}
 
 const DataCenter: React.FC = () => {
   const { t } = useTranslation();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [directoryTree, setDirectoryTree] = useState<DirectoryNode[]>([]);
   const [currentDirId, setCurrentDirId] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
   const [knowledgePoints, setKnowledgePoints] = useState<KnowledgePoint[]>([]);
   const [kpPage, setKpPage] = useState(1);
   const [kpTotal, setKpTotal] = useState(0);
   const [kpPageSize] = useState(50);
+  const [selectedKp, setSelectedKp] = useState<KnowledgePoint | null>(null);
+  const [highlightedKeywords, setHighlightedKeywords] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
-  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [newDirName, setNewDirName] = useState('');
   const [isCreatingDir, setIsCreatingDir] = useState(false);
-  
-  // Filter state for knowledge points
-  const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
     const interval = setInterval(() => {
-        // Poll for document status updates if any document is processing
-        const processingDocs = documents.filter(d => d.processingStatus === 'pending' || d.processingStatus === 'processing');
-        if (processingDocs.length > 0) {
-            loadDocuments();
-            loadKnowledgePoints(); // Refresh KPs as well if completed
-        }
+      const processing = documents.filter(
+        (d) => d.processingStatus === 'pending' || d.processingStatus === 'processing'
+      );
+      if (processing.length > 0) {
+        loadDocuments();
+        if (selectedDocId) loadKnowledgePoints();
+      }
     }, 3000);
     return () => clearInterval(interval);
-  }, [documents.map(d => d.processingStatus).join(',')]);
+  }, [documents.map((d) => d.processingStatus).join(',')]);
 
   useEffect(() => {
-      loadKnowledgePoints();
-  }, [kpPage, selectedDocId]);
+    if (selectedDocId == null) {
+      setKnowledgePoints([]);
+      setKpTotal(0);
+      setKpPage(1);
+      setSelectedKp(null);
+      setHighlightedKeywords([]);
+      return;
+    }
+    setKpPage(1);
+    setSelectedKp(null);
+    setHighlightedKeywords([]);
+    getKnowledgePoints(1, kpPageSize, selectedDocId)
+      .then((data) => {
+        setKnowledgePoints(data.knowledge_points);
+        setKpTotal(data.total);
+      })
+      .catch(() => {
+        setKnowledgePoints([]);
+        setKpTotal(0);
+      });
+  }, [selectedDocId, kpPageSize]);
+
+  useEffect(() => {
+    loadKnowledgePoints();
+  }, [kpPage]);
 
   const loadData = async () => {
-    await Promise.all([
-      loadDocuments(),
-      loadDirectories()
-    ]);
+    await Promise.all([loadDocuments(), loadDirectories()]);
   };
 
   const loadDirectories = async () => {
     try {
       const tree = await getDirectories();
       setDirectoryTree(tree);
-    } catch (error) {
-      console.error('Failed to load directories:', error);
+    } catch (e) {
+      console.error('Failed to load directories:', e);
     }
   };
 
@@ -71,319 +102,347 @@ const DataCenter: React.FC = () => {
     try {
       const docs = await getDocuments();
       setDocuments(docs);
-    } catch (error) {
-      console.error('Failed to load documents:', error);
+    } catch (e) {
+      console.error('Failed to load documents:', e);
     }
   };
 
   const loadKnowledgePoints = async () => {
+    if (selectedDocId == null) return;
     try {
-      const data = await getKnowledgePoints(kpPage, kpPageSize, selectedDocId || undefined);
+      const data = await getKnowledgePoints(kpPage, kpPageSize, selectedDocId);
       setKnowledgePoints(data.knowledge_points);
       setKpTotal(data.total);
-    } catch (error) {
-      console.error('Failed to load knowledge points:', error);
+    } catch (e) {
+      console.error('Failed to load knowledge points:', e);
     }
   };
 
+  const getCurrentItems = (): DirectoryNode[] => {
+    if (currentDirId === null) {
+      return directoryTree.filter((n) => !n.parentId && !n.directoryId);
+    }
+    const findNode = (nodes: DirectoryNode[]): DirectoryNode | null => {
+      for (const n of nodes) {
+        if (n.id === currentDirId && n.type === 'directory') return n;
+        if (n.children) {
+          const found = findNode(n.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    const node = findNode(directoryTree);
+    return node?.children ?? [];
+  };
+
+  const getBreadcrumbs = (): { id: number | null; name: string }[] => {
+    if (currentDirId === null) return [{ id: null, name: 'Root' }];
+    const crumbs: { id: number; name: string }[] = [];
+    let id: number | null | undefined = currentDirId;
+    const findNode = (nodes: DirectoryNode[]): DirectoryNode | null => {
+      for (const n of nodes) {
+        if (n.id === id && n.type === 'directory') return n;
+        if (n.children) {
+          const found = findNode(n.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+    while (id) {
+      const node = findNode(directoryTree);
+      if (node) {
+        crumbs.unshift({ id: node.id, name: node.name });
+        id = node.parentId;
+      } else break;
+    }
+    return [{ id: null, name: 'Root' }, ...crumbs];
+  };
+
+  const currentItems = getCurrentItems();
+  const allFiles = useMemo(() => flattenFileNodes(directoryTree), [directoryTree]);
+  const filteredBySearch = useMemo(() => {
+    const q = (searchQuery || '').trim().toLowerCase();
+    if (!q) return currentItems;
+    return allFiles.filter((n) => n.name.toLowerCase().includes(q));
+  }, [searchQuery, currentItems, allFiles]);
+
+  const displayItems = searchQuery.trim() ? filteredBySearch : currentItems;
+  const selectedDoc = selectedDocId != null ? documents.find((d) => d.id === selectedDocId) : null;
+
   const handleCreateDirectory = async () => {
     if (!newDirName.trim()) return;
-    
     try {
-      await createDirectory(newDirName, currentDirId || undefined);
+      await createDirectory(newDirName, currentDirId ?? undefined);
       setNewDirName('');
       setIsCreatingDir(false);
       await loadDirectories();
-    } catch (error) {
-      console.error('Create directory error:', error);
-      alert(t('dataCenter.createDirFailed') || 'Failed to create directory');
+    } catch (e) {
+      console.error('Create directory error:', e);
+      alert(t('dataCenter.createDirFailed'));
     }
   };
 
   const handleFileSelect = async () => {
     const filePath = await selectFile();
     if (!filePath) return;
-
     setIsUploading(true);
     setUploadProgress(t('dataCenter.processing'));
-    
     try {
-      // Upload document first
       const result = await uploadDocument(filePath);
-      
-      // If we are in a directory, move the new document there
       if (currentDirId && result.document_id) {
-         await moveDocument(result.document_id, currentDirId);
+        await moveDocument(result.document_id, currentDirId);
       }
-      
       setUploadProgress(t('dataCenter.documentProcessed'));
-      await loadData(); // Reload to see the new document in list
-
-      setTimeout(() => {
-        setUploadProgress('');
-      }, 3000);
-    } catch (error) {
-      console.error('Upload error:', error);
-      setUploadProgress(`Error: ${error}`);
+      await loadData();
+      setTimeout(() => setUploadProgress(''), 3000);
+    } catch (e) {
+      console.error('Upload error:', e);
+      setUploadProgress(String(e));
     } finally {
       setIsUploading(false);
     }
   };
 
   const handleDelete = async (item: DirectoryNode) => {
-    if (!confirm(t('dataCenter.confirmDelete'))) {
-      return;
-    }
-
+    if (!confirm(t('dataCenter.confirmDelete'))) return;
     setDeletingId(item.id);
     try {
-      if (item.type === 'file') {
-        await deleteDocument(item.id);
-      } else {
-        await deleteDirectory(item.id);
-      }
+      if (item.type === 'file') await deleteDocument(item.id);
+      else await deleteDirectory(item.id);
       await loadData();
-    } catch (error) {
-      console.error('Delete error:', error);
-      alert(`${t('dataCenter.deleteFailed')}: ${error}`);
+      if (selectedDocId === item.id) setSelectedDocId(null);
+    } catch (e) {
+      console.error('Delete error:', e);
+      alert(`${t('dataCenter.deleteFailed')}: ${e}`);
     } finally {
       setDeletingId(null);
     }
   };
-  
-  // Helper to get current level items based on currentDirId
-  const getCurrentItems = () => {
-    if (currentDirId === null) {
-      // Root level: items with no parentId (or null)
-      return directoryTree.filter(node => !node.parentId && !node.directoryId);
-    } else {
-      // Find the current directory node recursively
-      const findNode = (nodes: DirectoryNode[]): DirectoryNode | null => {
-        for (const node of nodes) {
-          if (node.id === currentDirId && node.type === 'directory') return node;
-          if (node.children) {
-            const found = findNode(node.children);
-            if (found) return found;
-          }
-        }
-        return null;
-      };
-      
-      const currentDirNode = findNode(directoryTree);
-      return currentDirNode?.children || [];
+
+  const handleKpContentMouseUp = () => {
+    const sel = window.getSelection();
+    const text = sel?.toString?.()?.trim();
+    if (text && !highlightedKeywords.includes(text)) {
+      setHighlightedKeywords((prev) => [...prev, text]);
     }
   };
 
-  const getBreadcrumbs = () => {
-    if (currentDirId === null) return [{ id: null, name: 'Root' }];
-    
-    const breadcrumbs = [];
-    let currentId: number | null | undefined = currentDirId;
-    
-    while (currentId) {
-      const findNode = (nodes: DirectoryNode[]): DirectoryNode | null => {
-        for (const node of nodes) {
-          if (node.id === currentId && node.type === 'directory') return node;
-          if (node.children) {
-            const found = findNode(node.children);
-            if (found) return found;
-          }
-        }
-        return null;
-      };
-      
-      const node = findNode(directoryTree);
-      if (node) {
-        breadcrumbs.unshift({ id: node.id, name: node.name });
-        currentId = node.parentId;
-      } else {
-        break;
-      }
-    }
-    
-    breadcrumbs.unshift({ id: null, name: 'Root' });
-    return breadcrumbs;
+  const removeKeyword = (index: number) => {
+    setHighlightedKeywords((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const currentItems = getCurrentItems();
   const breadcrumbs = getBreadcrumbs();
 
   return (
-    <div className="data-center">
-      <h2>{t('dataCenter.title')}</h2>
-      
-      <div className="file-manager-toolbar" style={{ display: 'flex', gap: '10px', marginBottom: '16px', alignItems: 'center' }}>
-        <button onClick={handleFileSelect} disabled={isUploading}>
-          {isUploading ? t('dataCenter.processing') : t('dataCenter.uploadFile') || 'Upload File'}
-        </button>
-        
-        {!isCreatingDir ? (
-           <button onClick={() => setIsCreatingDir(true)}>
-             {t('dataCenter.newFolder') || 'New Folder'}
-           </button>
-        ) : (
-           <div className="new-folder-input" style={{ display: 'flex', gap: '5px' }}>
-             <input 
-               type="text" 
-               value={newDirName} 
-               onChange={(e) => setNewDirName(e.target.value)}
-               placeholder="Folder Name"
-               autoFocus
-               onKeyDown={(e) => e.key === 'Enter' && handleCreateDirectory()}
-             />
-             <button onClick={handleCreateDirectory}>OK</button>
-             <button onClick={() => { setIsCreatingDir(false); setNewDirName(''); }}>Cancel</button>
-           </div>
-        )}
-        
-        {uploadProgress && <span style={{ marginLeft: '10px' }}>{uploadProgress}</span>}
-      </div>
-
-      <div className="breadcrumbs" style={{ marginBottom: '10px', padding: '5px', background: 'var(--vs-sidebar-bg)' }}>
-         {breadcrumbs && breadcrumbs.map((crumb, index) => (
-           <span key={crumb.id ?? 'root'}>
-             {index > 0 && ' > '}
-             <span 
-               style={{ cursor: 'pointer', textDecoration: 'underline', color: 'var(--vs-text-link)' }}
-               onClick={() => setCurrentDirId(crumb.id ?? null)}
-             >
-               {crumb.name}
-             </span>
-           </span>
-         ))}
-      </div>
-
-      <div className="documents-list">
-        <h3>{t('dataCenter.filesAndFolders') || 'Files & Folders'}</h3>
-        {currentItems.length === 0 ? (
-          <p>{t('dataCenter.emptyFolder') || 'This folder is empty'}</p>
-        ) : (
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: '40px' }}></th>
-                <th>{t('dataCenter.name') || 'Name'}</th>
-                <th>{t('dataCenter.type') || 'Type'}</th>
-                <th>{t('dataCenter.uploadTime')}</th>
-                <th>{t('dataCenter.status')}</th>
-                <th>{t('dataCenter.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentItems.map((item) => {
-                const doc = documents.find(d => d.id === item.id);
-                const status = doc?.processingStatus || (item.processed ? 'completed' : 'pending');
-                const message = doc?.processingMessage;
-                
-                return (
-                <tr key={`${item.type}-${item.id}`}>
-                  <td style={{ textAlign: 'center' }}>
-                    {item.type === 'directory' ? '📁' : '📄'}
-                  </td>
-                  <td>
-                    {item.type === 'directory' ? (
-                      <span 
-                        style={{ cursor: 'pointer', fontWeight: 'bold' }}
-                        onClick={() => setCurrentDirId(item.id)}
-                      >
-                        {item.name}
-                      </span>
-                    ) : (
-                      <span 
-                        style={{ cursor: 'pointer', color: selectedDocId === item.id ? 'var(--vs-focus-border)' : 'inherit' }}
-                        onClick={() => {
-                            setSelectedDocId(selectedDocId === item.id ? null : item.id);
-                            setKpPage(1); // Reset to first page on filter change
-                        }}
-                        title="Click to filter knowledge points"
-                      >
-                        {item.name}
-                      </span>
-                    )}
-                  </td>
-                  <td>{item.type === 'directory' ? 'Folder' : item.fileType}</td>
-                  <td>{item.uploadTime || '-'}</td>
-                  <td>
-                      {item.type === 'directory' ? '-' : (
-                          <span title={message || ''}>
-                              {status === 'processing' ? '⏳ Processing...' : 
-                               status === 'failed' ? '❌ Failed' : 
-                               status === 'completed' ? '✅ Processed' : 'Pending'}
-                          </span>
-                      )}
-                  </td>
-                  <td>
-                    <button
-                      onClick={() => handleDelete(item)}
-                      disabled={deletingId === item.id || (item.type === 'file' && status === 'processing')}
-                      className="delete-btn"
-                    >
-                      {deletingId === item.id ? t('dataCenter.deleting') : t('dataCenter.delete')}
-                    </button>
-                  </td>
-                </tr>
-              )})}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <div className="knowledge-points-list">
-        <div className="knowledge-points-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3>
-            {t('dataCenter.knowledgePointsList')} ({kpTotal})
-            {selectedDocId && <span style={{ fontSize: '0.8em', fontWeight: 'normal', marginLeft: '10px' }}>
-              (Filtered by: {documents.find(d => d.id === selectedDocId)?.filename || 'Document'})
-              <button 
-                onClick={() => { setSelectedDocId(null); setKpPage(1); }}
-                style={{ marginLeft: '5px', padding: '0 5px', fontSize: '0.8em' }}
-              >
-                Clear Filter
+    <div className="data-center data-center-layout">
+      <div className="dc-left">
+        <div className="dc-search-section">
+          <input
+            type="text"
+            className="dc-search-input"
+            placeholder={t('dataCenter.searchDocuments')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label={t('dataCenter.searchDocuments')}
+          />
+        </div>
+        <div className="dc-docs-section">
+          <div className="dc-section-title">{t('dataCenter.addAndProcessDocuments')}</div>
+          <div className="dc-toolbar">
+            <button type="button" onClick={handleFileSelect} disabled={isUploading} className="dc-btn dc-btn-primary">
+              {isUploading ? t('dataCenter.processing') : t('dataCenter.uploadFile')}
+            </button>
+            {!isCreatingDir ? (
+              <button type="button" onClick={() => setIsCreatingDir(true)} className="dc-btn">
+                {t('dataCenter.newFolder')}
               </button>
-            </span>}
-          </h3>
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <div className="pagination-controls" style={{ fontSize: '0.9em' }}>
-                  <button 
-                    disabled={kpPage <= 1} 
-                    onClick={() => setKpPage(p => Math.max(1, p - 1))}
-                    style={{ padding: '2px 8px' }}
-                  >
-                    &lt;
-                  </button>
-                  <span style={{ margin: '0 8px' }}>
-                      Page {kpPage} of {Math.max(1, Math.ceil(kpTotal / kpPageSize))}
-                  </span>
-                  <button 
-                    disabled={kpPage >= Math.ceil(kpTotal / kpPageSize)} 
-                    onClick={() => setKpPage(p => p + 1)}
-                    style={{ padding: '2px 8px' }}
-                  >
-                    &gt;
-                  </button>
+            ) : (
+              <div className="dc-new-folder">
+                <input
+                  type="text"
+                  value={newDirName}
+                  onChange={(e) => setNewDirName(e.target.value)}
+                  placeholder={t('dataCenter.folderName')}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateDirectory()}
+                  className="dc-input"
+                />
+                <button type="button" onClick={handleCreateDirectory} className="dc-btn dc-btn-small">
+                  {t('common.ok')}
+                </button>
+                <button type="button" onClick={() => { setIsCreatingDir(false); setNewDirName(''); }} className="dc-btn dc-btn-small">
+                  {t('common.cancel')}
+                </button>
               </div>
-              <button type="button" className="refresh-kp-btn" onClick={loadKnowledgePoints}>
-                {t('dataCenter.refreshKnowledgePoints')}
-              </button>
+            )}
+            {uploadProgress && <span className="dc-upload-status">{uploadProgress}</span>}
+          </div>
+          <div className="dc-breadcrumbs">
+            {breadcrumbs.map((crumb, i) => (
+              <span key={crumb.id ?? 'root'}>
+                {i > 0 && ' > '}
+                <button
+                  type="button"
+                  className="dc-crumb"
+                  onClick={() => setCurrentDirId(crumb.id)}
+                >
+                  {crumb.name}
+                </button>
+              </span>
+            ))}
+          </div>
+          <ul className="dc-doc-list" role="listbox" aria-label={t('dataCenter.filesAndFolders')}>
+            {displayItems.length === 0 ? (
+              <li className="dc-doc-item dc-empty">
+                {searchQuery.trim() ? t('dataCenter.noSearchResults') : t('dataCenter.emptyFolder')}
+              </li>
+            ) : (
+              displayItems.map((item) => {
+                const doc = documents.find((d) => d.id === item.id);
+                const status = doc?.processingStatus ?? (item.processed ? 'completed' : 'pending');
+                const isFile = item.type === 'file';
+                return (
+                  <li
+                    key={`${item.type}-${item.id}`}
+                    className={`dc-doc-item ${isFile && selectedDocId === item.id ? 'selected' : ''}`}
+                  >
+                    <span className="dc-doc-icon">{isFile ? '\uD83D\uDCC4' : '\uD83D\uDCC1'}</span>
+                    {isFile ? (
+                      <>
+                        <button
+                          type="button"
+                          className="dc-doc-name"
+                          onClick={() => setSelectedDocId(selectedDocId === item.id ? null : item.id)}
+                        >
+                          {item.name}
+                        </button>
+                        <span className="dc-doc-status">
+                          {status === 'processing' ? `\u23F3` : status === 'failed' ? `\u274C` : status === 'completed' ? `\u2705` : ''}
+                        </span>
+                        <button
+                          type="button"
+                          className="dc-btn dc-btn-danger dc-btn-small"
+                          disabled={deletingId === item.id || status === 'processing'}
+                          onClick={() => handleDelete(item)}
+                        >
+                          {deletingId === item.id ? t('dataCenter.deleting') : t('dataCenter.delete')}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button type="button" className="dc-doc-name" onClick={() => setCurrentDirId(item.id)}>
+                          {item.name}
+                        </button>
+                        <button
+                          type="button"
+                          className="dc-btn dc-btn-danger dc-btn-small"
+                          disabled={deletingId === item.id}
+                          onClick={() => handleDelete(item)}
+                        >
+                          {t('dataCenter.delete')}
+                        </button>
+                      </>
+                    )}
+                  </li>
+                );
+              })
+            )}
+          </ul>
+        </div>
+      </div>
+      <div className="dc-right">
+        <div className="dc-kp-list-section">
+          <div className="dc-section-title">
+            {selectedDoc
+              ? t('dataCenter.knowledgePointsList') + ` (${kpTotal}) - ${selectedDoc.filename}`
+              : t('dataCenter.selectDocumentForKp')}
+          </div>
+          {selectedDocId == null ? (
+            <p className="dc-placeholder">{t('dataCenter.selectDocumentFirst')}</p>
+          ) : (
+            <>
+              <div className="dc-kp-pagination">
+                <button
+                  type="button"
+                  className="dc-btn dc-btn-small"
+                  disabled={kpPage <= 1}
+                  onClick={() => setKpPage((p) => Math.max(1, p - 1))}
+                >
+                  &lt;
+                </button>
+                <span className="dc-page-info">
+                  {t('dataCenter.pageOf', { page: kpPage, total: Math.max(1, Math.ceil(kpTotal / kpPageSize)) })}
+                </span>
+                <button
+                  type="button"
+                  className="dc-btn dc-btn-small"
+                  disabled={kpPage >= Math.ceil(kpTotal / kpPageSize)}
+                  onClick={() => setKpPage((p) => p + 1)}
+                >
+                  &gt;
+                </button>
+              </div>
+              <ul className="dc-kp-list" role="listbox">
+                {knowledgePoints.length === 0 ? (
+                  <li className="dc-kp-item dc-empty">{t('dataCenter.noKnowledgePoints')}</li>
+                ) : (
+                  knowledgePoints.map((kp, idx) => (
+                    <li
+                      key={`${kp.document_id}-${kp.chunk_index}`}
+                      className={`dc-kp-item ${selectedKp === kp ? 'selected' : ''}`}
+                      onClick={() => { setSelectedKp(kp); setHighlightedKeywords([]); }}
+                    >
+                      <span className="dc-kp-index">{(kpPage - 1) * kpPageSize + idx + 1}.</span>
+                      <span className="dc-kp-preview" title={kp.content}>
+                        {kp.content.length > 60 ? kp.content.slice(0, 60) + '...' : kp.content}
+                      </span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            </>
+          )}
+        </div>
+        <div className="dc-kp-content-section">
+          <div className="dc-section-title">{t('dataCenter.knowledgePointContent')}</div>
+          <div
+            className="dc-kp-content-body"
+            onMouseUp={handleKpContentMouseUp}
+            role="article"
+          >
+            {selectedKp ? (
+              <>
+                <p className="dc-select-hint">{t('dataCenter.selectTextToAddKeyword')}</p>
+                <div className="dc-kp-content-text">{selectedKp.content}</div>
+              </>
+            ) : (
+              <p className="dc-placeholder">{t('dataCenter.selectKpForContent')}</p>
+            )}
           </div>
         </div>
-        {knowledgePoints.length === 0 ? (
-          <p>{t('dataCenter.noKnowledgePoints')}</p>
-        ) : (
-          <ul className="knowledge-points-items">
-            {knowledgePoints.map((kp, index) => (
-              <li key={`${kp.document_id}-${kp.chunk_index}`} className="knowledge-point-item">
-                <span className="kp-index">{(kpPage - 1) * kpPageSize + index + 1}.</span>
-                <div style={{ flex: 1 }}>
-                   <span className="kp-content">{kp.content}</span>
-                   <div style={{ fontSize: '0.8em', color: 'var(--vs-description-foreground)', marginTop: '4px' }}>
-                     Source: {kp.document_name}
-                   </div>
-                </div>
-              </li>
-            ))}
+        <div className="dc-keywords-section">
+          <div className="dc-section-title">{t('dataCenter.highlightedKeywords')}</div>
+          <ul className="dc-keywords-list">
+            {highlightedKeywords.length === 0 ? (
+              <li className="dc-keyword-item dc-empty">{t('dataCenter.noKeywordsYet')}</li>
+            ) : (
+              highlightedKeywords.map((kw, i) => (
+                <li key={`${i}-${kw.slice(0, 20)}`} className="dc-keyword-item">
+                  <span className="dc-keyword-text" title={kw}>{kw}</span>
+                  <button
+                    type="button"
+                    className="dc-btn dc-btn-small dc-btn-remove"
+                    onClick={() => removeKeyword(i)}
+                    aria-label={t('common.remove')}
+                  >
+                    &#215;
+                  </button>
+                </li>
+              ))
+            )}
           </ul>
-        )}
+        </div>
       </div>
     </div>
   );

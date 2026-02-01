@@ -1,44 +1,55 @@
-import React, { useState, useEffect, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import ActivityBar from './ActivityBar';
 import BottomPanel from './BottomPanel';
-import RightPanel from './RightPanel';
+import FileExplorer from './FileExplorer';
+import KnowledgeBaseTree from './KnowledgeBaseTree';
+import MenuBar from './MenuBar';
 import './VSLayout.css';
 
-export type ActivityType = 'dashboard' | 'datacenter' | 'training' | 'production' | 'evaluation' | 'privacy';
+export type ActivityType = 'dashboard' | 'datacenter' | 'fileResources' | 'knowledgeBase' | 'training' | 'production' | 'evaluation' | 'chat' | 'settings' | 'explorer';
+export type SidebarViewType = 'files' | 'knowledge';
 export type BottomPanelTab = 'output' | 'logs' | 'problems';
-export type RightPanelTab = 'properties' | 'details' | 'help' | 'chat';
+export type RightPanelTab = 'details' | 'chat';
 
 interface VSLayoutProps {
   children: ReactNode;
   activeActivity: ActivityType;
   onActivityChange: (activity: ActivityType) => void;
-  sidebarTitle?: string;
-  sidebarContent?: ReactNode;
-  rightPanelContent?: ReactNode;
   bottomPanelContent?: ReactNode;
+  sidebarContent?: ReactNode;
 }
 
 const VSLayout: React.FC<VSLayoutProps> = ({
   children,
   activeActivity,
   onActivityChange,
-  sidebarTitle,
-  sidebarContent,
-  rightPanelContent,
-  bottomPanelContent
+  bottomPanelContent,
+  sidebarContent
 }) => {
   const { t, i18n } = useTranslation();
   const [sidebarVisible, setSidebarVisible] = useState(true);
-  const [rightPanelVisible, setRightPanelVisible] = useState(true);
-  const [bottomPanelVisible, setBottomPanelVisible] = useState(true);
+  const [sidebarFloating, setSidebarFloating] = useState(false);
+  const [bottomPanelVisible, setBottomPanelVisible] = useState(false);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
   const [sidebarWidth, setSidebarWidth] = useState(280);
-  const [rightPanelWidth, setRightPanelWidth] = useState(300);
   const [bottomPanelTab, setBottomPanelTab] = useState<BottomPanelTab>('output');
-  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>('properties');
+  const [sidebarView, setSidebarView] = useState<SidebarViewType>('files');
   const [isMaximized, setIsMaximized] = useState(false);
+  const floatingSidebarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!sidebarFloating || !sidebarVisible) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const el = floatingSidebarRef.current;
+      if (el && !el.contains(e.target as Node)) {
+        setSidebarVisible(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [sidebarFloating, sidebarVisible]);
 
   useEffect(() => {
     const checkMaximized = async () => {
@@ -113,6 +124,7 @@ const VSLayout: React.FC<VSLayoutProps> = ({
 
   const handleSidebarResize = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (sidebarFloating) return;
     const startX = e.clientX;
     const startWidth = sidebarWidth;
 
@@ -120,27 +132,6 @@ const VSLayout: React.FC<VSLayoutProps> = ({
       const newWidth = startWidth + (moveEvent.clientX - startX);
       if (newWidth >= 200 && newWidth <= 500) {
         setSidebarWidth(newWidth);
-      }
-    };
-
-    const onMouseUp = () => {
-      document.removeEventListener('mousemove', onMouseMove);
-      document.removeEventListener('mouseup', onMouseUp);
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
-  };
-
-  const handleRightPanelResize = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = rightPanelWidth;
-
-    const onMouseMove = (moveEvent: MouseEvent) => {
-      const newWidth = startWidth - (moveEvent.clientX - startX);
-      if (newWidth >= 200 && newWidth <= 500) {
-        setRightPanelWidth(newWidth);
       }
     };
 
@@ -176,48 +167,22 @@ const VSLayout: React.FC<VSLayoutProps> = ({
 
   return (
     <div className="vs-layout">
-      {/* Title Bar */}
-      <div 
-        className="vs-titlebar"
-        onMouseDown={handleTitleBarDrag}
-        onDoubleClick={handleTitleBarDoubleClick}
-      >
-        <div className="vs-titlebar-left">
-          <span className="vs-app-icon">&#9830;</span>
-          <span className="vs-app-title">{t('app.title')}</span>
-        </div>
-        <div className="vs-titlebar-center">
-          <div className="vs-menu-items">
-            <span className="vs-menu-item">{t('menu.file')}</span>
-            <span className="vs-menu-item">{t('menu.edit')}</span>
-            <span className="vs-menu-item">{t('menu.view')}</span>
-            <span className="vs-menu-item">{t('menu.tools')}</span>
-            <span className="vs-menu-item">{t('menu.help')}</span>
-          </div>
-        </div>
-        <div className="vs-titlebar-right">
-          <select
-            value={i18n.language}
-            onChange={(e) => changeLanguage(e.target.value)}
-            className="vs-language-select"
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <option value="en">{t('common.english')}</option>
-            <option value="zh">{t('common.chinese')}</option>
-          </select>
-          <div className="vs-window-controls" onMouseDown={(e) => e.stopPropagation()}>
-            <button className="vs-window-btn vs-minimize" onClick={handleMinimize} title="Minimize">
-              &#x2212;
-            </button>
-            <button className="vs-window-btn vs-maximize" onClick={handleMaximize} title={isMaximized ? "Restore" : "Maximize"}>
-              {isMaximized ? '\u2752' : '\u25A1'}
-            </button>
-            <button className="vs-window-btn vs-close" onClick={handleClose} title="Close">
-              &#x2715;
-            </button>
-          </div>
-        </div>
-      </div>
+      <MenuBar
+        activeActivity={activeActivity}
+        onActivityChange={onActivityChange}
+        onMinimize={handleMinimize}
+        onMaximize={handleMaximize}
+        onClose={handleClose}
+        isMaximized={isMaximized}
+        onTitleBarDrag={handleTitleBarDrag}
+        onTitleBarDoubleClick={handleTitleBarDoubleClick}
+        onToggleSidebar={() => setSidebarVisible((v) => !v)}
+        onTogglePanel={() => setBottomPanelVisible((v) => !v)}
+        sidebarVisible={sidebarVisible}
+        bottomPanelVisible={bottomPanelVisible}
+        onLanguageChange={changeLanguage}
+        currentLanguage={i18n.language}
+      />
 
       {/* Main Content Area */}
       <div className="vs-main-container">
@@ -229,19 +194,120 @@ const VSLayout: React.FC<VSLayoutProps> = ({
           onToggleSidebar={() => setSidebarVisible(!sidebarVisible)}
         />
 
-        {/* Left Sidebar */}
-        {sidebarVisible && (
+        {/* Left Sidebar (in flow when not floating) */}
+        {sidebarVisible && !sidebarFloating && (
           <div className="vs-sidebar" style={{ width: sidebarWidth }}>
-            <div className="vs-sidebar-header">
-              <span className="vs-sidebar-title">{sidebarTitle || t(`nav.${activeActivity}`)}</span>
-              <button className="vs-sidebar-close" onClick={() => setSidebarVisible(false)}>
-                &#x2715;
+            <div className="vs-sidebar-toolbar">
+              <span className="vs-sidebar-toolbar-spacer" />
+              <button
+                type="button"
+                className={`vs-sidebar-toolbar-btn ${sidebarFloating ? 'active' : ''}`}
+                onClick={() => setSidebarFloating(true)}
+                title={t('sidebar.float')}
+                aria-label={t('sidebar.float')}
+              >
+                <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u29C9'}</span>
+              </button>
+              <button
+                type="button"
+                className="vs-sidebar-toolbar-btn vs-sidebar-toolbar-close"
+                onClick={() => setSidebarVisible(false)}
+                title={t('sidebar.close')}
+                aria-label={t('sidebar.close')}
+              >
+                <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u2715'}</span>
               </button>
             </div>
-            <div className="vs-sidebar-content">
-              {sidebarContent}
-            </div>
+            {sidebarContent ? (
+              <>{sidebarContent}</>
+            ) : (
+              <>
+                <div className="vs-sidebar-header">
+                  <div className="vs-sidebar-tabs">
+                    <button
+                      className={`vs-sidebar-tab ${sidebarView === 'files' ? 'active' : ''}`}
+                      onClick={() => setSidebarView('files')}
+                      title={t('sidebar.fileExplorer')}
+                    >
+                      <span className="vs-sidebar-tab-icon">{'\uD83D\uDCC1'}</span>
+                      <span className="vs-sidebar-tab-label">{t('sidebar.fileExplorer')}</span>
+                    </button>
+                    <button
+                      className={`vs-sidebar-tab ${sidebarView === 'knowledge' ? 'active' : ''}`}
+                      onClick={() => setSidebarView('knowledge')}
+                      title={t('sidebar.knowledgeBase')}
+                    >
+                      <span className="vs-sidebar-tab-icon">{'\uD83D\uDCDA'}</span>
+                      <span className="vs-sidebar-tab-label">{t('sidebar.knowledgeBase')}</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="vs-sidebar-content">
+                  {sidebarView === 'files' ? <FileExplorer /> : <KnowledgeBaseTree />}
+                </div>
+              </>
+            )}
             <div className="vs-resize-handle vs-resize-horizontal" onMouseDown={handleSidebarResize} />
+          </div>
+        )}
+
+        {/* Left Sidebar (float = overlay push/pull: sidebar slides in/out, main area never moves) */}
+        {sidebarFloating && (
+          <div
+            ref={floatingSidebarRef}
+            className={`vs-sidebar vs-sidebar-floating ${!sidebarVisible ? 'vs-sidebar-pushed' : ''}`}
+            style={{ width: sidebarWidth }}
+          >
+            <div className="vs-sidebar-toolbar">
+              <span className="vs-sidebar-toolbar-spacer" />
+              <button
+                type="button"
+                className="vs-sidebar-toolbar-btn active"
+                onClick={() => setSidebarFloating(false)}
+                title={t('sidebar.dock')}
+                aria-label={t('sidebar.dock')}
+              >
+                <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u29C9'}</span>
+              </button>
+              <button
+                type="button"
+                className="vs-sidebar-toolbar-btn vs-sidebar-toolbar-close"
+                onClick={() => setSidebarVisible(false)}
+                title={t('sidebar.close')}
+                aria-label={t('sidebar.close')}
+              >
+                <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u2715'}</span>
+              </button>
+            </div>
+            {sidebarContent ? (
+              <>{sidebarContent}</>
+            ) : (
+              <>
+                <div className="vs-sidebar-header">
+                  <div className="vs-sidebar-tabs">
+                    <button
+                      className={`vs-sidebar-tab ${sidebarView === 'files' ? 'active' : ''}`}
+                      onClick={() => setSidebarView('files')}
+                      title={t('sidebar.fileExplorer')}
+                    >
+                      <span className="vs-sidebar-tab-icon">{'\uD83D\uDCC1'}</span>
+                      <span className="vs-sidebar-tab-label">{t('sidebar.fileExplorer')}</span>
+                    </button>
+                    <button
+                      className={`vs-sidebar-tab ${sidebarView === 'knowledge' ? 'active' : ''}`}
+                      onClick={() => setSidebarView('knowledge')}
+                      title={t('sidebar.knowledgeBase')}
+                    >
+                      <span className="vs-sidebar-tab-icon">{'\uD83D\uDCDA'}</span>
+                      <span className="vs-sidebar-tab-label">{t('sidebar.knowledgeBase')}</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="vs-sidebar-content">
+                  {sidebarView === 'files' ? <FileExplorer /> : <KnowledgeBaseTree />}
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -257,6 +323,12 @@ const VSLayout: React.FC<VSLayoutProps> = ({
                 <span className="vs-tab-title">{t(`nav.${activeActivity}`)}</span>
                 <button className="vs-tab-close">&#x2715;</button>
               </div>
+              {['training', 'production', 'evaluation'].includes(activeActivity) && (
+                <span
+                  className="vs-tab-help"
+                  title={t('trainingLab.configHint')}
+                >?</span>
+              )}
             </div>
             <div className="vs-editor-content">
               {children}
@@ -277,19 +349,6 @@ const VSLayout: React.FC<VSLayoutProps> = ({
           )}
         </div>
 
-        {/* Right Panel */}
-        {rightPanelVisible && (
-          <div className="vs-right-panel" style={{ width: rightPanelWidth }}>
-            <div className="vs-resize-handle vs-resize-horizontal-left" onMouseDown={handleRightPanelResize} />
-            <RightPanel
-              activeTab={rightPanelTab}
-              onTabChange={setRightPanelTab}
-              onClose={() => setRightPanelVisible(false)}
-              content={rightPanelContent}
-              activeActivity={activeActivity}
-            />
-          </div>
-        )}
       </div>
 
       {/* Status Bar */}
@@ -309,14 +368,8 @@ const VSLayout: React.FC<VSLayoutProps> = ({
           >
             {t('panel.output')}
           </button>
-          <button 
-            className={`vs-status-item vs-status-btn ${rightPanelVisible ? 'active' : ''}`}
-            onClick={() => setRightPanelVisible(!rightPanelVisible)}
-          >
-            {t('panel.properties')}
-          </button>
-          <span className="vs-status-item">UTF-8</span>
-          <span className="vs-status-item">Ln 1, Col 1</span>
+          <span className="vs-status-item">{t('status.utf8')}</span>
+          <span className="vs-status-item">{t('status.lnCol', { ln: 1, col: 1 })}</span>
         </div>
       </div>
     </div>

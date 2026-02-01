@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { evaluationGenerate } from '../services/api';
+import { getAIConfig } from '../utils/aiConfig';
 import './Evaluation.css';
 
 interface EvaluationResult {
@@ -17,38 +18,42 @@ const Evaluation: React.FC = () => {
   const { t } = useTranslation();
   const [selectedTemplate, setSelectedTemplate] = useState('proposal');
   const [prompt, setPrompt] = useState('');
-  const [apiKey, setApiKey] = useState('');
   const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
 
-  const templates = {
-    proposal: {
-      name: 'Proposal',
-      prompt: 'Generate a professional proposal based on the following requirements:'
-    },
-    technical: {
-      name: 'Technical Solution',
-      prompt: 'Create a detailed technical solution document for:'
-    },
-    paper: {
-      name: 'Academic Paper',
-      prompt: 'Write an academic paper section about:'
-    },
-    custom: {
-      name: 'Custom',
-      prompt: ''
-    }
+  const getTemplateName = (key: string) => {
+    const map: Record<string, string> = {
+      proposal: t('evaluation.templateProposal'),
+      technical: t('evaluation.templateTechnical'),
+      paper: t('evaluation.templatePaper'),
+      custom: t('evaluation.templateCustom')
+    };
+    return map[key] ?? key;
+  };
+  const getTemplatePrompt = (key: string) => {
+    const map: Record<string, string> = {
+      proposal: t('evaluation.templateProposalPrompt'),
+      technical: t('evaluation.templateTechnicalPrompt'),
+      paper: t('evaluation.templatePaperPrompt'),
+      custom: ''
+    };
+    return map[key] ?? '';
   };
 
   const handleGenerate = async () => {
-    const text = selectedTemplate === 'custom' ? customPrompt : (prompt || (templates as any)[selectedTemplate]?.prompt || '');
+    const text = selectedTemplate === 'custom' ? customPrompt : (prompt || getTemplatePrompt(selectedTemplate) || '');
     if (!text.trim()) {
       alert(t('evaluation.pleaseEnterPrompt'));
       return;
     }
-    if (!apiKey.trim()) {
-      alert(t('trainingLab.pleaseEnterApiKey'));
+    const cfg = getAIConfig();
+    if (cfg.useLocalModel) {
+      alert(t('evaluation.useCloudForEval'));
+      return;
+    }
+    if (!cfg.defaultPlatform) {
+      alert(t('trainingLab.configureInSettings'));
       return;
     }
 
@@ -56,7 +61,7 @@ const Evaluation: React.FC = () => {
     setEvaluationResult(null);
     try {
       const templateKey = selectedTemplate === 'technical' ? 'technical_solution' : selectedTemplate === 'paper' ? 'research_paper' : selectedTemplate;
-      const result = await evaluationGenerate(text, templateKey, apiKey);
+      const result = await evaluationGenerate(text, templateKey, undefined, cfg.defaultPlatform);
       setEvaluationResult({
         before: result.prompt || text,
         after: result.generated_content || '',
@@ -68,7 +73,7 @@ const Evaluation: React.FC = () => {
       });
     } catch (error) {
       console.error('Generation error:', error);
-      alert(`Generation failed: ${error}`);
+      alert(`${t('evaluation.generationFailed')}: ${error}`);
     } finally {
       setIsGenerating(false);
     }
@@ -76,28 +81,17 @@ const Evaluation: React.FC = () => {
 
   const handleExport = (format: 'word' | 'pdf') => {
     if (!evaluationResult) return;
-    alert(`Export to ${format.toUpperCase()} - Coming soon`);
+    alert(t('evaluation.exportComingSoon', { format: format.toUpperCase() }));
   };
 
   return (
     <div className="evaluation">
-      <h2>{t('evaluation.title')}</h2>
-
       <div className="evaluation-config">
-        <div className="form-group">
-          <label>{t('trainingLab.apiKey')}:</label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder={t('trainingLab.enterApiKey')}
-          />
-        </div>
         <div className="form-group">
           <label>{t('evaluation.template')}:</label>
           <select value={selectedTemplate} onChange={(e) => setSelectedTemplate(e.target.value)}>
-            {Object.entries(templates).map(([key, template]) => (
-              <option key={key} value={key}>{template.name}</option>
+            {['proposal', 'technical', 'paper', 'custom'].map((key) => (
+              <option key={key} value={key}>{getTemplateName(key)}</option>
             ))}
           </select>
         </div>
@@ -119,7 +113,7 @@ const Evaluation: React.FC = () => {
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={4}
-              placeholder={`${templates[selectedTemplate as keyof typeof templates].prompt} ...`}
+              placeholder={`${getTemplatePrompt(selectedTemplate)} ...`}
             />
           </div>
         )}

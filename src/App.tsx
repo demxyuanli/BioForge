@@ -1,19 +1,27 @@
 import { useState, useEffect, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import DataCenter from "./components/DataCenter";
+import FileResourcesWorkspace from "./components/FileResourcesWorkspace";
+import KnowledgeBaseWorkspace from "./components/KnowledgeBaseWorkspace";
 import TrainingLab from "./components/TrainingLab";
 import ProductionTuning from "./components/ProductionTuning";
-import PrivacyCenter from "./components/PrivacyCenter";
 import Dashboard from "./components/Dashboard";
 import Evaluation from "./components/Evaluation";
+import ChatAssistant from "./components/ChatAssistant";
+import Settings, { SettingsTab } from "./components/Settings";
 import Wizard from "./components/Wizard";
 import { VSLayout, ActivityType } from "./components/layout";
-import { startPythonBackend, getDocuments, getFinetuningJobs, Document, FinetuningJob } from "./services/api";
+import ResourceSidebar from "./components/layout/ResourceSidebar";
+import SettingsSidebar from "./components/layout/SettingsSidebar";
+import { startPythonBackend, getDocuments, getFinetuningJobs, getStorageConfig, Document, FinetuningJob } from "./services/api";
 import "./App.css";
 
 function App() {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<ActivityType>("dashboard");
+  const [activeTab, setActiveTab] = useState<ActivityType>("fileResources");
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
+  const [resourceView, setResourceView] = useState<'files' | 'knowledge'>('files');
+  const [sidebarSubItem, setSidebarSubItem] = useState<string>('overview');
   const [backendStarted, setBackendStarted] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -22,23 +30,32 @@ function App() {
 
   useEffect(() => {
     const wizardCompleted = localStorage.getItem('wizardCompleted');
-    if (!wizardCompleted) {
-      setShowWizard(true);
-    }
-
-    startPythonBackend().then(() => {
-      setBackendStarted(true);
-      addLog(t('logs.backendStarted'));
-    }).catch((error) => {
-      console.warn('Python backend may already be running:', error);
-      setBackendStarted(true);
-      addLog(t('logs.backendAlreadyRunning'));
-    });
+    getStorageConfig().then((config) => {
+      const hasConfig = config?.documentsDir && config?.dbPath;
+      if (!wizardCompleted || !hasConfig) {
+        setShowWizard(true);
+      }
+      if (hasConfig) {
+        startPythonBackend().then(() => {
+          setBackendStarted(true);
+          addLog(t('logs.backendStarted'));
+        }).catch((error) => {
+          console.warn('Python backend may already be running:', error);
+          setBackendStarted(true);
+          addLog(t('logs.backendAlreadyRunning'));
+        });
+      }
+    }).catch(() => setShowWizard(true));
 
     const handleWizardNavigate = (event: CustomEvent) => {
-      setActiveTab(event.detail as ActivityType);
-      setShowWizard(false);
-    };
+    const tab = event.detail as ActivityType;
+    setActiveTab(tab);
+    // If navigating to settings via wizard, default to general
+    if (tab === 'settings') {
+      setSettingsTab('general');
+    }
+    setShowWizard(false);
+  };
 
     window.addEventListener('wizard-navigate', handleWizardNavigate as EventListener);
     return () => {
@@ -76,101 +93,85 @@ function App() {
     addLog(t('logs.wizardCompleted'));
   };
 
+  const handleStorageComplete = () => {
+    setBackendStarted(true);
+    addLog(t('logs.storageConfigured'));
+    addLog(t('logs.backendStarted'));
+  };
+
   const renderMainContent = () => {
     switch (activeTab) {
       case "dashboard":
-        return <Dashboard />;
+      case "explorer": {
+        const processedCount = documents.filter((d) => d.processed).length;
+        const activeJobsCount = jobs.filter((j) => j.status === 'running' || j.status === 'submitted').length;
+        return (
+          <Dashboard
+            backendStarted={backendStarted}
+            documentsCount={documents.length}
+            processedCount={processedCount}
+            jobsCount={jobs.length}
+            activeJobsCount={activeJobsCount}
+          />
+        );
+      }
+      case "fileResources":
+        return <FileResourcesWorkspace />;
       case "datacenter":
         return <DataCenter />;
+      case "knowledgeBase":
+        return <KnowledgeBaseWorkspace />;
       case "training":
         return <TrainingLab />;
       case "production":
         return <ProductionTuning />;
       case "evaluation":
         return <Evaluation />;
-      case "privacy":
-        return <PrivacyCenter />;
+      case "chat":
+        return <ChatAssistant />;
+      case "settings":
+        return <Settings activeTab={settingsTab} />;
       default:
         return <Dashboard />;
     }
   };
 
-  const renderSidebarContent = (): ReactNode => {
-    switch (activeTab) {
-      case "dashboard":
-        return (
-          <div className="sidebar-overview">
-            <div className="sidebar-section">
-              <h4>{t('sidebar.quickStats')}</h4>
-              <div className="sidebar-stat">
-                <span>{t('sidebar.documents')}</span>
-                <span className="stat-badge">{documents.length}</span>
-              </div>
-              <div className="sidebar-stat">
-                <span>{t('sidebar.jobs')}</span>
-                <span className="stat-badge">{jobs.length}</span>
-              </div>
-              <div className="sidebar-stat">
-                <span>{t('sidebar.activeJobs')}</span>
-                <span className="stat-badge">{jobs.filter(j => j.status === 'running').length}</span>
-              </div>
-            </div>
-          </div>
-        );
-      case "datacenter":
-        return (
-          <div className="sidebar-explorer">
-            <div className="sidebar-section">
-              <h4>{t('sidebar.recentDocuments')}</h4>
-              {documents.length === 0 ? (
-                <p className="sidebar-empty">{t('sidebar.noDocuments')}</p>
-              ) : (
-                <ul className="sidebar-list">
-                  {documents.slice(0, 10).map((doc) => (
-                    <li key={doc.id} className="sidebar-item">
-                      <span className="item-icon">&#128196;</span>
-                      <span className="item-name">{doc.filename}</span>
-                      <span className={`item-status ${doc.processed ? 'processed' : 'pending'}`}>
-                        {doc.processed ? '\u2713' : '\u25CB'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        );
-      case "training":
-      case "production":
-        return (
-          <div className="sidebar-jobs">
-            <div className="sidebar-section">
-              <h4>{t('sidebar.finetuningJobs')}</h4>
-              {jobs.length === 0 ? (
-                <p className="sidebar-empty">{t('sidebar.noJobs')}</p>
-              ) : (
-                <ul className="sidebar-list">
-                  {jobs.slice(0, 10).map((job) => (
-                    <li key={job.id} className="sidebar-item">
-                      <span className="item-icon">&#9881;</span>
-                      <span className="item-name">{job.id.slice(0, 12)}...</span>
-                      <span className={`item-status status-${job.status}`}>
-                        {job.status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-        );
-      default:
-        return (
-          <div className="sidebar-default">
-            <p className="sidebar-empty">{t('sidebar.selectActivity')}</p>
-          </div>
-        );
+  useEffect(() => {
+    if (activeTab === 'knowledgeBase') setResourceView('knowledge');
+    else if (activeTab === 'fileResources' || activeTab === 'datacenter') setResourceView('files');
+  }, [activeTab]);
+
+  const firstSubItemByActivity: Record<string, string> = {
+    datacenter: 'knowledgeCreation',
+    knowledgeBase: 'knowledgeTree',
+    training: 'knowledgePoints',
+    production: 'datasetAndCost',
+    evaluation: 'templates',
+    chat: 'conversation'
+  };
+  useEffect(() => {
+    const first = firstSubItemByActivity[activeTab];
+    if (first) setSidebarSubItem(first);
+  }, [activeTab]);
+
+  const renderSidebarContent = () => {
+    if (activeTab === 'settings') {
+      return (
+        <SettingsSidebar 
+          activeTab={settingsTab} 
+          onTabChange={setSettingsTab} 
+        />
+      );
     }
+    return (
+      <ResourceSidebar
+        activity={activeTab}
+        activeView={resourceView}
+        onViewChange={setResourceView}
+        selectedSubItem={sidebarSubItem}
+        onSubItemChange={setSidebarSubItem}
+      />
+    );
   };
 
   const renderBottomPanelContent = (): ReactNode => {
@@ -192,56 +193,19 @@ function App() {
     );
   };
 
-  const renderRightPanelContent = (): ReactNode => {
-    const activeJobsCount = jobs.filter(j => j.status === 'running' || j.status === 'submitted').length;
-    const processedDocsCount = documents.filter(d => d.processed).length;
-    
-    return (
-      <div className="vs-properties-list">
-        <div className="vs-property-group">
-          <div className="vs-property-group-header">{t('panel.currentView')}</div>
-          <div className="vs-property-item">
-            <span className="vs-property-label">{t('panel.name')}</span>
-            <span className="vs-property-value">{t(`nav.${activeTab}`)}</span>
-          </div>
-          <div className="vs-property-item">
-            <span className="vs-property-label">{t('panel.status')}</span>
-            <span className="vs-property-value">{backendStarted ? t('status.ready') : t('status.loading')}</span>
-          </div>
-        </div>
-        <div className="vs-property-group">
-          <div className="vs-property-group-header">{t('panel.statistics')}</div>
-          <div className="vs-property-item">
-            <span className="vs-property-label">{t('panel.totalDocuments')}</span>
-            <span className="vs-property-value">{documents.length}</span>
-          </div>
-          <div className="vs-property-item">
-            <span className="vs-property-label">{t('panel.processedDocuments')}</span>
-            <span className="vs-property-value">{processedDocsCount}</span>
-          </div>
-          <div className="vs-property-item">
-            <span className="vs-property-label">{t('panel.totalJobs')}</span>
-            <span className="vs-property-value">{jobs.length}</span>
-          </div>
-          <div className="vs-property-item">
-            <span className="vs-property-label">{t('panel.activeJobs')}</span>
-            <span className="vs-property-value">{activeJobsCount}</span>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <>
-      {showWizard && <Wizard onComplete={handleWizardComplete} />}
+      {showWizard && (
+        <Wizard
+          onComplete={handleWizardComplete}
+          onStorageComplete={handleStorageComplete}
+        />
+      )}
       <VSLayout
         activeActivity={activeTab}
         onActivityChange={setActiveTab}
-        sidebarTitle={t(`nav.${activeTab}`)}
-        sidebarContent={renderSidebarContent()}
         bottomPanelContent={renderBottomPanelContent()}
-        rightPanelContent={renderRightPanelContent()}
+        sidebarContent={renderSidebarContent()}
       >
         {renderMainContent()}
       </VSLayout>

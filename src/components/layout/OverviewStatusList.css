@@ -1,0 +1,49 @@
+.osl-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.osl-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vs-muted);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vs-border-subtle);
+}
+
+.osl-loading {
+  padding: 12px;
+  font-size: 12px;
+  color: var(--vs-muted);
+}
+
+.osl-list {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.osl-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.osl-item:hover {
+  background-color: var(--vs-list-hover);
+}
+
+.osl-label {
+  color: var(--vs-muted);
+}
+
+.osl-value {
+  font-weight: 500;
+  color: var(--vs-accent);
+}

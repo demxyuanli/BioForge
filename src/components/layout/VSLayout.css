@@ -1,4 +1,4 @@
-/* VS Style Layout - Dark Theme */
+/* VS Style Layout - Theme variables from App.css */
 
 /* Main Layout Container */
 .vs-layout {
@@ -6,10 +6,10 @@
   flex-direction: column;
   height: 100vh;
   width: 100vw;
-  background-color: #1e1e1e;
-  color: #cccccc;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 13px;
+  background-color: var(--vs-bg);
+  color: var(--vs-fg);
+  font-family: var(--app-font-family, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-size: inherit;
   overflow: hidden;
 }
 
@@ -19,8 +19,8 @@
   align-items: center;
   justify-content: space-between;
   height: 32px;
-  background-color: #323233;
-  border-bottom: 1px solid #252526;
+  background-color: var(--menubar-bg);
+  border-bottom: 1px solid var(--menubar-border);
   padding: 0;
   user-select: none;
   cursor: default;
@@ -35,12 +35,12 @@
 
 .vs-app-icon {
   font-size: 16px;
-  color: #007acc;
+  color: var(--vs-accent);
 }
 
 .vs-app-title {
   font-size: 12px;
-  color: #cccccc;
+  color: var(--vs-fg);
   font-weight: 400;
 }
 
@@ -62,7 +62,7 @@
 }
 
 .vs-menu-item:hover {
-  background-color: #505050;
+  background-color: var(--vs-hover-bg);
 }
 
 .vs-titlebar-right {
@@ -73,16 +73,16 @@
 
 .vs-language-select {
   padding: 2px 6px;
-  background-color: #3c3c3c;
-  border: 1px solid #5a5a5a;
-  color: #cccccc;
+  background-color: var(--vs-border-subtle);
+  border: 1px solid var(--vs-border);
+  color: var(--vs-fg);
   border-radius: 3px;
   font-size: 11px;
   cursor: pointer;
 }
 
 .vs-language-select:hover {
-  border-color: #007acc;
+  border-color: var(--vs-accent);
 }
 
 .vs-window-controls {
@@ -95,7 +95,7 @@
   height: 32px;
   border: none;
   background: transparent;
-  color: #cccccc;
+  color: var(--vs-fg);
   cursor: pointer;
   font-size: 12px;
   display: flex;
@@ -105,16 +105,16 @@
 }
 
 .vs-window-btn:hover {
-  background-color: #4d4d4d;
+  background-color: var(--vs-hover-bg);
 }
 
 .vs-window-btn.vs-close:hover {
-  background-color: #e81123;
-  color: white;
+  background-color: var(--vs-error);
+  color: #ffffff;
 }
 
 .vs-window-btn:active {
-  background-color: #3a3a3a;
+  background-color: var(--menubar-item-hover-bg);
 }
 
 .vs-window-btn.vs-close:active {
@@ -128,42 +128,45 @@
   overflow: hidden;
 }
 
-/* Activity Bar (leftmost icon bar) */
+/* Activity Bar (leftmost icon bar) - compact small icons */
 .vs-activity-bar {
-  width: 48px;
-  background-color: #333333;
+  width: 32px;
+  background-color: var(--vs-sidebar-bg);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  border-right: 1px solid #252526;
+  border-right: 1px solid var(--vs-border);
 }
 
 .vs-activity-top,
 .vs-activity-bottom {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+  padding: 6px 0;
 }
 
 .vs-activity-item {
-  width: 48px;
-  height: 48px;
+  width: 32px;
+  height: 28px;
+  min-height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   background: transparent;
-  color: #858585;
+  color: var(--vs-muted);
   cursor: pointer;
   position: relative;
   transition: color 0.15s;
 }
 
 .vs-activity-item:hover {
-  color: #ffffff;
+  color: var(--vs-accent-fg);
 }
 
 .vs-activity-item.active {
-  color: #ffffff;
+  color: var(--vs-accent-fg);
 }
 
 .vs-activity-item.active::before {
@@ -173,30 +176,154 @@
   top: 0;
   bottom: 0;
   width: 2px;
-  background-color: #007acc;
+  background-color: var(--vs-accent);
 }
 
 .vs-activity-icon {
-  font-size: 22px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vs-activity-icon.vs-activity-arrow {
+  font-size: 10px;
 }
 
 /* Left Sidebar */
 .vs-sidebar {
-  background-color: #252526;
+  background-color: var(--vs-sidebar-bg);
   display: flex;
   flex-direction: column;
   position: relative;
-  border-right: 1px solid #1e1e1e;
+  border-right: 1px solid var(--vs-bg);
+}
+
+.vs-sidebar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 4px 6px;
+  min-height: 28px;
+  background-color: var(--vs-sidebar-bg);
+  border-bottom: 1px solid var(--vs-bg);
+  flex-shrink: 0;
+}
+
+.vs-sidebar-toolbar-spacer {
+  flex: 1;
+}
+
+.vs-sidebar-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--vs-muted);
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 2px;
+}
+
+.vs-sidebar-toolbar-btn:hover:not(:disabled) {
+  color: var(--vs-fg);
+  background-color: var(--vs-hover-bg);
+}
+
+.vs-sidebar-toolbar-btn.active {
+  color: var(--vs-accent-fg);
+}
+
+.vs-sidebar-toolbar-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vs-sidebar-toolbar-close:hover:not(:disabled) {
+  color: var(--vs-errorForeground, #f14c4c);
+}
+
+.vs-sidebar-toolbar-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+
+.vs-sidebar-floating {
+  position: fixed;
+  left: 32px;
+  top: 32px;
+  bottom: 22px;
+  z-index: 1000;
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.3);
+  border-right: 1px solid var(--vs-bg);
+  display: flex;
+  flex-direction: column;
+  background-color: var(--vs-sidebar-bg);
+  transition: transform 0.25s ease;
+  transform: translateX(0);
+}
+
+.vs-sidebar-floating.vs-sidebar-pushed {
+  transform: translateX(calc(-100% - 32px));
+  pointer-events: none;
 }
 
 .vs-sidebar-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
-  background-color: #252526;
-  border-bottom: 1px solid #1e1e1e;
-  min-height: 35px;
+  padding: 4px 8px;
+  background-color: var(--vs-sidebar-bg);
+  border-bottom: 1px solid var(--vs-bg);
+  min-height: 36px;
+}
+
+.vs-sidebar-tabs {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  overflow: hidden;
+}
+
+.vs-sidebar-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  color: var(--vs-muted);
+  cursor: pointer;
+  font-size: 11px;
+  border-radius: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.vs-sidebar-tab:hover {
+  color: var(--vs-fg);
+  background-color: var(--vs-list-hover);
+}
+
+.vs-sidebar-tab.active {
+  color: var(--vs-accent-fg);
+  background-color: var(--vs-border-subtle);
+}
+
+.vs-sidebar-tab-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.vs-sidebar-tab-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .vs-sidebar-title {
@@ -204,21 +331,21 @@
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  color: #bbbbbb;
+  color: var(--vs-fg);
 }
 
 .vs-sidebar-close {
   background: transparent;
   border: none;
-  color: #858585;
+  color: var(--vs-muted);
   cursor: pointer;
   padding: 2px 6px;
   font-size: 12px;
 }
 
 .vs-sidebar-close:hover {
-  color: #ffffff;
-  background-color: #404040;
+  color: var(--vs-accent-fg);
+  background-color: var(--vs-hover-bg);
 }
 
 .vs-sidebar-content {
@@ -227,13 +354,19 @@
   padding: 8px;
 }
 
+.vs-sidebar-placeholder {
+  padding: 12px;
+  font-size: 12px;
+  color: var(--vs-fg-muted, #888);
+}
+
 /* Center Area */
 .vs-center-area {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background-color: #1e1e1e;
+  background-color: var(--vs-bg);
 }
 
 /* Editor Area (Top) */
@@ -245,10 +378,33 @@
 
 .vs-editor-tabs {
   display: flex;
-  background-color: #252526;
-  border-bottom: 1px solid #1e1e1e;
+  align-items: center;
+  background-color: var(--vs-sidebar-bg);
+  border-bottom: 1px solid var(--vs-bg);
   min-height: 35px;
   overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.vs-tab-help {
+  margin-left: auto;
+  margin-right: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vs-muted);
+  background-color: var(--vs-input-bg);
+  cursor: help;
+}
+
+.vs-editor-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .vs-tab {
@@ -256,20 +412,20 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background-color: #2d2d2d;
-  border-right: 1px solid #252526;
+  background-color: var(--vs-table-header);
+  border-right: 1px solid var(--vs-border);
   cursor: pointer;
   min-width: 120px;
   max-width: 200px;
 }
 
 .vs-tab:hover {
-  background-color: #3c3c3c;
+  background-color: var(--vs-border-subtle);
 }
 
 .vs-tab.vs-tab-active {
-  background-color: #1e1e1e;
-  border-bottom: 1px solid #1e1e1e;
+  background-color: var(--vs-bg);
+  border-bottom: 1px solid var(--vs-bg);
   margin-bottom: -1px;
 }
 
@@ -296,25 +452,28 @@
 }
 
 .vs-tab:hover .vs-tab-close {
-  color: #858585;
+  color: var(--vs-muted);
 }
 
 .vs-tab-close:hover {
-  background-color: #505050;
-  color: #ffffff !important;
+  background-color: var(--vs-hover-bg);
+  color: var(--vs-fg) !important;
 }
 
 .vs-editor-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow-y: auto;
-  background-color: #1e1e1e;
+  background-color: var(--vs-bg);
   padding: 16px;
 }
 
 /* Bottom Panel */
 .vs-bottom-panel {
-  background-color: #1e1e1e;
-  border-top: 1px solid #007acc;
+  background-color: var(--vs-bg);
+  border-top: 1px solid var(--vs-accent);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -322,8 +481,8 @@
 
 /* Right Panel */
 .vs-right-panel {
-  background-color: #252526;
-  border-left: 1px solid #1e1e1e;
+  background-color: var(--vs-sidebar-bg);
+  border-left: 1px solid var(--vs-bg);
   display: flex;
   flex-direction: column;
   position: relative;
@@ -340,8 +499,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #252526;
-  border-bottom: 1px solid #1e1e1e;
+  background-color: var(--vs-sidebar-bg);
+  border-bottom: 1px solid var(--vs-bg);
   min-height: 35px;
   padding: 0 8px;
 }
@@ -355,7 +514,7 @@
   padding: 6px 12px;
   background: transparent;
   border: none;
-  color: #858585;
+  color: var(--vs-muted);
   cursor: pointer;
   font-size: 12px;
   text-transform: uppercase;
@@ -365,12 +524,13 @@
 }
 
 .vs-panel-tab:hover {
-  color: #cccccc;
+  color: var(--vs-fg);
 }
 
 .vs-panel-tab.active {
-  color: #ffffff;
-  border-bottom-color: #007acc;
+  color: var(--vs-fg);
+  border-bottom-color: var(--vs-accent);
+  font-weight: 600;
 }
 
 .vs-panel-actions {
@@ -381,7 +541,7 @@
 .vs-panel-action {
   background: transparent;
   border: none;
-  color: #858585;
+  color: var(--vs-muted);
   cursor: pointer;
   padding: 4px 8px;
   font-size: 12px;
@@ -389,8 +549,8 @@
 }
 
 .vs-panel-action:hover {
-  background-color: #404040;
-  color: #ffffff;
+  background-color: var(--vs-hover-bg);
+  color: var(--vs-fg);
 }
 
 .vs-panel-content {
@@ -402,7 +562,7 @@
 }
 
 .vs-panel-placeholder {
-  color: #858585;
+  color: var(--vs-muted);
 }
 
 .vs-output-line {
@@ -412,16 +572,16 @@
 }
 
 .vs-output-time {
-  color: #569cd6;
+  color: var(--vs-info);
 }
 
 .vs-output-text {
-  color: #cccccc;
+  color: var(--vs-fg);
 }
 
 /* Right Panel Properties */
 .vs-right-panel-container {
-  border-left: 1px solid #1e1e1e;
+  border-left: 1px solid var(--vs-bg);
 }
 
 .vs-properties-list {
@@ -436,9 +596,9 @@
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  color: #bbbbbb;
+  color: var(--vs-muted);
   padding: 8px 0;
-  border-bottom: 1px solid #3c3c3c;
+  border-bottom: 1px solid var(--vs-border-subtle);
   margin-bottom: 8px;
 }
 
@@ -446,16 +606,16 @@
   display: flex;
   justify-content: space-between;
   padding: 4px 0;
-  border-bottom: 1px solid #2d2d2d;
+  border-bottom: 1px solid var(--vs-divider);
 }
 
 .vs-property-label {
-  color: #9cdcfe;
+  color: var(--vs-variable-color);
   font-size: 12px;
 }
 
 .vs-property-value {
-  color: #ce9178;
+  color: var(--vs-string-color);
   font-size: 12px;
 }
 
@@ -475,7 +635,7 @@
 }
 
 .vs-resize-horizontal:hover {
-  background-color: #007acc;
+  background-color: var(--vs-accent);
 }
 
 .vs-resize-horizontal-left {
@@ -487,7 +647,7 @@
 }
 
 .vs-resize-horizontal-left:hover {
-  background-color: #007acc;
+  background-color: var(--vs-accent);
 }
 
 .vs-resize-vertical {
@@ -499,7 +659,7 @@
 }
 
 .vs-resize-vertical:hover {
-  background-color: #007acc;
+  background-color: var(--vs-accent);
 }
 
 /* Status Bar */
@@ -508,8 +668,8 @@
   align-items: center;
   justify-content: space-between;
   height: 22px;
-  background-color: #007acc;
-  color: #ffffff;
+  background-color: var(--vs-accent);
+  color: var(--vs-accent-fg);
   padding: 0 8px;
   font-size: 12px;
 }
@@ -532,7 +692,7 @@
 .vs-status-btn {
   background: transparent;
   border: none;
-  color: #ffffff;
+  color: var(--vs-accent-fg);
   cursor: pointer;
   font-size: 12px;
 }
@@ -553,24 +713,7 @@
   font-size: 14px;
 }
 
-/* Scrollbar Styling */
-.vs-layout ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-
-.vs-layout ::-webkit-scrollbar-track {
-  background: #1e1e1e;
-}
-
-.vs-layout ::-webkit-scrollbar-thumb {
-  background: #424242;
-  border-radius: 5px;
-}
-
-.vs-layout ::-webkit-scrollbar-thumb:hover {
-  background: #4f4f4f;
-}
+/* Scrollbar uses global theme vars from App.css */
 
 /* Content Area Overrides for existing components */
 .vs-editor-content .dashboard,
@@ -585,16 +728,16 @@
 }
 
 .vs-editor-content h2 {
-  color: #e6e6e6;
+  color: var(--vs-fg);
   font-size: 18px;
   font-weight: 500;
   margin-bottom: 16px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #3c3c3c;
+  border-bottom: 1px solid var(--vs-border-subtle);
 }
 
 .vs-editor-content h3 {
-  color: #cccccc;
+  color: var(--vs-fg);
   font-size: 14px;
   font-weight: 500;
   margin: 16px 0 8px 0;
@@ -614,8 +757,8 @@
 .vs-editor-content .stats-grid,
 .vs-editor-content .recent-jobs,
 .vs-editor-content .recent-documents {
-  background-color: #252526;
-  border: 1px solid #3c3c3c;
+  background-color: var(--vs-sidebar-bg);
+  border: 1px solid var(--vs-border-subtle);
   border-radius: 4px;
   padding: 16px;
   margin-bottom: 16px;
@@ -629,29 +772,29 @@
 }
 
 .vs-editor-content table th {
-  background-color: #2d2d2d;
-  color: #cccccc;
+  background-color: var(--vs-table-header);
+  color: var(--vs-fg);
   padding: 10px 12px;
   text-align: left;
   font-weight: 500;
-  border-bottom: 1px solid #3c3c3c;
+  border-bottom: 1px solid var(--vs-border-subtle);
 }
 
 .vs-editor-content table td {
   padding: 10px 12px;
-  border-bottom: 1px solid #2d2d2d;
-  color: #cccccc;
+  border-bottom: 1px solid var(--vs-divider);
+  color: var(--vs-fg);
 }
 
 .vs-editor-content table tr:hover {
-  background-color: #2a2d2e;
+  background-color: var(--vs-list-hover);
 }
 
 /* Button Styling */
 .vs-editor-content button {
   padding: 6px 14px;
-  background-color: #0e639c;
-  color: #ffffff;
+  background-color: var(--vs-accent);
+  color: var(--vs-accent-fg);
   border: none;
   border-radius: 2px;
   cursor: pointer;
@@ -661,30 +804,30 @@
 }
 
 .vs-editor-content button:hover {
-  background-color: #1177bb;
+  background-color: var(--vs-dropdown-hover);
 }
 
 .vs-editor-content button:disabled {
-  background-color: #3c3c3c;
-  color: #858585;
+  background-color: var(--vs-border-subtle);
+  color: var(--vs-muted);
   cursor: not-allowed;
 }
 
 .vs-editor-content button.delete-btn {
-  background-color: #d73a49;
+  background-color: var(--vs-error);
 }
 
 .vs-editor-content button.delete-btn:hover {
-  background-color: #cb2431;
+  opacity: 0.9;
 }
 
 /* Form Elements */
 .vs-editor-content input,
 .vs-editor-content select,
 .vs-editor-content textarea {
-  background-color: #3c3c3c;
+  background-color: var(--vs-border-subtle);
   border: 1px solid #5a5a5a;
-  color: #cccccc;
+  color: var(--vs-fg);
   padding: 6px 10px;
   border-radius: 2px;
   font-size: 13px;
@@ -695,11 +838,11 @@
 .vs-editor-content select:focus,
 .vs-editor-content textarea:focus {
   outline: none;
-  border-color: #007acc;
+  border-color: var(--vs-accent);
 }
 
 .vs-editor-content input::placeholder {
-  color: #858585;
+  color: var(--vs-muted);
 }
 
 /* Form Group */
@@ -709,7 +852,7 @@
 
 .vs-editor-content .form-group label {
   display: block;
-  color: #9cdcfe;
+  color: var(--vs-code-accent);
   font-size: 12px;
   margin-bottom: 4px;
 }
@@ -731,15 +874,15 @@
 }
 
 .vs-editor-content .stat-card {
-  background-color: #2d2d2d;
+  background-color: var(--vs-table-header);
   padding: 16px;
   border-radius: 4px;
-  border-left: 3px solid #007acc;
+  border-left: 3px solid var(--vs-accent);
 }
 
 .vs-editor-content .stat-label {
   font-size: 11px;
-  color: #858585;
+  color: var(--vs-muted);
   text-transform: uppercase;
   margin-bottom: 4px;
 }
@@ -747,7 +890,7 @@
 .vs-editor-content .stat-value {
   font-size: 24px;
   font-weight: 500;
-  color: #ffffff;
+  color: var(--vs-fg);
 }
 
 /* Dashboard Sections */
@@ -766,11 +909,11 @@
 /* Job and Document Cards */
 .vs-editor-content .job-card,
 .vs-editor-content .document-card {
-  background-color: #2d2d2d;
+  background-color: var(--vs-table-header);
   padding: 12px;
   border-radius: 4px;
   margin-bottom: 8px;
-  border-left: 3px solid #3794ff;
+  border-left: 3px solid var(--vs-info);
 }
 
 .vs-editor-content .job-header {
@@ -787,28 +930,28 @@
 }
 
 .vs-editor-content .job-status-running {
-  background-color: #0e639c;
+  background-color: var(--vs-info);
   color: #ffffff;
 }
 
 .vs-editor-content .job-status-completed {
-  background-color: #388a34;
+  background-color: var(--vs-success);
   color: #ffffff;
 }
 
 .vs-editor-content .job-status-failed {
-  background-color: #d73a49;
+  background-color: var(--vs-error);
   color: #ffffff;
 }
 
 .vs-editor-content .job-status-submitted {
-  background-color: #856404;
+  background-color: var(--vs-warning);
   color: #ffffff;
 }
 
 .vs-editor-content .progress-bar {
   height: 4px;
-  background-color: #3c3c3c;
+  background-color: var(--vs-border-subtle);
   border-radius: 2px;
   margin-top: 8px;
   overflow: hidden;
@@ -816,17 +959,17 @@
 
 .vs-editor-content .progress-fill {
   height: 100%;
-  background-color: #0e639c;
+  background-color: var(--vs-info);
   transition: width 0.3s;
 }
 
 /* Annotation Items */
 .vs-editor-content .annotation-item {
-  background-color: #2d2d2d;
+  background-color: var(--vs-table-header);
   padding: 12px;
   border-radius: 4px;
   margin-bottom: 12px;
-  border-left: 3px solid #6a9955;
+  border-left: 3px solid var(--vs-success);
 }
 
 .vs-editor-content .annotation-item .instruction,
@@ -836,7 +979,7 @@
 }
 
 .vs-editor-content .training-lab-usage h4 {
-  color: #cccccc;
+  color: var(--vs-fg);
   font-size: 13px;
   font-weight: 500;
   margin: 0 0 8px 0;
@@ -845,7 +988,7 @@
 .vs-editor-content .training-lab-usage-steps {
   margin: 0;
   padding-left: 20px;
-  color: #cccccc;
+  color: var(--vs-fg);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -855,7 +998,7 @@
 }
 
 .vs-editor-content .annotation-item strong {
-  color: #9cdcfe;
+  color: var(--vs-code-accent);
 }
 
 .vs-editor-content .knowledge-points-header h3 {
@@ -863,23 +1006,23 @@
 }
 
 .vs-editor-content .knowledge-point-item {
-  border-bottom-color: #3c3c3c;
+  border-bottom-color: var(--vs-border-subtle);
 }
 
 .vs-editor-content .kp-index {
-  color: #858585;
+  color: var(--vs-muted);
 }
 
 .vs-editor-content .kp-content {
-  color: #cccccc;
+  color: var(--vs-fg);
 }
 
 /* Info Section */
 .vs-editor-content .info-section {
-  background-color: #063b49;
-  border: 1px solid #007acc;
+  background-color: var(--vs-info-bg);
+  border: 1px solid var(--vs-info);
   border-radius: 4px;
   padding: 12px 16px;
   margin-bottom: 16px;
-  color: #9cdcfe;
+  color: var(--vs-fg);
 }

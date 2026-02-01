@@ -1,0 +1,121 @@
+.storage-wizard-fields {
+  margin-top: 8px;
+}
+
+.storage-wizard-fields .storage-wizard-field {
+  margin-bottom: 16px;
+}
+
+.storage-wizard-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.storage-wizard-container {
+  background: var(--vs-dropdown-bg);
+  border-radius: 8px;
+  padding: 24px;
+  min-width: 420px;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.storage-wizard-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  color: var(--vs-fg);
+}
+
+.storage-wizard-desc {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--vs-muted);
+  line-height: 1.5;
+}
+
+.storage-wizard-field {
+  margin-bottom: 16px;
+}
+
+.storage-wizard-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--vs-fg);
+}
+
+.storage-wizard-input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.storage-wizard-input-row input {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 13px;
+  background: var(--vs-bg);
+  border: 1px solid var(--vs-border-subtle);
+  border-radius: 4px;
+  color: var(--vs-fg);
+}
+
+.storage-wizard-input-row button {
+  padding: 8px 14px;
+  font-size: 12px;
+  background: var(--vs-accent);
+  border: none;
+  border-radius: 4px;
+  color: var(--vs-accent-fg);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.storage-wizard-input-row button:hover {
+  background: var(--vs-dropdown-hover);
+}
+
+.storage-wizard-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--vs-muted);
+}
+
+.storage-wizard-error {
+  margin-bottom: 12px;
+  padding: 8px;
+  font-size: 12px;
+  color: var(--vs-error);
+  background: var(--vs-error-bg);
+  border-radius: 4px;
+}
+
+.storage-wizard-footer {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.storage-wizard-footer .primary {
+  padding: 10px 20px;
+  font-size: 13px;
+  background: var(--vs-accent);
+  border: none;
+  border-radius: 4px;
+  color: var(--vs-accent-fg);
+  cursor: pointer;
+}
+
+.storage-wizard-footer .primary:hover:not(:disabled) {
+  background: var(--vs-dropdown-hover);
+}
+
+.storage-wizard-footer .primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

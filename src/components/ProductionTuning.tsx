@@ -10,14 +10,12 @@ import {
   FinetuningJob,
   Annotation
 } from '../services/api';
+import { getAIConfig } from '../utils/aiConfig';
 
 const ProductionTuning: React.FC = () => {
   const { t } = useTranslation();
   const [jobs, setJobs] = useState<FinetuningJob[]>([]);
   const [savedAnnotations, setSavedAnnotations] = useState<Annotation[]>([]);
-  const [selectedPlatform, setSelectedPlatform] = useState('deepseek');
-  const [selectedModel, setSelectedModel] = useState('deepseek-chat');
-  const [apiKey, setApiKey] = useState('');
   const [datasetSize, setDatasetSize] = useState(100);
   const [costEstimate, setCostEstimate] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,7 +32,7 @@ const ProductionTuning: React.FC = () => {
     if (datasetSize > 0) {
       estimateCost();
     }
-  }, [datasetSize, selectedModel, selectedPlatform]);
+  }, [datasetSize]);
 
   const loadTrainingSet = async () => {
     try {
@@ -78,11 +76,13 @@ const ProductionTuning: React.FC = () => {
   };
 
   const estimateCost = async () => {
+    const cfg = getAIConfig();
+    if (cfg.useLocalModel) return;
     try {
       const estimate = await estimateFinetuningCost(
         datasetSize,
-        selectedModel,
-        selectedPlatform
+        cfg.defaultCloudModel,
+        cfg.defaultPlatform
       );
       setCostEstimate(estimate);
     } catch (error) {
@@ -91,8 +91,13 @@ const ProductionTuning: React.FC = () => {
   };
 
   const handleStartFinetuning = async () => {
-    if (!apiKey) {
-      alert(t('productionTuning.pleaseEnterApiKey'));
+    const cfg = getAIConfig();
+    if (cfg.useLocalModel) {
+      alert(t('productionTuning.useCloudForFinetuning'));
+      return;
+    }
+    if (!cfg.defaultPlatform) {
+      alert(t('trainingLab.configureInSettings'));
       return;
     }
 
@@ -112,51 +117,26 @@ const ProductionTuning: React.FC = () => {
     try {
       const job = await submitFinetuningJob(
         annotationsToSubmit,
-        selectedPlatform,
-        selectedModel,
-        apiKey,
+        cfg.defaultPlatform,
+        cfg.defaultCloudModel,
+        '',
         'sft'
       );
       await loadJobs();
-      alert(`Fine-tuning job submitted: ${job.id ?? (job as any).job_id ?? '-'}`);
+      alert(`${t('productionTuning.jobSubmitted')}: ${job.id ?? (job as any).job_id ?? '-'}`);
     } catch (error) {
       console.error('Fine-tuning error:', error);
-      alert(`Failed to submit job: ${error}`);
+      alert(`${t('productionTuning.jobSubmitFailed')}: ${error}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const platforms = {
-    deepseek: {
-      name: 'DeepSeek (api.deepseek.com)',
-      models: ['deepseek-chat', 'deepseek-r1']
-    }
-  };
-
   return (
     <div className="production-tuning">
-      <h2>{t('productionTuning.title')}</h2>
-      
       <div className="job-configuration">
-        <h3>{t('productionTuning.configureJob')}</h3>
-        <div className="form-group">
-          <label>{t('productionTuning.platform')}:</label>
-          <select value={selectedPlatform} onChange={(e) => setSelectedPlatform(e.target.value)}>
-            {Object.entries(platforms).map(([key, platform]) => (
-              <option key={key} value={key}>{platform.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group">
-          <label>{t('productionTuning.model')}:</label>
-          <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)}>
-            {platforms[selectedPlatform as keyof typeof platforms].models.map(model => (
-              <option key={model} value={model}>{model}</option>
-            ))}
-          </select>
-        </div>
-        <div className="form-group">
+        <div className="form-group" style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ color: 'var(--vs-muted)' }}>{getAIConfig().defaultPlatform} / {getAIConfig().defaultCloudModel}</span>
           <label>{t('productionTuning.datasetSize')}:</label>
           <input
             type="number"
@@ -165,24 +145,15 @@ const ProductionTuning: React.FC = () => {
             onChange={(e) => setDatasetSize(parseInt(e.target.value) || 0)}
           />
           {savedAnnotations.length > 0 && (
-            <span className="saved-count">({t('productionTuning.usingSaved')}: {savedAnnotations.length})</span>
+            <span className="saved-count">({savedAnnotations.length})</span>
           )}
         </div>
-        <div className="form-group">
-          <label>{t('productionTuning.apiKey')}:</label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder={t('productionTuning.enterApiKey')}
-          />
-        </div>
-        {costEstimate && (
+        {!getAIConfig().useLocalModel && costEstimate && (
           <div className="cost-estimate">
             <p><strong>{t('productionTuning.estimatedCost')}:</strong> ${costEstimate.estimated_cost_usd?.toFixed(2) || 'N/A'}</p>
           </div>
         )}
-        <button onClick={handleStartFinetuning} disabled={isSubmitting || !apiKey}>
+        <button onClick={handleStartFinetuning} disabled={isSubmitting}>
           {isSubmitting ? t('productionTuning.submitting') : t('productionTuning.startFineTuning')}
         </button>
       </div>

@@ -3,6 +3,21 @@
   margin: 0 auto;
 }
 
+.dashboard-status-bar {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  padding: 8px 12px;
+  background: var(--vs-panel-bg);
+  border-radius: 6px;
+  font-size: 13px;
+  border: 1px solid var(--vs-border-subtle);
+}
+
+.dashboard-status-item {
+  color: var(--vs-muted);
+}
+
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -11,23 +26,24 @@
 }
 
 .stat-card {
-  background: white;
+  background: var(--vs-panel-bg);
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
   text-align: center;
+  border: 1px solid var(--vs-border-subtle);
 }
 
 .stat-label {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--vs-muted);
   margin-bottom: 0.5rem;
 }
 
 .stat-value {
   font-size: 2rem;
   font-weight: bold;
-  color: #646cff;
+  color: var(--vs-accent);
 }
 
 .dashboard-sections {
@@ -38,16 +54,18 @@
 
 .recent-jobs,
 .recent-documents {
-  background: white;
+  background: var(--vs-panel-bg);
   padding: 1.5rem;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  border: 1px solid var(--vs-border-subtle);
 }
 
 .recent-jobs h3,
 .recent-documents h3 {
   margin-top: 0;
   margin-bottom: 1rem;
+  color: var(--vs-fg);
 }
 
 .jobs-list,
@@ -60,9 +78,10 @@
 .job-card,
 .document-card {
   padding: 1rem;
-  background: #f9f9f9;
+  background: var(--vs-bg);
   border-radius: 4px;
-  border-left: 3px solid #646cff;
+  border-left: 3px solid var(--vs-accent);
+  color: var(--vs-fg);
 }
 
 .job-header {
@@ -86,28 +105,28 @@
 }
 
 .job-status-submitted {
-  background-color: #e3f2fd;
-  color: #1976d2;
+  background-color: var(--vs-info);
+  color: white;
 }
 
 .job-status-running {
-  background-color: #fff3e0;
-  color: #f57c00;
+  background-color: var(--vs-warning);
+  color: white;
 }
 
 .job-status-completed {
-  background-color: #e8f5e9;
-  color: #388e3c;
+  background-color: var(--vs-success);
+  color: white;
 }
 
 .job-status-failed {
-  background-color: #ffebee;
-  color: #d32f2f;
+  background-color: var(--vs-error);
+  color: white;
 }
 
 .job-details {
   font-size: 0.9rem;
-  color: #666;
+  color: var(--vs-muted);
 }
 
 .job-details > div {
@@ -117,7 +136,7 @@
 .progress-bar {
   width: 100%;
   height: 8px;
-  background-color: #e0e0e0;
+  background-color: var(--vs-border-subtle);
   border-radius: 4px;
   overflow: hidden;
   margin-top: 0.5rem;
@@ -125,7 +144,7 @@
 
 .progress-fill {
   height: 100%;
-  background-color: #646cff;
+  background-color: var(--vs-accent);
   transition: width 0.3s ease;
 }
 
@@ -138,7 +157,7 @@
   display: flex;
   gap: 1rem;
   font-size: 0.9rem;
-  color: #666;
+  color: var(--vs-muted);
 }
 
 .doc-type {
@@ -154,25 +173,11 @@
 }
 
 .doc-status.processed {
-  background-color: #e8f5e9;
-  color: #388e3c;
+  background-color: var(--vs-success);
+  color: white;
 }
 
 .doc-status.pending {
-  background-color: #fff3e0;
-  color: #f57c00;
-}
-
-@media (prefers-color-scheme: dark) {
-  .stat-card,
-  .recent-jobs,
-  .recent-documents {
-    background-color: #2f2f2f;
-    color: #f6f6f6;
-  }
-
-  .job-card,
-  .document-card {
-    background-color: #333;
-  }
+  background-color: var(--vs-warning);
+  color: white;
 }

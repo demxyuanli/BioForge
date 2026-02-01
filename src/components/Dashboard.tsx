@@ -3,7 +3,21 @@ import { useTranslation } from 'react-i18next';
 import { getFinetuningJobs, getDocuments, FinetuningJob, Document } from '../services/api';
 import './Dashboard.css';
 
-const Dashboard: React.FC = () => {
+interface DashboardProps {
+  backendStarted?: boolean;
+  documentsCount?: number;
+  processedCount?: number;
+  jobsCount?: number;
+  activeJobsCount?: number;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({
+  backendStarted = true,
+  documentsCount,
+  processedCount,
+  jobsCount,
+  activeJobsCount
+}) => {
   const { t } = useTranslation();
   const [jobs, setJobs] = useState<FinetuningJob[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -47,22 +61,38 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  const displayStats = {
+    totalDocuments: documentsCount ?? stats.totalDocuments,
+    totalJobs: jobsCount ?? stats.totalJobs,
+    activeJobs: activeJobsCount ?? stats.activeJobs,
+    completedJobs: stats.completedJobs,
+    totalCost: stats.totalCost
+  };
+
   return (
     <div className="dashboard">
-      <h2>{t('dashboard.title')}</h2>
-      
+      <div className="dashboard-status-bar">
+        <span className="dashboard-status-item">
+          {t('panel.status')}: {backendStarted ? t('status.ready') : t('status.loading')}
+        </span>
+        {processedCount != null && (
+          <span className="dashboard-status-item">
+            {t('panel.processedDocuments')}: {processedCount}
+          </span>
+        )}
+      </div>
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-label">{t('dashboard.totalDocuments')}</div>
-          <div className="stat-value">{stats.totalDocuments}</div>
+          <div className="stat-value">{displayStats.totalDocuments}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">{t('dashboard.totalJobs')}</div>
-          <div className="stat-value">{stats.totalJobs}</div>
+          <div className="stat-value">{displayStats.totalJobs}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">{t('dashboard.activeJobs')}</div>
-          <div className="stat-value">{stats.activeJobs}</div>
+          <div className="stat-value">{displayStats.activeJobs}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">{t('dashboard.completedJobs')}</div>

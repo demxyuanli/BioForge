@@ -1,0 +1,136 @@
+.fe-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fe-mount-header {
+  padding: 8px;
+  border-bottom: 1px solid var(--vs-border-subtle);
+}
+
+.fe-add-mount-btn {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 12px;
+  background: var(--vs-table-header);
+  border: 1px dashed var(--vs-border);
+  color: var(--vs-fg);
+  border-radius: 2px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.fe-add-mount-btn:hover {
+  background: var(--vs-border-subtle);
+  border-color: var(--vs-accent);
+}
+
+.fe-add-hint {
+  padding: 16px 12px;
+  color: var(--vs-muted);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.fe-add-hint:hover {
+  color: var(--vs-fg);
+}
+
+.fe-mount-node {
+  margin-bottom: 4px;
+}
+
+.fe-mount-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  min-height: 28px;
+  border-radius: 2px;
+}
+
+.fe-mount-item:hover {
+  background-color: var(--vs-list-hover);
+}
+
+.fe-remove-mount {
+  margin-left: auto;
+  padding: 2px 8px;
+  font-size: 14px;
+  background: transparent;
+  border: none;
+  color: var(--vs-muted);
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.fe-remove-mount:hover {
+  background: var(--vs-hover-bg);
+  color: #fff;
+}
+
+.fe-loading,
+.fe-empty {
+  padding: 16px 12px;
+  color: var(--vs-muted);
+  font-size: 12px;
+}
+
+.fe-tree {
+  font-size: 12px;
+}
+
+.fe-tree-node {
+  user-select: none;
+}
+
+.fe-tree-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  min-height: 24px;
+  border-radius: 2px;
+}
+
+.fe-tree-item:hover {
+  background-color: var(--vs-list-hover);
+}
+
+.fe-tree-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.fe-tree-icon-img {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.fe-tree-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vs-fg);
+}
+
+.fe-tree-badge {
+  font-size: 10px;
+  color: #6a9955;
+  flex-shrink: 0;
+}
+
+.fe-tree-children {
+  margin-left: 0;
+}

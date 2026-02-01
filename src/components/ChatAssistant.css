@@ -2,9 +2,9 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: var(--vs-editor-bg);
-  color: var(--vs-text);
-  font-family: var(--vs-font-family);
+  background-color: var(--vs-bg);
+  color: var(--vs-fg);
+  font-family: var(--app-font-family, system-ui, sans-serif);
 }
 
 .chat-messages {
@@ -24,8 +24,8 @@
 
 .chat-message.user {
   align-self: flex-end;
-  background-color: var(--vs-button-primary-bg);
-  color: var(--vs-button-primary-fg);
+  background-color: var(--vs-accent);
+  color: var(--vs-accent-fg);
   border-radius: 8px 8px 0 8px;
   padding: 8px 12px;
 }
@@ -36,6 +36,7 @@
   border: 1px solid var(--vs-border);
   border-radius: 8px 8px 8px 0;
   padding: 8px 12px;
+  color: var(--vs-fg);
 }
 
 .chat-message-content {
@@ -47,7 +48,7 @@
 .chat-message-sources {
   margin-top: 8px;
   font-size: 11px;
-  color: var(--vs-text-muted);
+  color: var(--vs-muted);
   border-top: 1px solid var(--vs-border);
   padding-top: 4px;
 }
@@ -62,9 +63,9 @@
 
 .chat-input {
   flex: 1;
-  background-color: var(--vs-input-bg);
-  color: var(--vs-input-fg);
-  border: 1px solid var(--vs-input-border);
+  background-color: var(--settings-input-bg);
+  color: var(--settings-input-color);
+  border: 1px solid var(--settings-input-border);
   border-radius: 4px;
   padding: 8px;
   font-family: inherit;
@@ -75,13 +76,13 @@
 }
 
 .chat-input:focus {
-  outline: 1px solid var(--vs-focus-border);
-  border-color: var(--vs-focus-border);
+  outline: 1px solid var(--vs-accent);
+  border-color: var(--vs-accent);
 }
 
 .chat-send-btn {
-  background-color: var(--vs-button-primary-bg);
-  color: var(--vs-button-primary-fg);
+  background-color: var(--vs-accent);
+  color: var(--vs-accent-fg);
   border: none;
   border-radius: 4px;
   padding: 0 16px;
@@ -90,11 +91,12 @@
 }
 
 .chat-send-btn:hover {
-  background-color: var(--vs-button-primary-hover);
+  background-color: var(--vs-dropdown-hover);
 }
 
 .chat-send-btn:disabled {
-  opacity: 0.5;
+  background-color: var(--vs-border-subtle);
+  color: var(--vs-muted);
   cursor: not-allowed;
 }
 
@@ -112,7 +114,7 @@
 .chat-loading-dot {
   width: 6px;
   height: 6px;
-  background-color: var(--vs-text-muted);
+  background-color: var(--vs-muted);
   border-radius: 50%;
   animation: chat-dot-bounce 1.4s infinite ease-in-out both;
 }

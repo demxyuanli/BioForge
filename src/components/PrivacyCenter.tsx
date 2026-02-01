@@ -38,7 +38,7 @@ const PrivacyCenter: React.FC = () => {
       await loadAPIKeys();
     } catch (error) {
       console.error('Save API key error:', error);
-      alert(`Failed to save API key: ${error}`);
+      alert(`${t('privacyCenter.apiKeySaveFailed')}: ${error}`);
     }
   };
 
