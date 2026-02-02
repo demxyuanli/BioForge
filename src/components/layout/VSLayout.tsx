@@ -6,6 +6,7 @@ import BottomPanel from './BottomPanel';
 import FileExplorer from './FileExplorer';
 import KnowledgeBaseTree from './KnowledgeBaseTree';
 import MenuBar from './MenuBar';
+import Tooltip from '../Tooltip';
 import './VSLayout.css';
 
 export type ActivityType = 'dashboard' | 'datacenter' | 'fileResources' | 'knowledgeBase' | 'training' | 'production' | 'evaluation' | 'chat' | 'settings' | 'explorer';
@@ -33,7 +34,8 @@ const VSLayout: React.FC<VSLayoutProps> = ({
   const [sidebarFloating, setSidebarFloating] = useState(false);
   const [bottomPanelVisible, setBottomPanelVisible] = useState(false);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
-  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const SIDEBAR_MIN_WIDTH = 200;
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_MIN_WIDTH);
   const [bottomPanelTab, setBottomPanelTab] = useState<BottomPanelTab>('output');
   const [sidebarView, setSidebarView] = useState<SidebarViewType>('files');
   const [isMaximized, setIsMaximized] = useState(false);
@@ -130,7 +132,7 @@ const VSLayout: React.FC<VSLayoutProps> = ({
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const newWidth = startWidth + (moveEvent.clientX - startX);
-      if (newWidth >= 200 && newWidth <= 500) {
+      if (newWidth >= SIDEBAR_MIN_WIDTH && newWidth <= 500) {
         setSidebarWidth(newWidth);
       }
     };
@@ -196,27 +198,29 @@ const VSLayout: React.FC<VSLayoutProps> = ({
 
         {/* Left Sidebar (in flow when not floating) */}
         {sidebarVisible && !sidebarFloating && (
-          <div className="vs-sidebar" style={{ width: sidebarWidth }}>
+          <div className="vs-sidebar" style={{ width: sidebarWidth, minWidth: SIDEBAR_MIN_WIDTH }}>
             <div className="vs-sidebar-toolbar">
               <span className="vs-sidebar-toolbar-spacer" />
-              <button
-                type="button"
-                className={`vs-sidebar-toolbar-btn ${sidebarFloating ? 'active' : ''}`}
-                onClick={() => setSidebarFloating(true)}
-                title={t('sidebar.float')}
-                aria-label={t('sidebar.float')}
-              >
-                <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u29C9'}</span>
-              </button>
-              <button
-                type="button"
-                className="vs-sidebar-toolbar-btn vs-sidebar-toolbar-close"
-                onClick={() => setSidebarVisible(false)}
-                title={t('sidebar.close')}
-                aria-label={t('sidebar.close')}
-              >
-                <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u2715'}</span>
-              </button>
+              <Tooltip title={t('sidebar.float')}>
+                <button
+                  type="button"
+                  className={`vs-sidebar-toolbar-btn ${sidebarFloating ? 'active' : ''}`}
+                  onClick={() => setSidebarFloating(true)}
+                  aria-label={t('sidebar.float')}
+                >
+                  <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u29C9'}</span>
+                </button>
+              </Tooltip>
+              <Tooltip title={t('sidebar.close')}>
+                <button
+                  type="button"
+                  className="vs-sidebar-toolbar-btn vs-sidebar-toolbar-close"
+                  onClick={() => setSidebarVisible(false)}
+                  aria-label={t('sidebar.close')}
+                >
+                  <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u2715'}</span>
+                </button>
+              </Tooltip>
             </div>
             {sidebarContent ? (
               <>{sidebarContent}</>
@@ -224,22 +228,24 @@ const VSLayout: React.FC<VSLayoutProps> = ({
               <>
                 <div className="vs-sidebar-header">
                   <div className="vs-sidebar-tabs">
-                    <button
-                      className={`vs-sidebar-tab ${sidebarView === 'files' ? 'active' : ''}`}
-                      onClick={() => setSidebarView('files')}
-                      title={t('sidebar.fileExplorer')}
-                    >
-                      <span className="vs-sidebar-tab-icon">{'\uD83D\uDCC1'}</span>
-                      <span className="vs-sidebar-tab-label">{t('sidebar.fileExplorer')}</span>
-                    </button>
-                    <button
-                      className={`vs-sidebar-tab ${sidebarView === 'knowledge' ? 'active' : ''}`}
-                      onClick={() => setSidebarView('knowledge')}
-                      title={t('sidebar.knowledgeBase')}
-                    >
-                      <span className="vs-sidebar-tab-icon">{'\uD83D\uDCDA'}</span>
-                      <span className="vs-sidebar-tab-label">{t('sidebar.knowledgeBase')}</span>
-                    </button>
+                    <Tooltip title={t('sidebar.fileExplorer')}>
+                      <button
+                        className={`vs-sidebar-tab ${sidebarView === 'files' ? 'active' : ''}`}
+                        onClick={() => setSidebarView('files')}
+                      >
+                        <span className="vs-sidebar-tab-icon">{'\uD83D\uDCC1'}</span>
+                        <span className="vs-sidebar-tab-label">{t('sidebar.fileExplorer')}</span>
+                      </button>
+                    </Tooltip>
+                    <Tooltip title={t('sidebar.knowledgeBase')}>
+                      <button
+                        className={`vs-sidebar-tab ${sidebarView === 'knowledge' ? 'active' : ''}`}
+                        onClick={() => setSidebarView('knowledge')}
+                      >
+                        <span className="vs-sidebar-tab-icon">{'\uD83D\uDCDA'}</span>
+                        <span className="vs-sidebar-tab-label">{t('sidebar.knowledgeBase')}</span>
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
                 <div className="vs-sidebar-content">
@@ -256,28 +262,30 @@ const VSLayout: React.FC<VSLayoutProps> = ({
           <div
             ref={floatingSidebarRef}
             className={`vs-sidebar vs-sidebar-floating ${!sidebarVisible ? 'vs-sidebar-pushed' : ''}`}
-            style={{ width: sidebarWidth }}
+            style={{ width: sidebarWidth, minWidth: SIDEBAR_MIN_WIDTH }}
           >
             <div className="vs-sidebar-toolbar">
               <span className="vs-sidebar-toolbar-spacer" />
-              <button
-                type="button"
-                className="vs-sidebar-toolbar-btn active"
-                onClick={() => setSidebarFloating(false)}
-                title={t('sidebar.dock')}
-                aria-label={t('sidebar.dock')}
-              >
-                <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u29C9'}</span>
-              </button>
-              <button
-                type="button"
-                className="vs-sidebar-toolbar-btn vs-sidebar-toolbar-close"
-                onClick={() => setSidebarVisible(false)}
-                title={t('sidebar.close')}
-                aria-label={t('sidebar.close')}
-              >
-                <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u2715'}</span>
-              </button>
+              <Tooltip title={t('sidebar.dock')}>
+                <button
+                  type="button"
+                  className="vs-sidebar-toolbar-btn active"
+                  onClick={() => setSidebarFloating(false)}
+                  aria-label={t('sidebar.dock')}
+                >
+                  <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u29C9'}</span>
+                </button>
+              </Tooltip>
+              <Tooltip title={t('sidebar.close')}>
+                <button
+                  type="button"
+                  className="vs-sidebar-toolbar-btn vs-sidebar-toolbar-close"
+                  onClick={() => setSidebarVisible(false)}
+                  aria-label={t('sidebar.close')}
+                >
+                  <span className="vs-sidebar-toolbar-icon" aria-hidden>{'\u2715'}</span>
+                </button>
+              </Tooltip>
             </div>
             {sidebarContent ? (
               <>{sidebarContent}</>
@@ -285,22 +293,24 @@ const VSLayout: React.FC<VSLayoutProps> = ({
               <>
                 <div className="vs-sidebar-header">
                   <div className="vs-sidebar-tabs">
-                    <button
-                      className={`vs-sidebar-tab ${sidebarView === 'files' ? 'active' : ''}`}
-                      onClick={() => setSidebarView('files')}
-                      title={t('sidebar.fileExplorer')}
-                    >
-                      <span className="vs-sidebar-tab-icon">{'\uD83D\uDCC1'}</span>
-                      <span className="vs-sidebar-tab-label">{t('sidebar.fileExplorer')}</span>
-                    </button>
-                    <button
-                      className={`vs-sidebar-tab ${sidebarView === 'knowledge' ? 'active' : ''}`}
-                      onClick={() => setSidebarView('knowledge')}
-                      title={t('sidebar.knowledgeBase')}
-                    >
-                      <span className="vs-sidebar-tab-icon">{'\uD83D\uDCDA'}</span>
-                      <span className="vs-sidebar-tab-label">{t('sidebar.knowledgeBase')}</span>
-                    </button>
+                    <Tooltip title={t('sidebar.fileExplorer')}>
+                      <button
+                        className={`vs-sidebar-tab ${sidebarView === 'files' ? 'active' : ''}`}
+                        onClick={() => setSidebarView('files')}
+                      >
+                        <span className="vs-sidebar-tab-icon">{'\uD83D\uDCC1'}</span>
+                        <span className="vs-sidebar-tab-label">{t('sidebar.fileExplorer')}</span>
+                      </button>
+                    </Tooltip>
+                    <Tooltip title={t('sidebar.knowledgeBase')}>
+                      <button
+                        className={`vs-sidebar-tab ${sidebarView === 'knowledge' ? 'active' : ''}`}
+                        onClick={() => setSidebarView('knowledge')}
+                      >
+                        <span className="vs-sidebar-tab-icon">{'\uD83D\uDCDA'}</span>
+                        <span className="vs-sidebar-tab-label">{t('sidebar.knowledgeBase')}</span>
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
                 <div className="vs-sidebar-content">
@@ -324,10 +334,9 @@ const VSLayout: React.FC<VSLayoutProps> = ({
                 <button className="vs-tab-close">&#x2715;</button>
               </div>
               {['training', 'production', 'evaluation'].includes(activeActivity) && (
-                <span
-                  className="vs-tab-help"
-                  title={t('trainingLab.configHint')}
-                >?</span>
+                <Tooltip title={t('trainingLab.configHint')}>
+                  <span className="vs-tab-help">?</span>
+                </Tooltip>
               )}
             </div>
             <div className="vs-editor-content">

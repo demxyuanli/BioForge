@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BottomPanelTab } from './VSLayout';
+import Tooltip from '../Tooltip';
 
 interface BottomPanelProps {
   activeTab: BottomPanelTab;
@@ -43,15 +44,21 @@ const BottomPanel: React.FC<BottomPanelProps> = ({
           ))}
         </div>
         <div className="vs-panel-actions">
-          <button className="vs-panel-action" title={t('panel.clear')}>
-            &#x2715;
-          </button>
-          <button className="vs-panel-action" title={t('panel.maximize')}>
-            &#x25A1;
-          </button>
-          <button className="vs-panel-action" onClick={onClose} title={t('panel.close')}>
-            &#x2715;
-          </button>
+          <Tooltip title={t('panel.clear')}>
+            <button className="vs-panel-action">
+              &#x2715;
+            </button>
+          </Tooltip>
+          <Tooltip title={t('panel.maximize')}>
+            <button className="vs-panel-action">
+              &#x25A1;
+            </button>
+          </Tooltip>
+          <Tooltip title={t('panel.close')}>
+            <button className="vs-panel-action" onClick={onClose}>
+              &#x2715;
+            </button>
+          </Tooltip>
         </div>
       </div>
       <div className="vs-panel-content">

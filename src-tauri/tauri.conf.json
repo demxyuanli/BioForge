@@ -15,6 +15,7 @@
         "title": "PrivateTune Pro",
         "width": 1400,
         "height": 900,
+        "center": true,
         "decorations": false,
         "transparent": false,
         "resizable": true,

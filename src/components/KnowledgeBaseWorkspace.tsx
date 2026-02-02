@@ -1,148 +1,354 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  getDocuments,
-  getKnowledgePoints,
-  getTrainingSet,
-  createKnowledgePoint,
-  type Document,
-  type KnowledgePoint,
-} from '../services/api';
+import { FileText, X, Maximize2, Minimize2 } from 'lucide-react';
+import Tooltip from './Tooltip';
+import PdfViewer from './PdfViewer';
+import { getDocuments, getDirectories, getKnowledgePoints, updateKnowledgePointWeight, updateKnowledgePointExcluded, getDocumentSummaryByDocumentId, getDocumentPreviewByDocumentId, type Document, type DirectoryNode, type KnowledgePoint } from '../services/api';
+import { loadFileMeta, saveFileMeta, type FileMetaItem } from '../utils/fileMeta';
 import './KnowledgeBaseWorkspace.css';
 
+const UPPER_MIN = 40;
+const UPPER_MAX_OFFSET = 40;
+const UPPER_DEFAULT = 48;
 const RECENT_LIMIT = 20;
+const LOWER_VISIBLE_DEFAULT = false;
 const KP_PAGE_SIZE = 50;
-const BRIEF_LENGTH = 80;
-const STAR_FILLED = '\u2605';
-const STAR_EMPTY = '\u2606';
-const WEIGHT_STARS = 5;
-
-function weightToStars(weight: number | undefined | null): number {
-  const w = weight ?? 1;
-  return Math.min(WEIGHT_STARS, Math.max(1, Math.round(w)));
-}
-
-function renderStars(count: number, filled: number): React.ReactNode {
-  return Array.from({ length: count }, (_, i) => {
-    const n = i + 1;
-    const isFilled = n <= filled;
-    const char = isFilled ? STAR_FILLED : STAR_EMPTY;
-    const starClass = isFilled ? 'kb-star-filled' : 'kb-star-empty';
-    return <span key={n} className={`kb-star-static ${starClass}`}>{char}</span>;
-  });
-}
-
-function getLocatedKeywords(content: string, snippets: string[]): string[] {
-  const unique = Array.from(new Set(snippets)).filter((s) => s && typeof s === 'string' && s.length > 0);
-  return unique.filter((snip) => content.indexOf(snip) >= 0);
-}
-
-function highlightAnnotationSpans(
-  content: string,
-  snippets: string[],
-  weightStars: number
-): React.ReactNode {
-  const unique = Array.from(new Set(snippets)).filter((s) => s && typeof s === 'string' && s.length > 0);
-  if (unique.length === 0) return content;
-  const sorted = [...unique].sort((a, b) => b.length - a.length);
-  type Span = { start: number; end: number };
-  const spans: Span[] = [];
-  for (const snip of sorted) {
-    let pos = 0;
-    while (pos < content.length) {
-      const idx = content.indexOf(snip, pos);
-      if (idx === -1) break;
-      const endIdx = idx + snip.length;
-      if (!spans.some((s) => (s.start < endIdx && s.end > idx))) {
-        spans.push({ start: idx, end: endIdx });
-      }
-      pos = endIdx;
-    }
-  }
-  spans.sort((a, b) => a.start - b.start);
-  const merged: Span[] = [];
-  for (const s of spans) {
-    if (merged.length && merged[merged.length - 1].end >= s.start) {
-      merged[merged.length - 1].end = Math.max(merged[merged.length - 1].end, s.end);
-    } else {
-      merged.push({ ...s });
-    }
-  }
-  const starLevel = Math.min(5, Math.max(1, weightStars));
-  const weightClass = `kb-weight-${starLevel}`;
-  if (merged.length === 0) return content;
-  const parts: React.ReactNode[] = [];
-  let last = 0;
-  for (const { start, end } of merged) {
-    if (start > last) parts.push(content.slice(last, start));
-    parts.push(
-      <mark key={`${start}-${end}`} className={`kb-content-mark ${weightClass}`}>
-        {content.slice(start, end)}
-      </mark>
-    );
-    last = end;
-  }
-  if (last < content.length) parts.push(content.slice(last));
-  return <>{parts}</>;
-}
+const LEFT_PANEL_MIN = 280;
+const LEFT_PANEL_DEFAULT = 400;
+const LEFT_PANEL_HANDLE_WIDTH = 4;
+const RIGHT_PANEL_MIN = 200;
+const KP_LIST_MIN_HEIGHT = 100;
+const KP_DETAIL_MIN_HEIGHT = 100;
+const KP_RESIZE_HANDLE_HEIGHT = 4;
 
 const KnowledgeBaseWorkspace: React.FC = () => {
   const { t } = useTranslation();
-  const [documents, setDocuments] = useState<Document[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [directoryTree, setDirectoryTree] = useState<DirectoryNode[]>([]);
+  const [selectedDirId, setSelectedDirId] = useState<number | null>(null);
   const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
   const [knowledgePoints, setKnowledgePoints] = useState<KnowledgePoint[]>([]);
-  const [kpTotal, setKpTotal] = useState(0);
   const [kpPage, setKpPage] = useState(1);
-  const [kpPageSize] = useState(KP_PAGE_SIZE);
+  const [kpTotal, setKpTotal] = useState(0);
   const [selectedKp, setSelectedKp] = useState<KnowledgePoint | null>(null);
-  const [loadingKp, setLoadingKp] = useState(false);
-  const [annotationSnippets, setAnnotationSnippets] = useState<string[]>([]);
-  const [showAddManual, setShowAddManual] = useState(false);
-  const [manualContent, setManualContent] = useState('');
-  const [addingManual, setAddingManual] = useState(false);
-  const prevDocIdRef = useRef<number | null>(null);
+  const [upperHeight, setUpperHeight] = useState(UPPER_DEFAULT);
+  const [lowerVisible, setLowerVisible] = useState(() => LOWER_VISIBLE_DEFAULT);
+  const [previewMaximized, setPreviewMaximized] = useState(false);
+  const [resizing, setResizing] = useState(false);
+  const [resizingHorizontal, setResizingHorizontal] = useState(false);
+  const [resizingKpVertical, setResizingKpVertical] = useState(false);
+  const [kpListHeight, setKpListHeight] = useState<number | null>(null);
+  const [leftPanelWidth, setLeftPanelWidth] = useState(LEFT_PANEL_DEFAULT);
+  const [fileMeta, setFileMeta] = useState<Record<number, FileMetaItem>>(loadFileMeta);
+  const [expandedNoteDocId, setExpandedNoteDocId] = useState<number | null>(null);
+  const [addTagDocId, setAddTagDocId] = useState<number | null>(null);
+  const [addTagInput, setAddTagInput] = useState('');
+  const [deletedKpIds, setDeletedKpIds] = useState<Set<number>>(new Set());
+  const [kpWeightDragging, setKpWeightDragging] = useState<{ kpId: number; value: number } | null>(null);
+  const [highlightedKeywords, setHighlightedKeywords] = useState<string[]>([]);
+  const kpWeightSliderRef = useRef<HTMLSpanElement | null>(null);
+  const kpWeightDragValueRef = useRef<number>(1);
+  const kpWeightDragKpRef = useRef<KnowledgePoint | null>(null);
+  const startYRef = useRef(0);
+  const startHeightRef = useRef(0);
+  const currentUpperHeightRef = useRef(0);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+  const upperBodyRef = useRef<HTMLDivElement>(null);
+  const upperLeftRightRef = useRef<HTMLDivElement>(null);
+  const kpTopPanelRef = useRef<HTMLDivElement>(null);
+  const startYKpRef = useRef(0);
+  const startHeightKpRef = useRef(0);
+  const [documentSummary, setDocumentSummary] = useState('');
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const previewBlobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    loadDocuments();
+    saveFileMeta(fileMeta);
+  }, [fileMeta]);
+
+  useEffect(() => {
+    if (!lowerVisible || selectedDocId == null) {
+      setDocumentSummary('');
+      setLoadingSummary(false);
+      setPreviewError(null);
+      if (previewBlobUrlRef.current) {
+        URL.revokeObjectURL(previewBlobUrlRef.current);
+        previewBlobUrlRef.current = null;
+      }
+      setPreviewBlobUrl(null);
+      setLoadingPreview(false);
+      return;
+    }
+    setLoadingSummary(true);
+    setDocumentSummary('');
+    getDocumentSummaryByDocumentId(selectedDocId)
+      .then((r) => setDocumentSummary(r.summary))
+      .catch(() => setDocumentSummary(''))
+      .finally(() => setLoadingSummary(false));
+    setLoadingPreview(true);
+    setPreviewError(null);
+    if (previewBlobUrlRef.current) {
+      URL.revokeObjectURL(previewBlobUrlRef.current);
+      previewBlobUrlRef.current = null;
+    }
+    setPreviewBlobUrl(null);
+    getDocumentPreviewByDocumentId(selectedDocId)
+      .then((base64) => {
+        if (!base64) {
+          setPreviewError('Preview not available');
+          return;
+        }
+        try {
+          const bin = atob(base64);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const blob = new Blob([bytes], { type: 'application/pdf' });
+          const url = URL.createObjectURL(blob);
+          if (previewBlobUrlRef.current) URL.revokeObjectURL(previewBlobUrlRef.current);
+          previewBlobUrlRef.current = url;
+          setPreviewBlobUrl(url);
+        } catch {
+          setPreviewError('Preview failed');
+        }
+      })
+      .catch(() => setPreviewError('Preview failed'))
+      .finally(() => setLoadingPreview(false));
+    return () => {
+      if (previewBlobUrlRef.current) {
+        URL.revokeObjectURL(previewBlobUrlRef.current);
+        previewBlobUrlRef.current = null;
+      }
+    };
+  }, [lowerVisible, selectedDocId]);
+
+  function getMeta(docId: number): FileMetaItem {
+    return (
+      fileMeta[docId] ?? {
+        weight: 0,
+        note: '',
+        tags: []
+      }
+    );
+  }
+
+  function updateMeta(docId: number, patch: Partial<FileMetaItem>): void {
+    setFileMeta((prev) => {
+      const current = prev[docId] ?? { weight: 0, note: '', tags: [] };
+      return { ...prev, [docId]: { ...current, ...patch } };
+    });
+  }
+
+  useEffect(() => {
+    getDocuments()
+      .then(setDocuments)
+      .catch(() => setDocuments([]));
   }, []);
+
+  useEffect(() => {
+    getDirectories()
+      .then(setDirectoryTree)
+      .catch(() => setDirectoryTree([]));
+  }, []);
+
+  const topLevelDirs = useMemo(() => {
+    return directoryTree.filter(
+      (n) => n.type === 'directory' && !n.parentId && !n.directoryId
+    );
+  }, [directoryTree]);
+
+  const topLevelItems = useMemo(() => {
+    return directoryTree.filter((n) => !n.parentId && !n.directoryId);
+  }, [directoryTree]);
+
+  function findNodeInTree(nodes: DirectoryNode[], id: number): DirectoryNode | null {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      if (n.children?.length) {
+        const found = findNodeInTree(n.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  const selectedDirChildren = useMemo(() => {
+    if (selectedDirId == null) return [];
+    const node = findNodeInTree(directoryTree, selectedDirId);
+    const fromChildren = node?.children;
+    if (fromChildren && fromChildren.length > 0) return fromChildren;
+    return directoryTree.filter(
+      (n) => n.parentId === selectedDirId || n.directoryId === selectedDirId
+    );
+  }, [directoryTree, selectedDirId]);
+
+  const fileListInDir = useMemo(() => {
+    const fromTree = selectedDirId == null ? topLevelItems : selectedDirChildren;
+    const filesFromTree = fromTree.filter((n) => n.type === 'file');
+    if (filesFromTree.length > 0) return filesFromTree;
+    if (selectedDirId == null) {
+      return documents.map((d) => ({
+        id: d.id,
+        name: d.filename,
+        type: 'file' as const,
+        processed: d.processed
+      }));
+    }
+    return [];
+  }, [selectedDirId, topLevelItems, selectedDirChildren, documents]);
 
   useEffect(() => {
     if (selectedDocId == null) {
       setKnowledgePoints([]);
-      setKpTotal(0);
       setKpPage(1);
+      setKpTotal(0);
       setSelectedKp(null);
-      prevDocIdRef.current = null;
       return;
     }
-    const docChanged = selectedDocId !== prevDocIdRef.current;
-    if (docChanged) {
-      prevDocIdRef.current = selectedDocId;
-    }
-    const pageToFetch = docChanged ? 1 : kpPage;
-    setLoadingKp(true);
-    getKnowledgePoints(pageToFetch, kpPageSize, selectedDocId)
-      .then((data) => {
-        setKnowledgePoints(data.knowledge_points);
-        setKpTotal(data.total);
-        setSelectedKp(null);
+    setKnowledgePoints([]);
+    setKpTotal(0);
+    setKpPage(1);
+    setSelectedKp(null);
+  }, [selectedDocId]);
+
+  const selectedDocIdRef = useRef<number | null>(selectedDocId);
+  const fetchPageRef = useRef(1);
+  useEffect(() => {
+    selectedDocIdRef.current = selectedDocId;
+  }, [selectedDocId]);
+  useEffect(() => {
+    fetchPageRef.current = kpPage;
+  }, [kpPage]);
+  useEffect(() => {
+    if (selectedDocId != null) fetchPageRef.current = 1;
+  }, [selectedDocId]);
+
+  const refetchKnowledgePoints = useCallback(() => {
+    if (selectedDocId == null) return;
+    const docId = selectedDocId;
+    const page = fetchPageRef.current;
+    getKnowledgePoints(page, KP_PAGE_SIZE, docId)
+      .then((res) => {
+        if (selectedDocIdRef.current !== docId) return;
+        setKnowledgePoints(res.knowledge_points ?? []);
+        setKpTotal(res.total ?? 0);
       })
       .catch(() => {
+        if (selectedDocIdRef.current !== docId) return;
         setKnowledgePoints([]);
         setKpTotal(0);
-        setSelectedKp(null);
-      })
-      .finally(() => setLoadingKp(false));
-  }, [selectedDocId, kpPage, kpPageSize]);
+      });
+  }, [selectedDocId, kpPage]);
 
-  const loadDocuments = async () => {
-    try {
-      const docs = await getDocuments();
-      setDocuments(docs);
-    } catch (error) {
-      console.error('Failed to load documents:', error);
-      setDocuments([]);
+  useEffect(() => {
+    refetchKnowledgePoints();
+  }, [refetchKnowledgePoints]);
+
+  const kpTotalPages = Math.max(1, Math.ceil(kpTotal / KP_PAGE_SIZE));
+
+  const onKpWeightChange = (kp: KnowledgePoint, weight: number) => {
+    const id = kp.id;
+    if (id == null) return;
+    const clamped = Math.max(1, Math.min(5, Math.round(weight)));
+    updateKnowledgePointWeight(id, clamped)
+      .then(() => {
+        setKnowledgePoints((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, weight: clamped } : p))
+        );
+      })
+      .catch(() => {});
+  };
+
+  const handleKpWeightMouseDown = useCallback((kp: KnowledgePoint, currentWeight: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = kp.id;
+    if (id == null) return;
+    const el = e.currentTarget as HTMLSpanElement;
+    const value = Math.max(1, Math.min(5, Math.round(currentWeight)));
+    kpWeightSliderRef.current = el;
+    kpWeightDragValueRef.current = value;
+    kpWeightDragKpRef.current = kp;
+    setKpWeightDragging({ kpId: id, value });
+    const onMove = (moveEvent: MouseEvent) => {
+      const rect = el.getBoundingClientRect();
+      const x = moveEvent.clientX - rect.left;
+      const w = rect.width;
+      let v = value;
+      if (w > 0) {
+        const p = Math.max(0, Math.min(1, x / w));
+        v = Math.round(p * 5);
+        v = Math.max(1, Math.min(5, v));
+      }
+      kpWeightDragValueRef.current = v;
+      setKpWeightDragging((prev) => (prev?.kpId === id ? { kpId: id, value: v } : prev));
+    };
+    const onUp = () => {
+      const finalValue = kpWeightDragValueRef.current;
+      const targetKp = kpWeightDragKpRef.current;
+      setKpWeightDragging(null);
+      kpWeightSliderRef.current = null;
+      kpWeightDragKpRef.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      if (targetKp?.id != null) {
+        updateKnowledgePointWeight(targetKp.id, finalValue)
+          .then(() => {
+            setKnowledgePoints((prev) =>
+              prev.map((p) => (p.id === targetKp.id ? { ...p, weight: finalValue } : p))
+            );
+          })
+          .catch(() => {});
+      }
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, []);
+
+  const onKpSetDeleted = (kp: KnowledgePoint, deleted: boolean, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const id = kp.id;
+    if (id == null) return;
+    setDeletedKpIds((prev) => {
+      const next = new Set(prev);
+      if (deleted) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    updateKnowledgePointExcluded(id, deleted)
+      .then(() => {
+        setKnowledgePoints((prev) =>
+          prev.map((p) => (p.id === id ? { ...p, excluded: deleted } : p))
+        );
+        setDeletedKpIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      })
+      .catch(() => {
+        setDeletedKpIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      });
+  };
+
+  const onKpDelete = (kp: KnowledgePoint, e: React.MouseEvent) => onKpSetDeleted(kp, true, e);
+  const onKpRestore = (kp: KnowledgePoint, e: React.MouseEvent) => onKpSetDeleted(kp, false, e);
+
+  const onSelectFile = (id: number) => {
+    if (selectedDocId === id) {
+      setSelectedDocId(null);
+    } else {
+      setSelectedDocId(id);
+      setKpPage(1);
     }
   };
 
@@ -158,307 +364,695 @@ const KnowledgeBaseWorkspace: React.FC = () => {
       .slice(0, RECENT_LIMIT);
   }, [documents]);
 
-  const selectedDoc = selectedDocId != null
-    ? documents.find((d) => d.id === selectedDocId) ?? null
-    : null;
+  const selectedDoc = useMemo(
+    () => (selectedDocId != null ? documents.find((d) => d.id === selectedDocId) ?? null : null),
+    [documents, selectedDocId]
+  );
 
   useEffect(() => {
-    getTrainingSet()
-      .then(({ annotations }) => {
-        const snips: string[] = [];
-        for (const a of annotations) {
-          const instr = (a as { instruction?: string }).instruction;
-          const q = (a as { question?: string }).question;
-          if (instr && typeof instr === 'string') snips.push(instr.trim());
-          if (q && typeof q === 'string' && q.trim() !== instr?.trim()) snips.push(q.trim());
-        }
-        setAnnotationSnippets(snips);
-      })
-      .catch(() => setAnnotationSnippets([]));
-  }, []);
+    if (!resizing) return;
+    const onMove = (e: MouseEvent) => {
+      const delta = e.clientY - startYRef.current;
+      let next = startHeightRef.current + delta;
+      const el = workspaceRef.current;
+      const max = el ? el.clientHeight - UPPER_MAX_OFFSET : next + 1;
+      next = Math.max(UPPER_MIN, Math.min(max, next));
+      currentUpperHeightRef.current = next;
+      setUpperHeight(next);
+    };
+    const onUp = () => {
+      const el = workspaceRef.current;
+      const threshold = el ? el.clientHeight - UPPER_MAX_OFFSET - 4 : 0;
+      if (lowerVisible && currentUpperHeightRef.current >= threshold) {
+        setLowerVisible(false);
+        setUpperHeight(UPPER_DEFAULT);
+      }
+      setResizing(false);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [resizing, lowerVisible]);
 
-  const kpRowId = (kp: KnowledgePoint) => kp.id ?? `doc-${kp.document_id}-chunk-${kp.chunk_index}`;
-
-  const handleAddManualSubmit = async () => {
-    const content = manualContent.trim();
-    if (!content || selectedDocId == null) return;
-    setAddingManual(true);
-    try {
-      const created = await createKnowledgePoint(selectedDocId, content);
-      setManualContent('');
-      setShowAddManual(false);
-      const nextTotal = kpTotal + 1;
-      const lastPage = Math.max(1, Math.ceil(nextTotal / kpPageSize));
-      const data = await getKnowledgePoints(lastPage, kpPageSize, selectedDocId);
-      setKnowledgePoints(data.knowledge_points);
-      setKpTotal(data.total);
-      setKpPage(data.page);
-      const found = data.knowledge_points.find((kp) => kp.id === created.id);
-      setSelectedKp(found ?? created);
-    } catch (e) {
-      console.error('Create manual knowledge point failed:', e);
-    } finally {
-      setAddingManual(false);
+  const onResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!lowerVisible) {
+      setLowerVisible(true);
     }
+    startYRef.current = e.clientY;
+    startHeightRef.current = upperHeight;
+    setResizing(true);
   };
 
+  useEffect(() => {
+    if (!resizingHorizontal) return;
+    const onMove = (e: MouseEvent) => {
+      const delta = e.clientX - startXRef.current;
+      let next = startWidthRef.current + delta;
+      const el = upperBodyRef.current;
+      const maxW = el ? el.clientWidth - 280 - LEFT_PANEL_HANDLE_WIDTH - RIGHT_PANEL_MIN : next + 1;
+      next = Math.max(LEFT_PANEL_MIN, Math.min(maxW, next));
+      setLeftPanelWidth(next);
+    };
+    const onUp = () => setResizingHorizontal(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [resizingHorizontal]);
+
+  const onResizeHorizontalStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    startXRef.current = e.clientX;
+    startWidthRef.current = leftPanelWidth;
+    setResizingHorizontal(true);
+  };
+
+  useEffect(() => {
+    if (!resizingKpVertical) return;
+    const onMove = (e: MouseEvent) => {
+      const delta = e.clientY - startYKpRef.current;
+      let next = startHeightKpRef.current + delta;
+      const el = upperLeftRightRef.current;
+      const maxTop = el ? el.clientHeight - KP_RESIZE_HANDLE_HEIGHT - KP_DETAIL_MIN_HEIGHT : next + 1;
+      next = Math.max(KP_LIST_MIN_HEIGHT, Math.min(maxTop, next));
+      setKpListHeight(next);
+    };
+    const onUp = () => setResizingKpVertical(false);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, [resizingKpVertical]);
+
+  const onResizeKpVerticalStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const currentTop =
+      kpListHeight ??
+      (kpTopPanelRef.current?.offsetHeight ?? 200);
+    startYKpRef.current = e.clientY;
+    startHeightKpRef.current = currentTop;
+    setKpListHeight(currentTop);
+    setResizingKpVertical(true);
+  };
+
+  useEffect(() => {
+    setHighlightedKeywords([]);
+  }, [selectedKp]);
+
+  const handleKpContentMouseUp = useCallback(() => {
+    const sel = window.getSelection();
+    const text = sel?.toString?.()?.trim();
+    if (text && !highlightedKeywords.includes(text)) {
+      setHighlightedKeywords((prev) => [...prev, text]);
+    }
+  }, [highlightedKeywords]);
+
+  const removeHighlightedKeyword = useCallback((index: number) => {
+    setHighlightedKeywords((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
   return (
-    <div className="kb-workspace">
-      <div className="kb-workspace-left">
-        <div className="kb-search-section">
-          <input
-            type="text"
-            className="kb-search-input"
-            placeholder={t('knowledgeBaseWorkspace.searchFiles')}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            aria-label={t('knowledgeBaseWorkspace.searchFiles')}
-          />
+    <div className={`kb-workspace ${previewMaximized ? 'kb-workspace-preview-maximized' : ''}`} ref={workspaceRef}>
+      {!previewMaximized && (
+      <div
+        className="kb-upper"
+        style={
+          lowerVisible
+            ? { height: upperHeight, flexShrink: 0 }
+            : { flex: 1, minHeight: 0 }
+        }
+      >
+        <div className="kb-upper-top">
+          <span className="kb-upper-top-label">{t('knowledgeBaseWorkspace.directory')}</span>
+          <span className="kb-upper-top-brackets">
+            <button
+              type="button"
+              className={`kb-upper-top-tag ${selectedDirId === null ? 'kb-upper-top-tag-selected' : ''}`}
+              onClick={() => setSelectedDirId(null)}
+              aria-pressed={selectedDirId === null}
+            >
+              [ {t('knowledgeBaseWorkspace.root')} ]
+            </button>
+            {topLevelDirs.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                className={`kb-upper-top-tag ${selectedDirId === d.id ? 'kb-upper-top-tag-selected' : ''}`}
+                onClick={() => setSelectedDirId(selectedDirId === d.id ? null : d.id)}
+                aria-pressed={selectedDirId === d.id}
+              >
+                [ {d.name} ]
+              </button>
+            ))}
+          </span>
         </div>
-        <div className="kb-results-section">
-          <div className="kb-section-title">{t('knowledgeBaseWorkspace.searchResults')}</div>
-          <ul className="kb-file-list" role="listbox" aria-label={t('knowledgeBaseWorkspace.searchResults')}>
-            {searchQuery.trim() ? (
-              searchResults.length === 0 ? (
+        <div className="kb-upper-body" ref={upperBodyRef}>
+        <div className="kb-upper-left">
+          <div
+            className="kb-upper-left-filelist kb-cli-panel"
+            style={{ width: leftPanelWidth, minWidth: LEFT_PANEL_MIN }}
+          >
+            <div className="kb-section-title kb-cli-title">
+              {t('knowledgeBaseWorkspace.documentList')}
+            </div>
+            <div className="kb-cli-file-table-wrap" role="listbox" aria-label={t('knowledgeBaseWorkspace.documentList')}>
+              {fileListInDir.length === 0 ? (
+                <div className="kb-cli-line kb-cli-empty">{t('knowledgeBaseWorkspace.emptyDirectory')}</div>
+              ) : (
+                <>
+                  <div className="kb-cli-file-table-header">
+                    <span className="kb-cli-col-processed" aria-hidden="true" />
+                    <span className="kb-cli-col-filename">{t('fileResourcesWorkspace.columnFileName')}</span>
+                    <span className="kb-cli-col-weight">{t('fileResourcesWorkspace.columnWeight')}</span>
+                    <span className="kb-cli-col-notes" aria-hidden="true" />
+                  </div>
+                  {fileListInDir.map((item) => {
+                    const meta = getMeta(item.id);
+                    const weight = Math.min(5, Math.max(0, meta.weight));
+                    const noteExpanded = expandedNoteDocId === item.id;
+                    const addingTag = addTagDocId === item.id;
+                    const isSelected = selectedDocId === item.id;
+                    return (
+                      <React.Fragment key={item.id}>
+                        <div
+                          className={`kb-cli-file-row ${isSelected ? 'kb-cli-file-row-selected' : ''}`}
+                          onClick={() => onSelectFile(item.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              onSelectFile(item.id);
+                            }
+                          }}
+                          aria-pressed={isSelected}
+                        >
+                          {item.processed ? (
+                            <Tooltip title={t('knowledgeBaseWorkspace.fileProcessedBadge')}>
+                              <span className="kb-cli-col-processed" aria-label={t('knowledgeBaseWorkspace.fileProcessedBadge')}>
+                                <span className="kb-file-badge">&#10003;</span>
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <span className="kb-cli-col-processed" aria-hidden> </span>
+                          )}
+                          <Tooltip title={item.name}>
+                            <span className={`kb-cli-col-filename kb-file-weight-${weight}`}>
+                              <span className="kb-file-name">{item.name}</span>
+                            </span>
+                          </Tooltip>
+                          <span
+                            className="kb-cli-col-weight"
+                            onClick={(e) => e.stopPropagation()}
+                            role="group"
+                            aria-label={t('knowledgeBaseWorkspace.weight')}
+                          >
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Tooltip key={s} title={`${t('knowledgeBaseWorkspace.setWeight')} ${s}`}>
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  className={`kb-star ${s <= weight ? 'filled' : ''}`}
+                                  onClick={() => updateMeta(item.id, { weight: s })}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      updateMeta(item.id, { weight: s });
+                                    }
+                                  }}
+                                  aria-pressed={s <= weight}
+                                >
+                                  {s <= weight ? '\u2605' : '\u2606'}
+                                </span>
+                              </Tooltip>
+                            ))}
+                          </span>
+                          <span className="kb-cli-col-notes" onClick={(e) => e.stopPropagation()}>
+                            <Tooltip title={t('knowledgeBaseWorkspace.note')}>
+                              <button
+                                type="button"
+                                className={`kb-cli-notes-toggle ${meta.note.trim() ? 'kb-notes-has' : ''}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedNoteDocId((id) => (id === item.id ? null : item.id));
+                                }}
+                                aria-expanded={noteExpanded}
+                                aria-label={t('knowledgeBaseWorkspace.note')}
+                              >
+                              &#x25BC;
+                            </button>
+                            </Tooltip>
+                            <span className="kb-file-item-tags">
+                              {meta.tags.map((tag) => (
+                                <span key={tag} className="kb-file-tag">
+                                  {tag}
+                                  <button
+                                    type="button"
+                                    className="kb-file-tag-remove"
+                                    onClick={() =>
+                                      updateMeta(item.id, {
+                                        tags: meta.tags.filter((t) => t !== tag)
+                                      })
+                                    }
+                                    aria-label={t('knowledgeBaseWorkspace.removeTag')}
+                                  >
+                                    &#215;
+                                  </button>
+                                </span>
+                              ))}
+                              {addingTag ? (
+                                <input
+                                  type="text"
+                                  className="kb-file-tag-input"
+                                  value={addTagInput}
+                                  onChange={(e) => setAddTagInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const v = addTagInput.trim();
+                                      if (v && !meta.tags.includes(v)) {
+                                        updateMeta(item.id, { tags: [...meta.tags, v] });
+                                        setAddTagInput('');
+                                        setAddTagDocId(null);
+                                      }
+                                    }
+                                    if (e.key === 'Escape') {
+                                      setAddTagInput('');
+                                      setAddTagDocId(null);
+                                    }
+                                  }}
+                                  onBlur={() => {
+                                    const v = addTagInput.trim();
+                                    if (v && !meta.tags.includes(v)) {
+                                      updateMeta(item.id, { tags: [...meta.tags, v] });
+                                    }
+                                    setAddTagInput('');
+                                    setAddTagDocId(null);
+                                  }}
+                                  placeholder={t('knowledgeBaseWorkspace.tagPlaceholder')}
+                                  autoFocus
+                                />
+                              ) : (
+                                <Tooltip title={t('knowledgeBaseWorkspace.addTag')}>
+                                  <button
+                                    type="button"
+                                    className="kb-file-tag-add"
+                                    onClick={() => {
+                                      setAddTagDocId(item.id);
+                                      setAddTagInput('');
+                                    }}
+                                  >
+                                  +
+                                </button>
+                                </Tooltip>
+                              )}
+                            </span>
+                          </span>
+                        </div>
+                        {noteExpanded && (
+                          <div className="kb-cli-notes-expanded-row" onClick={(e) => e.stopPropagation()}>
+                            <textarea
+                              className="kb-file-note-input"
+                              value={meta.note}
+                              onChange={(e) => updateMeta(item.id, { note: e.target.value })}
+                              placeholder={t('knowledgeBaseWorkspace.notePlaceholder')}
+                              rows={2}
+                              aria-label={t('knowledgeBaseWorkspace.note')}
+                            />
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          </div>
+          <div
+            className="kb-resize-handle-h"
+            role="separator"
+            aria-label="Resize left panel"
+            onMouseDown={onResizeHorizontalStart}
+          />
+          <div className="kb-upper-left-right" ref={upperLeftRightRef}>
+            <div
+              ref={kpTopPanelRef}
+              className="kb-upper-left-right-top kb-cli-panel"
+              style={
+                kpListHeight != null
+                  ? { height: kpListHeight, flexShrink: 0 }
+                  : undefined
+              }
+            >
+              <div className="kb-kp-list-title-bar">
+                <span className="kb-kp-list-title">{t('knowledgeBaseWorkspace.knowledgePointList')}</span>
+                {selectedDocId != null && lowerVisible !== true && (
+                  <Tooltip title={t('knowledgeBaseWorkspace.documentPreview')}>
+                    <button
+                      type="button"
+                      className="kb-kp-preview-icon-btn"
+                      onClick={() => {
+                      setLowerVisible(true);
+                      const el = workspaceRef.current;
+                      if (el) {
+                        const total = el.clientHeight;
+                        const half = Math.floor((total - 4) / 2);
+                        const next = Math.max(UPPER_MIN, Math.min(total - 4 - UPPER_MAX_OFFSET, half));
+                        setUpperHeight(next);
+                      }
+                    }}
+                    aria-label={t('knowledgeBaseWorkspace.documentPreview')}
+                  >
+                    <FileText size={16} aria-hidden />
+                  </button>
+                  </Tooltip>
+                )}
+              </div>
+              {selectedDocId == null ? (
+                <p className="kb-placeholder">{t('knowledgeBaseWorkspace.selectFileFirst')}</p>
+              ) : knowledgePoints.length === 0 && kpTotal === 0 ? (
+                <p className="kb-placeholder">{t('knowledgeBaseWorkspace.noKnowledgePointsForFile')}</p>
+              ) : (
+                <>
+                  <div className="kb-kp-table-wrap" role="listbox" aria-label={t('knowledgeBaseWorkspace.selectedDocKnowledgePoints')}>
+                    <div className="kb-kp-table-header">
+                      <span className="kb-kp-col-state" aria-hidden="true" />
+                      <span className="kb-kp-col-content">{t('knowledgeBaseWorkspace.columnName')}</span>
+                      <span className="kb-kp-col-weight">{t('knowledgeBaseWorkspace.weight')}</span>
+                      <span className="kb-kp-col-action" aria-hidden="true" />
+                    </div>
+                    <ul className="kb-kp-list">
+                      {knowledgePoints.map((kp, idx) => {
+                        const baseWeight = Math.max(1, Math.min(5, Math.round(kp.weight ?? 1)));
+                        const weight = kpWeightDragging && kpWeightDragging.kpId === kp.id ? kpWeightDragging.value : baseWeight;
+                        const isSelected = selectedKp === kp;
+                        const isDeleted = kp.excluded || (kp.id != null && deletedKpIds.has(kp.id));
+                        const contentText = (kp.content || '').trim();
+                        return (
+                          <li
+                            key={kp.id ?? `kp-${kp.document_id}-${kp.chunk_index}-${idx}`}
+                            className={`kb-kp-item ${isSelected ? 'kb-kp-item-selected' : ''} ${isDeleted ? 'kb-kp-item-deleted' : ''}`}
+                            role="option"
+                            aria-selected={isSelected}
+                            aria-label={isDeleted ? t('knowledgeBaseWorkspace.deletedState') : undefined}
+                            onClick={() => setSelectedKp(isSelected ? null : kp)}
+                          >
+                            <Tooltip title={t('knowledgeBaseWorkspace.setWeight')}>
+                              <span className="kb-kp-col-state" aria-label={t('knowledgeBaseWorkspace.setWeight')}>
+                                {isDeleted ? '\u2717' : '\u22EE'}
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={isDeleted ? `[${t('knowledgeBaseWorkspace.deletedState')}] ${kp.content}` : (kp.content || '')} truncate>
+                              <span className={`kb-kp-col-content kb-kp-item-preview kb-kp-weight-${Math.min(5, Math.max(1, weight))}`}>
+                              {isDeleted ? `[${t('knowledgeBaseWorkspace.deletedState')}] ` : ''}
+                              {contentText}
+                            </span>
+                            </Tooltip>
+                            <span
+                              className="kb-kp-col-weight kb-kp-weight-slider"
+                              onClick={(e) => e.stopPropagation()}
+                              role="slider"
+                              aria-valuemin={1}
+                              aria-valuemax={5}
+                              aria-valuenow={weight}
+                              aria-label={t('knowledgeBaseWorkspace.weight')}
+                              onMouseDown={(e) => kp.id != null && handleKpWeightMouseDown(kp, weight, e)}
+                            >
+                              {[1, 2, 3, 4, 5].map((s) => (
+                                <Tooltip key={s} title={`${t('knowledgeBaseWorkspace.setWeight')} ${s}`}>
+                                  <span
+                                    role="button"
+                                    tabIndex={0}
+                                    className={`kb-kp-star ${s <= weight ? 'filled' : ''}`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (kp.id != null) onKpWeightChange(kp, s);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if ((e.key === 'Enter' || e.key === ' ') && kp.id != null) {
+                                        e.preventDefault();
+                                        onKpWeightChange(kp, s);
+                                      }
+                                    }}
+                                    aria-pressed={s <= weight}
+                                  >
+                                    {s <= weight ? '\u2605' : '\u2606'}
+                                  </span>
+                                </Tooltip>
+                              ))}
+                            </span>
+                            <span className="kb-kp-col-action" onClick={(e) => e.stopPropagation()}>
+                              {kp.id != null && (
+                                <Tooltip title={isDeleted ? t('knowledgeBaseWorkspace.restore') : t('knowledgeBaseWorkspace.deleteSelected')}>
+                                  <button
+                                    type="button"
+                                    className="kb-kp-action-btn"
+                                    onClick={(e) => (isDeleted ? onKpRestore(kp, e) : onKpDelete(kp, e))}
+                                    aria-label={isDeleted ? t('knowledgeBaseWorkspace.restore') : t('knowledgeBaseWorkspace.deleteSelected')}
+                                  >
+                                  {isDeleted ? '\u21BB' : '\u00D7'}
+                                </button>
+                                </Tooltip>
+                              )}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                  {kpTotalPages > 1 && (
+                    <div className="kb-kp-pagination">
+                      <button
+                        type="button"
+                        className="kb-kp-pagination-btn"
+                        disabled={kpPage <= 1}
+                        onClick={() => setKpPage((p) => Math.max(1, p - 1))}
+                        aria-label={t('knowledgeBaseWorkspace.prevPage')}
+                      >
+                        {t('knowledgeBaseWorkspace.prevPage')}
+                      </button>
+                      <span className="kb-kp-pagination-info">
+                        {t('knowledgeBaseWorkspace.pageOf', { page: kpPage, total: kpTotalPages })}
+                      </span>
+                      <button
+                        type="button"
+                        className="kb-kp-pagination-btn"
+                        disabled={kpPage >= kpTotalPages}
+                        onClick={() => setKpPage((p) => Math.min(kpTotalPages, p + 1))}
+                        aria-label={t('knowledgeBaseWorkspace.nextPage')}
+                      >
+                        {t('knowledgeBaseWorkspace.nextPage')}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            <div
+              className="kb-resize-handle-v"
+              role="separator"
+              aria-label="Resize knowledge point list and detail"
+              onMouseDown={onResizeKpVerticalStart}
+            />
+            <div
+              className="kb-upper-left-right-bottom"
+              style={
+                kpListHeight != null
+                  ? { flex: 1, minHeight: KP_DETAIL_MIN_HEIGHT }
+                  : undefined
+              }
+            >
+              {selectedKp == null ? (
+                <p className="kb-placeholder">{t('knowledgeBaseWorkspace.selectKpForDetail')}</p>
+              ) : (
+                <div className="kb-kp-detail-wrap">
+                  <div className="kb-kp-detail-left kb-cli-panel">
+                    <div className="kb-kp-detail-meta">
+                      {selectedKp.document_name && (
+                        <span className="kb-kp-detail-source">
+                          {t('knowledgeBaseWorkspace.source')}: {selectedKp.document_name}
+                        </span>
+                      )}
+                      {selectedKp.chunk_index != null && (
+                        <span className="kb-kp-detail-chunk">
+                          {t('knowledgeBaseWorkspace.chunk')}: {selectedKp.chunk_index + 1}
+                        </span>
+                      )}
+                    </div>
+                    <p className="kb-kp-detail-select-hint">{t('knowledgeBaseWorkspace.selectTextToAddKeyword')}</p>
+                    <div
+                      className="kb-kp-detail-content"
+                      onMouseUp={handleKpContentMouseUp}
+                      role="article"
+                    >
+                      {selectedKp.content}
+                    </div>
+                  </div>
+                  <div className="kb-kp-detail-right kb-cli-panel">
+                    <div className="kb-kp-detail-keywords-title kb-cli-title">
+                      {t('knowledgeBaseWorkspace.knowledgePointKeywordList')}
+                    </div>
+                    {highlightedKeywords.length === 0 ? (
+                      <p className="kb-kp-detail-keywords-empty">
+                        {t('knowledgeBaseWorkspace.noKeywordsYet')}
+                      </p>
+                    ) : (
+                      <ul className="kb-kp-detail-keywords-list" role="list">
+                        {highlightedKeywords.map((kw, idx) => (
+                          <li key={`${idx}-${kw.slice(0, 20)}`} className="kb-kp-detail-keyword">
+                            <Tooltip title={kw}>
+                              <span className="kb-kp-detail-keyword-text">{kw}</span>
+                            </Tooltip>
+                            <button
+                              type="button"
+                              className="kb-kp-detail-keyword-remove"
+                              onClick={() => removeHighlightedKeyword(idx)}
+                              aria-label={t('common.remove')}
+                            >
+                              &#215;
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="kb-upper-right">
+          <div className="kb-upper-right-search">
+            <input
+              type="text"
+              className="kb-search-input"
+              placeholder={t('knowledgeBaseWorkspace.searchFiles')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label={t('knowledgeBaseWorkspace.searchFiles')}
+            />
+          </div>
+          <div className="kb-upper-right-results">
+            <div className="kb-section-title">{t('knowledgeBaseWorkspace.searchResults')}</div>
+            <ul className="kb-file-list" role="listbox" aria-label={t('knowledgeBaseWorkspace.searchResults')}>
+              {!searchQuery.trim() ? (
+                <li className="kb-file-item kb-empty">{t('knowledgeBaseWorkspace.typeToSearch')}</li>
+              ) : searchResults.length === 0 ? (
                 <li className="kb-file-item kb-empty">{t('knowledgeBaseWorkspace.noResults')}</li>
               ) : (
                 searchResults.map((doc) => (
-                  <li
-                    key={doc.id}
-                    className={`kb-file-item ${selectedDocId === doc.id ? 'selected' : ''}`}
-                    onClick={() => {
-                      setSelectedDocId(doc.id);
-                      setKpPage(1);
-                    }}
-                    role="option"
-                    aria-selected={selectedDocId === doc.id}
-                  >
-                    <span className="kb-file-name" title={doc.filename}>{doc.filename}</span>
-                    {doc.processed && <span className="kb-file-badge">&#10003;</span>}
-                  </li>
-                ))
-              )
-            ) : (
-              <li className="kb-file-item kb-empty">{t('knowledgeBaseWorkspace.typeToSearch')}</li>
-            )}
-          </ul>
-        </div>
-        <div className="kb-recent-section">
-          <div className="kb-section-title">{t('knowledgeBaseWorkspace.recentFiles')}</div>
-          <ul className="kb-file-list" role="listbox" aria-label={t('knowledgeBaseWorkspace.recentFiles')}>
-            {recentFiles.length === 0 ? (
-              <li className="kb-file-item kb-empty">{t('knowledgeBaseWorkspace.noRecentFiles')}</li>
-            ) : (
-              recentFiles.map((doc) => (
-                <li
-                  key={doc.id}
-                  className={`kb-file-item ${selectedDocId === doc.id ? 'selected' : ''}`}
-                  onClick={() => {
-                    setSelectedDocId(doc.id);
-                    setKpPage(1);
-                  }}
-                  role="option"
-                  aria-selected={selectedDocId === doc.id}
-                >
-                  <span className="kb-file-name" title={doc.filename}>{doc.filename}</span>
-                  {doc.processed && <span className="kb-file-badge">&#10003;</span>}
-                </li>
-              ))
-            )}
-          </ul>
-        </div>
-      </div>
-      <div className="kb-workspace-right">
-        <div className="kb-kp-brief-section">
-          <div className="kb-kp-brief-header">
-            <div className="kb-section-title">
-              {selectedDoc
-                ? t('knowledgeBaseWorkspace.knowledgePointsBrief', { name: selectedDoc.filename, count: kpTotal })
-                : t('knowledgeBaseWorkspace.selectFileForKp')}
-            </div>
-            {selectedDocId != null && (
-              <div className="kb-kp-header-actions">
-                <button
-                  type="button"
-                  className="kb-kp-add-manual-btn"
-                  onClick={() => setShowAddManual(true)}
-                  aria-label={t('knowledgeBaseWorkspace.addManual')}
-                >
-                  {t('knowledgeBaseWorkspace.addManual')}
-                </button>
-                {kpTotal > 0 && (
-                  <div className="kb-kp-pagination">
-                    <button
-                      type="button"
-                      className="kb-kp-page-btn"
-                      disabled={kpPage <= 1}
-                      onClick={() => setKpPage((p) => Math.max(1, p - 1))}
-                      aria-label={t('knowledgeBaseWorkspace.prevPage')}
-                    >
-                      &lt;
-                    </button>
-                    <span className="kb-kp-page-info">
-                      {t('knowledgeBaseWorkspace.pageOf', {
-                        page: kpPage,
-                        total: Math.max(1, Math.ceil(kpTotal / kpPageSize)),
-                      })}
-                    </span>
-                    <button
-                      type="button"
-                      className="kb-kp-page-btn"
-                      disabled={kpPage >= Math.ceil(kpTotal / kpPageSize)}
-                      onClick={() => setKpPage((p) => p + 1)}
-                      aria-label={t('knowledgeBaseWorkspace.nextPage')}
-                    >
-                      &gt;
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          {showAddManual && selectedDocId != null && (
-            <div className="kb-add-manual-form">
-              <textarea
-                className="kb-add-manual-textarea"
-                value={manualContent}
-                onChange={(e) => setManualContent(e.target.value)}
-                placeholder={t('knowledgeBaseWorkspace.manualContentPlaceholder')}
-                rows={4}
-                aria-label={t('knowledgeBaseWorkspace.manualContentPlaceholder')}
-              />
-              <div className="kb-add-manual-buttons">
-                <button
-                  type="button"
-                  className="kb-kp-page-btn"
-                  onClick={() => { setShowAddManual(false); setManualContent(''); }}
-                  disabled={addingManual}
-                >
-                  {t('common.cancel')}
-                </button>
-                <button
-                  type="button"
-                  className="kb-kp-add-manual-submit"
-                  onClick={handleAddManualSubmit}
-                  disabled={addingManual || !manualContent.trim()}
-                >
-                  {addingManual ? t('knowledgeBaseWorkspace.adding') : t('knowledgeBaseWorkspace.addManualConfirm')}
-                </button>
-              </div>
-            </div>
-          )}
-          {loadingKp ? (
-            <div className="kb-loading">{t('sidebar.loading')}</div>
-          ) : (
-            <ul className="kb-kp-brief-list" role="listbox" aria-label={t('dataCenter.knowledgePointsList')}>
-              {knowledgePoints.length === 0 ? (
-                <li className="kb-kp-brief-item kb-empty">
-                  {selectedDocId
-                    ? t('knowledgeBaseWorkspace.noKnowledgePointsForFile')
-                    : t('knowledgeBaseWorkspace.selectFileFirst')}
-                </li>
-              ) : (
-                knowledgePoints.map((kp, index) => (
-                  <li
-                    key={kpRowId(kp)}
-                    className={`kb-kp-brief-item ${selectedKp === kp ? 'selected' : ''}${kp.excluded ? ' kb-kp-excluded' : ''}`}
-                    onClick={() => setSelectedKp(kp)}
-                    role="option"
-                    aria-selected={selectedKp === kp}
-                  >
-                    <span className="kb-kp-brief-index">{(kpPage - 1) * kpPageSize + index + 1}.</span>
-                    <span className={`kb-kp-source-badge ${kp.is_manual ? 'kb-kp-manual' : 'kb-kp-auto'}`} title={kp.is_manual ? t('knowledgeBaseWorkspace.manual') : t('knowledgeBaseWorkspace.auto')}>
-                      {kp.is_manual ? t('knowledgeBaseWorkspace.manual') : t('knowledgeBaseWorkspace.auto')}
-                    </span>
-                    <span className="kb-kp-brief-text" title={kp.content}>
-                      {kp.content.length <= BRIEF_LENGTH
-                        ? kp.content
-                        : `${kp.content.slice(0, BRIEF_LENGTH)}...`}
-                    </span>
-                    {kp.excluded && (
-                      <span className="kb-kp-excluded-badge" title={t('knowledgeBaseWorkspace.excluded')}>
-                        {t('knowledgeBaseWorkspace.excluded')}
-                      </span>
+                  <li key={doc.id} className="kb-file-item" role="option">
+                    <Tooltip title={doc.filename}>
+                      <span className="kb-file-name">{doc.filename}</span>
+                    </Tooltip>
+                    {doc.processed && (
+                      <Tooltip title={t('knowledgeBaseWorkspace.fileProcessedBadge')}>
+                        <span className="kb-file-badge" aria-label={t('knowledgeBaseWorkspace.fileProcessedBadge')}>&#10003;</span>
+                      </Tooltip>
                     )}
-                    <span className="kb-kp-weight-stars" title={t('knowledgeBaseWorkspace.weight')}>
-                      {renderStars(WEIGHT_STARS, weightToStars(kp.weight))}
-                    </span>
                   </li>
                 ))
               )}
             </ul>
-          )}
-        </div>
-        <div className="kb-kp-detail-section">
-          <div className="kb-section-title">{t('knowledgeBaseWorkspace.knowledgePointDetail')}</div>
-          <div className="kb-kp-detail-content" role="article">
-            {selectedKp ? (
-              <>
-                <div className="kb-kp-detail-meta">
-                  {selectedDoc && (
-                    <span className="kb-kp-detail-source">
-                      {t('knowledgeBaseWorkspace.source')}: {selectedDoc.filename}
-                    </span>
-                  )}
-                  <span className={`kb-kp-source-badge ${selectedKp.is_manual ? 'kb-kp-manual' : 'kb-kp-auto'}`}>
-                    {selectedKp.is_manual ? t('knowledgeBaseWorkspace.manual') : t('knowledgeBaseWorkspace.auto')}
-                  </span>
-                  <span className="kb-kp-detail-index">
-                    {t('knowledgeBaseWorkspace.chunk')} #{selectedKp.chunk_index + 1}
-                  </span>
-                </div>
-                <div className="kb-kp-detail-weight-row">
-                  <span className="kb-kp-weight-label">{t('knowledgeBaseWorkspace.weight')}</span>
-                  <div className="kb-kp-stars" role="group" aria-label={t('knowledgeBaseWorkspace.weight')}>
-                    {renderStars(WEIGHT_STARS, weightToStars(selectedKp.weight))}
-                  </div>
-                  {selectedKp.excluded && (
-                    <span className="kb-kp-excluded-badge" title={t('knowledgeBaseWorkspace.excluded')}>
-                      {t('knowledgeBaseWorkspace.excluded')}
-                    </span>
-                  )}
-                </div>
-                {annotationSnippets.length > 0 && (
-                  <p className="kb-kp-pre-select-hint">{t('knowledgeBaseWorkspace.annotationPreSelectHint')}</p>
-                )}
-                <div className="kb-kp-detail-body">
-                  {highlightAnnotationSpans(
-                    selectedKp.content,
-                    annotationSnippets,
-                    weightToStars(selectedKp.weight)
-                  )}
-                </div>
-                <div className="kb-keywords-list-section">
-                  <div className="kb-keywords-list-title">{t('knowledgeBaseWorkspace.keywordsList')}</div>
-                  {(() => {
-                    const located = getLocatedKeywords(selectedKp.content, annotationSnippets);
-                    const stars = weightToStars(selectedKp.weight);
-                    if (located.length === 0) {
-                      return <div className="kb-keywords-list-empty">{t('knowledgeBaseWorkspace.noKeywordsInContent')}</div>;
-                    }
-                    return (
-                      <ul className="kb-keywords-list">
-                        {located.map((kw, i) => (
-                          <li key={`${i}-${kw.slice(0, 30)}`} className="kb-keyword-tag">
-                            <span className="kb-keyword-text" title={kw}>
-                              {kw.length > 40 ? `${kw.slice(0, 40)}...` : kw}
-                            </span>
-                            <span className="kb-keyword-stars" title={t('knowledgeBaseWorkspace.weight')}>
-                              {renderStars(WEIGHT_STARS, stars)}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    );
-                  })()}
-                </div>
-              </>
-            ) : (
-              <div className="kb-kp-detail-placeholder">{t('knowledgeBaseWorkspace.selectKpForDetail')}</div>
-            )}
+          </div>
+          <div className="kb-upper-right-recent">
+            <div className="kb-section-title">{t('knowledgeBaseWorkspace.recentFiles')}</div>
+            <ul className="kb-file-list" role="listbox" aria-label={t('knowledgeBaseWorkspace.recentFiles')}>
+              {recentFiles.length === 0 ? (
+                <li className="kb-file-item kb-empty">{t('knowledgeBaseWorkspace.noRecentFiles')}</li>
+              ) : (
+                recentFiles.map((doc) => (
+                  <li key={doc.id} className="kb-file-item" role="option">
+                    <Tooltip title={doc.filename}>
+                      <span className="kb-file-name">{doc.filename}</span>
+                    </Tooltip>
+                    {doc.processed && (
+                      <Tooltip title={t('knowledgeBaseWorkspace.fileProcessedBadge')}>
+                        <span className="kb-file-badge" aria-label={t('knowledgeBaseWorkspace.fileProcessedBadge')}>&#10003;</span>
+                      </Tooltip>
+                    )}
+                  </li>
+                ))
+              )}
+            </ul>
           </div>
         </div>
+        </div>
       </div>
+      )}
+      {lowerVisible === true && (
+        <>
+          {!previewMaximized && (
+            <div
+              className="kb-resize-handle"
+              role="separator"
+              aria-label="Resize"
+              onMouseDown={onResizeStart}
+            />
+          )}
+          <div className="kb-lower">
+            <div className="kb-lower-detail">
+              <div className="kb-lower-detail-header">
+                <Tooltip title={selectedDoc?.filename ?? ''}>
+                  <span className="kb-lower-detail-title">{selectedDoc?.filename ?? ''}</span>
+                </Tooltip>
+                <div className="kb-lower-detail-actions">
+                  <Tooltip title={previewMaximized ? t('knowledgeBaseWorkspace.restorePreview') : t('knowledgeBaseWorkspace.maximizePreview')}>
+                    <button
+                      type="button"
+                      className="kb-lower-maximize-btn"
+                      onClick={() => setPreviewMaximized((m) => !m)}
+                      aria-label={previewMaximized ? t('knowledgeBaseWorkspace.restorePreview') : t('knowledgeBaseWorkspace.maximizePreview')}
+                    >
+                      {previewMaximized ? <Minimize2 size={14} aria-hidden /> : <Maximize2 size={14} aria-hidden />}
+                    </button>
+                  </Tooltip>
+                  <Tooltip title={t('knowledgeBaseWorkspace.closePreview')}>
+                    <button
+                      type="button"
+                      className="kb-lower-hide-btn"
+                      onClick={() => { setLowerVisible(false); setPreviewMaximized(false); }}
+                      aria-label={t('knowledgeBaseWorkspace.closePreview')}
+                    >
+                      <X size={14} className="kb-lower-hide-btn-icon" aria-hidden />
+                    </button>
+                  </Tooltip>
+                </div>
+              </div>
+              <div className="kb-lower-summary-block">
+                {loadingSummary ? (
+                  <div className="kb-lower-summary-placeholder">{t('sidebar.loading')}</div>
+                ) : (
+                  <div className="kb-lower-summary-content">
+                    {(documentSummary || '').trim() ? documentSummary : t('knowledgeBaseWorkspace.summaryReservedForAI')}
+                  </div>
+                )}
+              </div>
+              <div className="kb-lower-preview-block">
+                {loadingPreview ? (
+                  <div className="kb-lower-preview-placeholder">{t('sidebar.loading')}</div>
+                ) : previewError ? (
+                  <div className="kb-lower-preview-error">{previewError}</div>
+                ) : previewBlobUrl ? (
+                  <PdfViewer
+                    url={previewBlobUrl}
+                    className="kb-lower-preview-pdf"
+                  />
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

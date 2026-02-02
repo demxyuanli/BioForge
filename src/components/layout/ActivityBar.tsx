@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { LayoutDashboard, Database, GraduationCap, Settings2, CheckSquare, Settings, FolderOpen, BookOpen, MessageCircle } from 'lucide-react';
 import { ActivityType } from './VSLayout';
+import Tooltip from '../Tooltip';
 
 interface ActivityBarProps {
   activeActivity: ActivityType;
@@ -50,31 +51,33 @@ const ActivityBar: React.FC<ActivityBarProps> = ({
     <div className="vs-activity-bar">
       <div className="vs-activity-top">
         {activities.map((item) => (
-          <button
-            key={item.id}
-            className={`vs-activity-item ${activeActivity === item.id ? 'active' : ''}`}
-            onClick={() => handleActivityClick(item.id)}
-            title={t(item.titleKey)}
-          >
-            <span className="vs-activity-icon">{item.icon}</span>
-          </button>
+          <Tooltip key={item.id} title={t(item.titleKey)}>
+            <button
+              className={`vs-activity-item ${activeActivity === item.id ? 'active' : ''}`}
+              onClick={() => handleActivityClick(item.id)}
+            >
+              <span className="vs-activity-icon">{item.icon}</span>
+            </button>
+          </Tooltip>
         ))}
       </div>
       <div className="vs-activity-bottom">
-        <button
-          className="vs-activity-item"
-          onClick={onToggleSidebar}
-          title={t('panel.toggleSidebar')}
-        >
-          <span className="vs-activity-icon" style={{ fontSize: '12px' }}>{sidebarVisible ? '◀' : '▶'}</span>
-        </button>
-        <button
-          className={`vs-activity-item ${activeActivity === 'settings' ? 'active' : ''}`}
-          title={t('panel.settings')}
-          onClick={() => handleActivityClick('settings')}
-        >
+        <Tooltip title={t('panel.toggleSidebar')}>
+          <button
+            className="vs-activity-item"
+            onClick={onToggleSidebar}
+          >
+            <span className="vs-activity-icon" style={{ fontSize: '12px' }}>{sidebarVisible ? '◀' : '▶'}</span>
+          </button>
+        </Tooltip>
+        <Tooltip title={t('panel.settings')}>
+          <button
+            className={`vs-activity-item ${activeActivity === 'settings' ? 'active' : ''}`}
+            onClick={() => handleActivityClick('settings')}
+          >
           <span className="vs-activity-icon"><Settings size={18} strokeWidth={1.5} /></span>
         </button>
+        </Tooltip>
       </div>
     </div>
   );

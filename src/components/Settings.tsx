@@ -8,8 +8,7 @@ import {
   getDesensitizationLog,
   getLocalModels
 } from '../services/api';
-import { getStoredTheme, applyTheme, AppTheme, getStoredFontFamily, getStoredFontScale, applyFontFamily, applyFontScale, FONT_FAMILY_OPTIONS, FONT_SCALE_OPTIONS } from '../utils/theme';
-import { setAIConfig } from '../utils/aiConfig';
+import { getStoredTheme, applyTheme, AppTheme } from '../utils/theme';
 import './Settings.css';
 
 export type SettingsTab = 'general' | 'models' | 'privacy' | 'context';
@@ -35,8 +34,6 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
   const [documentsDir, setDocumentsDir] = useState<string | null>(null);
   const [dbPath, setDbPath] = useState<string | null>(null);
   const [theme, setTheme] = useState<AppTheme>(getStoredTheme());
-  const [fontFamily, setFontFamily] = useState(getStoredFontFamily());
-  const [fontScale, setFontScale] = useState(getStoredFontScale());
 
   // Model Settings State
   const [localModelName, setLocalModelName] = useState(localStorage.getItem('ollama_model') || 'qwen2.5:7b');
@@ -46,9 +43,6 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [apiKeyValue, setApiKeyValue] = useState('');
-  const [useLocalByDefault, setUseLocalByDefault] = useState(localStorage.getItem('ai_use_local_model') === 'true');
-  const [defaultPlatform, setDefaultPlatform] = useState(localStorage.getItem('ai_default_platform') || 'deepseek');
-  const [defaultCloudModel, setDefaultCloudModel] = useState(localStorage.getItem('ai_default_cloud_model') || 'deepseek-chat');
 
   // Privacy Settings State
   const [auditLogEntries, setAuditLogEntries] = useState<any[]>([]);
@@ -78,14 +72,6 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
     localStorage.setItem('ollama_base_url', localBaseUrl);
   }, [localModelName, localBaseUrl]);
 
-  useEffect(() => {
-    setAIConfig({
-      useLocalModel: useLocalByDefault,
-      defaultPlatform,
-      defaultCloudModel,
-    });
-  }, [useLocalByDefault, defaultPlatform, defaultCloudModel]);
-
   const loadAPIKeys = async () => {
     try {
       const list = await getApiKeys();
@@ -101,10 +87,10 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
       await saveApiKey(selectedPlatform, apiKeyValue);
       setApiKeyValue('');
       await loadAPIKeys();
-      alert(t('settings.models.apiKeySaved'));
+      alert(t('settings.models.apiKeySaved') || 'API Key saved successfully');
     } catch (error) {
       console.error('Save API key error:', error);
-      alert(`${t('settings.models.apiKeySaveFailed')}: ${error}`);
+      alert(`Failed to save API key: ${error}`);
     }
   };
 
@@ -120,7 +106,7 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
       }
     } catch (error) {
       console.error('Failed to fetch local models:', error);
-      alert(t('settings.models.ollamaConnectFailed'));
+      alert('Failed to connect to Ollama. Please check if it is running.');
     } finally {
       setIsFetchingModels(false);
     }
@@ -167,15 +153,15 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
       <div className="settings-content">
         <h1>
           {activeTab === 'general' && t('settings.general.title')}
-          {activeTab === 'models' && t('settings.models.title')}
-          {activeTab === 'privacy' && t('settings.privacy.title')}
-          {activeTab === 'context' && t('settings.context.title')}
+          {activeTab === 'models' && (t('settings.models.title') || 'Model Configuration')}
+          {activeTab === 'privacy' && (t('settings.privacy.title') || 'Privacy & Rules')}
+          {activeTab === 'context' && (t('settings.context.title') || 'Context & Knowledge')}
         </h1>
 
         {activeTab === 'general' && (
           <>
             <section className="settings-section">
-              <h2>{t('settings.general.appearance')}</h2>
+              <h2>{t('settings.general.appearance') || 'Appearance'}</h2>
               <div className="settings-field-group">
                 <div className="settings-field">
                   <label>{t('settings.general.theme')}</label>
@@ -191,38 +177,6 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
                     <option value="system">{t('settings.general.themeSystem')}</option>
                     <option value="light">{t('settings.general.themeLight')}</option>
                     <option value="dark">{t('settings.general.themeDark')}</option>
-                  </select>
-                </div>
-                <div className="settings-field">
-                  <label>{t('settings.general.fontFamily')}</label>
-                  <select
-                    className="settings-select"
-                    value={fontFamily}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setFontFamily(v);
-                      applyFontFamily(v);
-                    }}
-                  >
-                    {FONT_FAMILY_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="settings-field">
-                  <label>{t('settings.general.fontSize')}</label>
-                  <select
-                    className="settings-select"
-                    value={fontScale}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value, 10);
-                      setFontScale(v);
-                      applyFontScale(v);
-                    }}
-                  >
-                    {FONT_SCALE_OPTIONS.map((pct) => (
-                      <option key={pct} value={pct}>{pct}%</option>
-                    ))}
                   </select>
                 </div>
                 <div className="settings-field">
@@ -259,65 +213,21 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
         {activeTab === 'models' && (
           <>
             <section className="settings-section">
-              <h2>{t('settings.models.defaultAI')}</h2>
-              <p className="settings-section-desc">{t('settings.models.defaultAIDesc')}</p>
+              <h2>Local LLM (Ollama)</h2>
+              <p className="settings-section-desc">Configure your local Ollama instance for privacy-preserving inference.</p>
               <div className="settings-field-group">
                 <div className="settings-field">
-                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={useLocalByDefault}
-                      onChange={(e) => setUseLocalByDefault(e.target.checked)}
-                      style={{ marginRight: '8px' }}
-                    />
-                    {t('settings.models.useLocalByDefault')}
-                  </label>
-                </div>
-                {!useLocalByDefault && (
-                  <>
-                    <div className="settings-field">
-                      <label>{t('settings.models.defaultPlatform')}</label>
-                      <select
-                        className="settings-select"
-                        value={defaultPlatform}
-                        onChange={(e) => setDefaultPlatform(e.target.value)}
-                      >
-                        {platforms.map((p) => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="settings-field">
-                      <label>{t('settings.models.defaultCloudModel')}</label>
-                      <select
-                        className="settings-select"
-                        value={defaultCloudModel}
-                        onChange={(e) => setDefaultCloudModel(e.target.value)}
-                      >
-                        <option value="deepseek-chat">deepseek-chat</option>
-                        <option value="deepseek-r1">deepseek-r1</option>
-                      </select>
-                    </div>
-                  </>
-                )}
-              </div>
-            </section>
-            <section className="settings-section">
-              <h2>{t('settings.models.ollamaTitle')}</h2>
-              <p className="settings-section-desc">{t('settings.models.ollamaDesc')}</p>
-              <div className="settings-field-group">
-                <div className="settings-field">
-                  <label>{t('settings.models.baseUrl')}</label>
+                  <label>Base URL</label>
                   <input
                     className="settings-input"
                     type="text"
                     value={localBaseUrl}
                     onChange={(e) => setLocalBaseUrl(e.target.value)}
-                    placeholder={t('settings.models.baseUrlPlaceholder')}
+                    placeholder="http://localhost:11434/v1"
                   />
                 </div>
                 <div className="settings-field">
-                  <label>{t('settings.models.modelName')}</label>
+                  <label>Model Name</label>
                   <div style={{ display: 'flex', gap: '8px', maxWidth: '400px' }}>
                     <input
                       className="settings-input"
@@ -325,7 +235,7 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
                       type="text"
                       value={localModelName}
                       onChange={(e) => setLocalModelName(e.target.value)}
-                      placeholder={t('settings.models.modelPlaceholder')}
+                      placeholder="e.g. qwen2.5:7b"
                     />
                     <datalist id="local-models-list">
                       {availableLocalModels.map(m => <option key={m} value={m} />)}
@@ -335,7 +245,7 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
                       onClick={fetchLocalModels}
                       disabled={isFetchingModels}
                     >
-                      {isFetchingModels ? '...' : t('settings.models.refresh')}
+                      {isFetchingModels ? '...' : 'Refresh'}
                     </button>
                   </div>
                 </div>
@@ -343,8 +253,8 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
             </section>
 
             <section className="settings-section">
-              <h2>{t('settings.models.cloudTitle')}</h2>
-              <p className="settings-section-desc">{t('settings.models.cloudDesc')}</p>
+              <h2>Cloud Providers & API Keys</h2>
+              <p className="settings-section-desc">Manage API keys for cloud-based models (DeepSeek, OpenAI, etc.). Keys are stored encrypted.</p>
               <div className="settings-field-group">
                 <div className="settings-field">
                   <label>{t('privacyCenter.platform')}</label>
@@ -398,7 +308,7 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
               <h2>{t('privacyCenter.dataDesensitization')}</h2>
               <p className="settings-section-desc">{t('privacyCenter.autoDesensitization')}</p>
               <button className="settings-btn" onClick={loadDesensitizationLog}>
-                {loadingLogs ? t('sidebar.loading') : t('privacyCenter.viewDesensitizationLog')}
+                {loadingLogs ? 'Loading...' : t('privacyCenter.viewDesensitizationLog')}
               </button>
               
               {desensitizationEntries.length > 0 && (
@@ -416,9 +326,9 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
 
             <section className="settings-section">
               <h2>{t('privacyCenter.auditLog')}</h2>
-              <p className="settings-section-desc">{t('settings.privacy.viewAuditDesc')}</p>
+              <p className="settings-section-desc">View system audit logs for security and compliance.</p>
               <button className="settings-btn" onClick={loadAuditLog}>
-                {loadingLogs ? t('sidebar.loading') : t('privacyCenter.viewAuditLog')}
+                {loadingLogs ? 'Loading...' : t('privacyCenter.viewAuditLog')}
               </button>
 
               {auditLogEntries.length > 0 && (
@@ -438,18 +348,18 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
 
         {activeTab === 'context' && (
           <section className="settings-section">
-            <h2>{t('settings.context.ragTitle')}</h2>
-            <p className="settings-section-desc">{t('settings.context.ragDesc')}</p>
+            <h2>RAG & Context Management</h2>
+            <p className="settings-section-desc">Configure retrieval augmented generation parameters.</p>
             <div className="settings-field-group">
               <div className="settings-field">
-                <label>{t('settings.context.chunkSize')}</label>
+                <label>Chunk Size</label>
                 <input className="settings-input" type="number" defaultValue={500} />
               </div>
               <div className="settings-field">
-                <label>{t('settings.context.contextWindow')}</label>
+                <label>Context Window (Top K)</label>
                 <input className="settings-input" type="number" defaultValue={5} />
               </div>
-              <p className="settings-hint">{t('settings.context.hint')}</p>
+              <p className="settings-hint">These settings will be applied to new queries.</p>
             </div>
           </section>
         )}

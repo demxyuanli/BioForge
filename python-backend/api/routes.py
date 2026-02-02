@@ -4,7 +4,7 @@ FastAPI routes for document processing, annotation, and fine-tuning
 """
 from fastapi import APIRouter, UploadFile, File, HTTPException, Request, Body, BackgroundTasks, Query
 from fastapi.responses import Response
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import os
 import json
 import logging
@@ -661,17 +661,35 @@ async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = 
         raise HTTPException(status_code=500, detail=str(e))
 
 def process_document_background(document_id: int, file_path: str, file_type: str):
-    """Background task to process document"""
+    """Background task to process document. Non-PDF Office docs are converted to PDF first."""
     db = get_db_session()
     try:
         doc = db.query(Document).filter(Document.id == document_id).first()
         if not doc:
             return
-            
+
+        # Convert non-PDF Office documents to PDF so all stored docs are unified as PDF
+        if (file_type or "").lower() != "pdf" and is_office_extension((file_type or "").lower()):
+            out_dir = os.path.dirname(file_path)
+            pdf_path = convert_to_pdf(file_path, out_dir)
+            if pdf_path and os.path.isfile(pdf_path):
+                try:
+                    if os.path.isfile(file_path) and os.path.abspath(file_path) != os.path.abspath(pdf_path):
+                        os.remove(file_path)
+                except OSError:
+                    pass
+                doc.file_path = pdf_path
+                doc.file_type = "pdf"
+                base = os.path.splitext(doc.filename)[0]
+                doc.filename = base + ".pdf" if base else "document.pdf"
+                db.commit()
+                file_path = pdf_path
+                file_type = "pdf"
+
         doc.processing_status = 'processing'
         doc.processing_message = 'Extracting text...'
         db.commit()
-        
+
         # Process document
         from services.document_processor import DocumentProcessor
         processor = DocumentProcessor()
@@ -753,15 +771,83 @@ async def list_documents():
             db.close()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get("/documents/{document_id}/summary")
+async def get_document_summary_by_id(document_id: int):
+    """Temporary placeholder for document summary by id. Returns empty or text_content snippet; AI extraction will be used later."""
+    db = get_db_session()
+    try:
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if not doc:
+            db.close()
+            raise HTTPException(status_code=404, detail="Document not found")
+        summary = ""
+        if doc.text_content:
+            summary = (doc.text_content[:500] + "..." if len(doc.text_content) > 500 else doc.text_content)
+        db.close()
+        return {"summary": summary}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/documents/{document_id}/preview")
+async def get_document_preview_by_id(document_id: int):
+    """Generate document preview by document id (uses file_path). Returns PDF or 404."""
+    db = get_db_session()
+    try:
+        doc = db.query(Document).filter(Document.id == document_id).first()
+        if not doc:
+            db.close()
+            raise HTTPException(status_code=404, detail="Document not found")
+        full_path = (doc.file_path or "").strip()
+        if not full_path or not os.path.isfile(full_path):
+            db.close()
+            raise HTTPException(status_code=404, detail="File not found")
+        ext = (os.path.splitext(full_path)[1] or "").lstrip(".").lower()
+        if ext == "jpeg":
+            ext = "jpg"
+        if ext == "pdf":
+            with open(full_path, "rb") as f:
+                data = f.read()
+            db.close()
+            return Response(content=data, media_type="application/pdf")
+        if not is_office_extension(ext):
+            db.close()
+            raise HTTPException(status_code=400, detail="Preview not supported for this file type")
+        out_dir = tempfile.mkdtemp()
+        try:
+            pdf_path = convert_to_pdf(full_path, out_dir)
+            if not pdf_path or not os.path.isfile(pdf_path):
+                raise HTTPException(status_code=502, detail="LibreOffice conversion failed")
+            with open(pdf_path, "rb") as f:
+                data = f.read()
+            return Response(content=data, media_type="application/pdf")
+        finally:
+            try:
+                shutil.rmtree(out_dir, ignore_errors=True)
+            except OSError:
+                pass
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/documents/knowledge-points")
-async def list_knowledge_points(page: int = 1, page_size: int = 50, document_id: int = None):
-    """List knowledge points with pagination"""
+async def list_knowledge_points(page: int = 1, page_size: int = 50, document_id: Optional[int] = None):
+    """List knowledge points with pagination. Filter by document_id when provided."""
     db = None
     try:
         db = get_db_session()
         query = db.query(KnowledgePoint, Document).join(Document, KnowledgePoint.document_id == Document.id)
         
-        if document_id:
+        if document_id is not None:
             query = query.filter(KnowledgePoint.document_id == document_id)
             
         total = query.count()
@@ -917,6 +1003,32 @@ async def update_knowledge_point_weight(kp_id: int, body: Dict[str, Any] = Body(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.patch("/documents/knowledge-points/{kp_id}/excluded")
+async def update_knowledge_point_excluded(kp_id: int, body: Dict[str, Any] = Body(...)):
+    """Update knowledge point excluded (soft delete) state."""
+    excluded = body.get("excluded")
+    if excluded is None or not isinstance(excluded, bool):
+        raise HTTPException(status_code=400, detail="excluded must be a boolean")
+    db = None
+    try:
+        db = get_db_session()
+        kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
+        if not kp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Knowledge point not found")
+        kp.excluded = excluded
+        db.commit()
+        db.close()
+        return {"id": kp_id, "excluded": excluded}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.rollback()
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/documents/{document_id}")
 async def delete_document(document_id: int):
     """Delete a document and its associated data"""
@@ -946,25 +1058,53 @@ async def delete_document(document_id: int):
             from services.rag_service import RAGService
             rag = RAGService()
             if rag.client:
+                # Delete from document-specific collection
                 collection_name = f"doc_{document_id}"
                 try:
                     rag.client.delete_collection(collection_name)
                 except Exception as e:
-                    print(f"Warning: Failed to delete vector store collection {collection_name}: {e}")
+                    logger.warning(f"Failed to delete vector store collection {collection_name}: {e}")
+                # Delete from global knowledge base collection
+                try:
+                    rag.delete_document(str(document_id), "global_knowledge_base")
+                except Exception as e:
+                    logger.warning(f"Failed to delete document from global vector store: {e}")
         except Exception as e:
-            print(f"Warning: Failed to delete vector store collection: {e}")
+            logger.warning(f"Failed to delete vector store data: {e}")
         
         # Delete the document
         db.delete(doc)
         db.commit()
         db.close()
         
-        # Delete the document file if it exists (after successful DB deletion)
-        if file_path and os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except Exception as e:
-                print(f"Warning: Failed to delete file {file_path}: {e}")
+        # Delete the document file and any related files (after successful DB deletion)
+        if file_path:
+            file_path = file_path.strip()
+            if file_path and os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Deleted document file: {file_path}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete file {file_path}: {e}")
+            # Also try to delete original file if it was converted to PDF
+            # Check for files with same base name but different extensions
+            if file_path:
+                try:
+                    file_dir = os.path.dirname(file_path)
+                    file_base = os.path.splitext(os.path.basename(file_path))[0]
+                    if file_dir and file_base:
+                        # Common office extensions that might have been converted
+                        original_extensions = ['.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.odt', '.ods', '.odp']
+                        for ext in original_extensions:
+                            original_path = os.path.join(file_dir, file_base + ext)
+                            if os.path.exists(original_path) and os.path.abspath(original_path) != os.path.abspath(file_path):
+                                try:
+                                    os.remove(original_path)
+                                    logger.info(f"Deleted original file: {original_path}")
+                                except Exception as e:
+                                    logger.warning(f"Failed to delete original file {original_path}: {e}")
+                except Exception as e:
+                    logger.warning(f"Failed to check for original files: {e}")
         
         return {"success": True, "message": "Document deleted successfully"}
     except HTTPException:

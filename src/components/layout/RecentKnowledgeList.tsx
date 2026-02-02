@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getDocuments, type Document } from '../../services/api';
+import Tooltip from '../Tooltip';
 import './RecentKnowledgeList.css';
 
 const RecentKnowledgeList: React.FC = () => {
@@ -48,9 +49,9 @@ const RecentKnowledgeList: React.FC = () => {
         ) : (
           documents.map((doc) => (
             <li key={doc.id} className="rkl-item">
-              <span className="rkl-name" title={doc.filename}>
-                {doc.filename}
-              </span>
+              <Tooltip title={doc.filename}>
+                <span className="rkl-name">{doc.filename}</span>
+              </Tooltip>
               <span className="rkl-meta">{doc.fileType}</span>
             </li>
           ))

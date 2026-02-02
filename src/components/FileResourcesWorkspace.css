@@ -108,6 +108,36 @@
   display: block;
 }
 
+.fr-document-detail-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.fr-document-detail-maximize {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: var(--vs-fg);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.fr-document-detail-maximize:hover {
+  background: var(--vs-list-hover);
+}
+
+.fr-workspace-preview-maximized .fr-workspace-bottom {
+  flex: 1;
+  min-height: 0;
+}
+
 .fr-document-summary-block {
   flex-shrink: 0;
   padding: 8px 12px;
@@ -150,14 +180,16 @@
   color: var(--vs-error-foreground);
 }
 
-.fr-document-preview-iframe {
+.fr-document-preview-iframe,
+.fr-document-preview-pdf {
   flex: 1;
-  min-height: 240px;
+  min-height: 0;
   width: 100%;
+  height: 100%;
   border: 1px solid var(--vs-border);
   border-radius: 4px;
   background: var(--vs-editor-background);
-  display: block;
+  overflow: hidden;
 }
 
 .fr-search-section {
@@ -209,7 +241,8 @@
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
-  color: var(--vs-description-foreground);
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+  color: var(--fr-cli-muted, #858585);
   letter-spacing: 0.5px;
   border-bottom: 1px solid var(--vs-border-subtle);
 }
@@ -222,17 +255,21 @@
   overflow-y: auto;
   flex: 1;
   min-height: 0;
+  background: transparent;
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
+  font-size: 12px;
 }
 
 .fr-file-item,
 .fr-attachment-item {
-  padding: 6px 12px;
-  font-size: 13px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--vs-fg);
+  color: var(--fr-cli-fg, #d4d4d4);
   border: none;
   background: transparent;
   width: 100%;
@@ -264,8 +301,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 10px;
-  color: var(--vs-description-foreground);
+  font-size: 11px;
+  color: var(--fr-cli-muted, #858585);
 }
 
 .fr-file-badge {
@@ -276,7 +313,7 @@
 
 .fr-file-item.fr-empty,
 .fr-attachment-item.fr-empty {
-  color: var(--vs-description-foreground);
+  color: var(--fr-cli-muted, #858585);
   cursor: default;
   font-style: italic;
 }
@@ -312,22 +349,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 4px;
-  min-width: 22px;
-  min-height: 22px;
+  padding: 4px 8px;
+  min-width: 20px;
+  min-height: 20px;
   color: var(--vs-fg);
-  background: var(--vs-input-bg) !important;
-  border: 1px solid var(--vs-border);
+  background: transparent !important;
+  border: none;
   border-radius: 2px;
   cursor: pointer;
+  box-shadow: none;
 }
 .fr-workspace .fr-add-mount-btn:hover:not(:disabled) {
   background: var(--vs-list-hover) !important;
 }
 .fr-workspace .fr-add-mount-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
-  background: var(--vs-input-bg) !important;
+  background: transparent !important;
 }
 .fr-add-mount-icon {
   flex-shrink: 0;
@@ -342,10 +380,10 @@
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.45;
-  background: var(--fr-cli-bg, #1e1e1e);
+  background: transparent;
   color: var(--fr-cli-fg, #d4d4d4);
-  border: 1px solid var(--vs-border, #3c3c3c);
-  border-radius: 4px;
+  border: none;
+  border-radius: 0;
   padding: 8px 10px;
   overflow: auto;
   flex: 1;
@@ -385,11 +423,12 @@
 }
 
 .fr-cli-mount-row:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--vs-list-hover);
 }
 
 .fr-cli-mount-row.selected {
-  background: rgba(38, 79, 120, 0.4);
+  background: var(--vs-list-active-selection-bg);
+  color: var(--vs-list-active-selection-fg);
 }
 
 .fr-cli-mount-name {
@@ -554,10 +593,10 @@
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Consolas, monospace;
   font-size: 12px;
   line-height: 1.4;
-  background: var(--fr-cli-bg, #1e1e1e);
+  background: transparent;
   color: var(--fr-cli-fg, #d4d4d4);
-  border: 1px solid var(--vs-border, #3c3c3c);
-  border-radius: 4px;
+  border: none;
+  border-radius: 0;
   padding: 8px 10px;
 }
 
@@ -574,7 +613,7 @@
 
 .fr-cli-file-table-header {
   display: grid;
-  grid-template-columns: 2fr 4.5fr 1.4fr 1fr;
+  grid-template-columns: 2fr 4.5fr 84px 56px;
   gap: 8px;
   padding: 4px 0 6px;
   font-size: 11px;
@@ -582,7 +621,7 @@
   color: var(--fr-cli-muted, #858585);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--vs-border, #3c3c3c);
+  border-bottom: 1px solid var(--vs-border-subtle);
 }
 
 .fr-cli-file-table-header .fr-cli-col-weight,
@@ -594,12 +633,12 @@
 
 .fr-cli-file-row {
   display: grid;
-  grid-template-columns: 2fr 4.5fr 1.4fr 1fr;
+  grid-template-columns: 2fr 4.5fr 84px 56px;
   gap: 8px;
   padding: 4px 0;
   align-items: center;
   font-size: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--vs-border-subtle);
   cursor: pointer;
 }
 
@@ -615,7 +654,7 @@
 }
 
 .fr-cli-file-row:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--vs-list-hover);
 }
 
 .fr-cli-col-filename,
@@ -733,7 +772,7 @@
   padding: 6px 0 8px;
   font-size: 11px;
   color: var(--fr-cli-muted, #858585);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--vs-border-subtle);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -767,9 +806,9 @@
   line-height: 1.5;
   color: var(--fr-cli-fg, #d4d4d4);
   padding: 6px 8px;
-  background: rgba(0, 0, 0, 0.2);
+  background: transparent;
   border-radius: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--vs-border-subtle);
 }
 
 .fr-notes-preview p {
@@ -848,10 +887,11 @@
   font-size: 11px;
   font-weight: 600;
   color: var(--vs-fg);
-  background: var(--vs-input-bg) !important;
+  background: transparent !important;
   border: none;
   cursor: pointer;
   text-align: left;
+  border-radius: 2px;
 }
 
 .fr-workspace .fr-description-collapse-header:hover {
@@ -1007,13 +1047,16 @@
   gap: 6px;
 }
 .fr-workspace .fr-btn {
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: 4px 8px;
+  min-width: 20px;
+  min-height: 20px;
+  font-size: 12px;
   border-radius: 2px;
   cursor: pointer;
-  border: 1px solid var(--vs-border);
+  border: none;
   color: var(--vs-fg);
-  background: var(--vs-input-bg) !important;
+  background: transparent !important;
+  box-shadow: none;
 }
 .fr-workspace .fr-btn:hover:not(:disabled) {
   background: var(--vs-list-hover) !important;
@@ -1024,8 +1067,8 @@
 }
 .fr-btn-neutral {
   color: var(--vs-fg);
-  background: var(--vs-input-bg);
-  border-color: var(--vs-border);
+  background: transparent;
+  border: none;
 }
 .fr-btn-neutral:hover:not(:disabled) {
   background: var(--vs-list-hover);
@@ -1035,15 +1078,16 @@
   cursor: not-allowed;
 }
 .fr-btn-danger {
-  color: var(--vs-fg);
-  background: var(--vs-input-bg);
-  border-color: var(--vs-border);
+  color: var(--vs-errorForeground, #f14c4c);
+  background: transparent;
+  border: none;
 }
-.fr-btn-danger:hover {
+.fr-btn-danger:hover:not(:disabled) {
   background: var(--vs-list-hover);
+  color: var(--vs-errorForeground, #f14c4c);
 }
 .fr-btn-danger:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 .fr-remove-error {

@@ -30,21 +30,21 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ activeTab, onTabChang
               onClick={() => onTabChange('models')}
               style={{ backgroundColor: activeTab === 'models' ? 'var(--vs-list-hover)' : 'transparent' }}
             >
-              <span className="item-name" style={{ paddingLeft: '8px' }}>{t('settings.models.title')}</span>
+              <span className="item-name" style={{ paddingLeft: '8px' }}>{t('settings.models.title') || 'Model Configuration'}</span>
             </div>
             <div 
               className={`sidebar-item ${activeTab === 'privacy' ? 'active' : ''}`}
               onClick={() => onTabChange('privacy')}
               style={{ backgroundColor: activeTab === 'privacy' ? 'var(--vs-list-hover)' : 'transparent' }}
             >
-              <span className="item-name" style={{ paddingLeft: '8px' }}>{t('settings.privacy.title')}</span>
+              <span className="item-name" style={{ paddingLeft: '8px' }}>{t('settings.privacy.title') || 'Privacy & Rules'}</span>
             </div>
             <div 
               className={`sidebar-item ${activeTab === 'context' ? 'active' : ''}`}
               onClick={() => onTabChange('context')}
               style={{ backgroundColor: activeTab === 'context' ? 'var(--vs-list-hover)' : 'transparent' }}
             >
-              <span className="item-name" style={{ paddingLeft: '8px' }}>{t('settings.context.title')}</span>
+              <span className="item-name" style={{ paddingLeft: '8px' }}>{t('settings.context.title') || 'Context & Knowledge'}</span>
             </div>
           </div>
         </div>

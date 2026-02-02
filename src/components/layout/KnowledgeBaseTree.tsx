@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import Tooltip from '../Tooltip';
 import {
   getDirectories,
   getKnowledgePoints,
@@ -138,9 +139,9 @@ const ManagedNode: React.FC<ManagedNodeProps> = ({ node, level, pointsByDoc, onR
           {isDir ? (expanded ? '\u25BE' : '\u25B8') : '\u2003'}
         </span>
         <span className="kbt-icon">{icon}</span>
-        <span className="kbt-name" title={node.name}>
-          {node.name}
-        </span>
+        <Tooltip title={node.name}>
+          <span className="kbt-name">{node.name}</span>
+        </Tooltip>
         {!isDir && node.processed && <span className="kbt-badge">{'\u2713'}</span>}
         {!isDir && points.length > 0 && <span className="kbt-count">({points.length})</span>}
       </div>

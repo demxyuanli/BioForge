@@ -192,6 +192,7 @@
 
 /* Left Sidebar */
 .vs-sidebar {
+  min-width: 200px;
   background-color: var(--vs-sidebar-bg);
   display: flex;
   flex-direction: column;
@@ -790,7 +791,7 @@
   background-color: var(--vs-list-hover);
 }
 
-/* Button Styling */
+/* Button Styling (non-workspace content) */
 .vs-editor-content button {
   padding: 6px 14px;
   background-color: var(--vs-accent);
@@ -819,6 +820,38 @@
 
 .vs-editor-content button.delete-btn:hover {
   opacity: 0.9;
+}
+
+/* Workspace unified icon buttons: no background, small icon style */
+.vs-editor-content .kb-workspace button,
+.vs-editor-content .fr-workspace button {
+  padding: 4px 8px;
+  min-width: 20px;
+  min-height: 20px;
+  background: transparent !important;
+  border: none;
+  color: var(--vs-fg);
+  font-size: 12px;
+  border-radius: 2px;
+  box-shadow: none;
+  appearance: none;
+}
+
+.vs-editor-content .kb-workspace button:hover:not(:disabled),
+.vs-editor-content .fr-workspace button:hover:not(:disabled) {
+  background: var(--vs-list-hover) !important;
+  color: var(--vs-fg);
+}
+
+.vs-editor-content .kb-workspace button:focus,
+.vs-editor-content .fr-workspace button:focus {
+  outline: none;
+}
+
+.vs-editor-content .kb-workspace button:disabled,
+.vs-editor-content .fr-workspace button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Form Elements */

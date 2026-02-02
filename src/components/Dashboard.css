@@ -3,21 +3,6 @@
   margin: 0 auto;
 }
 
-.dashboard-status-bar {
-  display: flex;
-  gap: 1.5rem;
-  margin-bottom: 1rem;
-  padding: 8px 12px;
-  background: var(--vs-panel-bg);
-  border-radius: 6px;
-  font-size: 13px;
-  border: 1px solid var(--vs-border-subtle);
-}
-
-.dashboard-status-item {
-  color: var(--vs-muted);
-}
-
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

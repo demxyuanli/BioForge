@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityType } from './VSLayout';
+import Tooltip from '../Tooltip';
 import './MenuBar.css';
 
 interface MenuBarProps {
@@ -173,12 +174,16 @@ const MenuBar: React.FC<MenuBarProps> = ({
           </div>
         ))}
         <div className="menubar-nav" onMouseDown={(e) => e.stopPropagation()}>
-          <button className="menubar-nav-btn" onClick={handleNavBack} title={t('menu.back')}>
-            &#x25C0;
-          </button>
-          <button className="menubar-nav-btn" onClick={handleNavForward} title={t('menu.forward')}>
-            &#x25B6;
-          </button>
+          <Tooltip title={t('menu.back')}>
+            <button className="menubar-nav-btn" onClick={handleNavBack}>
+              &#x25C0;
+            </button>
+          </Tooltip>
+          <Tooltip title={t('menu.forward')}>
+            <button className="menubar-nav-btn" onClick={handleNavForward}>
+              &#x25B6;
+            </button>
+          </Tooltip>
         </div>
         <span className="menubar-title">{t('app.title')}</span>
       </div>
@@ -209,53 +214,62 @@ const MenuBar: React.FC<MenuBarProps> = ({
       )}
 
       <div className="menubar-right" onMouseDown={(e) => e.stopPropagation()}>
-        <button
-          className={`menubar-layout-btn ${sidebarVisible ? 'active' : ''}`}
-          onClick={() => onToggleSidebar?.()}
-          title={t('menu.toggleSidebar')}
-        >
+        <Tooltip title={t('menu.toggleSidebar')}>
+          <button
+            className={`menubar-layout-btn ${sidebarVisible ? 'active' : ''}`}
+            onClick={() => onToggleSidebar?.()}
+          >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="0.5" y="0.5" width="11" height="11" rx="0.5" />
             <line x1="3" y1="1" x2="3" y2="11" strokeWidth="1.5" />
           </svg>
         </button>
-        <button
-          className={`menubar-layout-btn ${bottomPanelVisible ? 'active' : ''}`}
-          onClick={() => onTogglePanel?.()}
-          title={t('panel.output')}
-        >
+        </Tooltip>
+        <Tooltip title={t('panel.output')}>
+          <button
+            className={`menubar-layout-btn ${bottomPanelVisible ? 'active' : ''}`}
+            onClick={() => onTogglePanel?.()}
+          >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="0.5" y="0.5" width="11" height="11" rx="0.5" />
             <line x1="1" y1="9" x2="11" y2="9" strokeWidth="1.5" />
           </svg>
         </button>
-        <button
-          className="menubar-btn menubar-settings"
-          onClick={() => onActivityChange('settings')}
-          title={t('panel.settings')}
-        >
+        </Tooltip>
+        <Tooltip title={t('panel.settings')}>
+          <button
+            className="menubar-btn menubar-settings"
+            onClick={() => onActivityChange('settings')}
+          >
           &#x2699;
         </button>
-        <button
-          className="menubar-btn menubar-lang"
-          onClick={() => onLanguageChange?.(currentLanguage === 'zh' ? 'en' : 'zh')}
-          title={t('menu.language')}
-        >
+        </Tooltip>
+        <Tooltip title={t('menu.language')}>
+          <button
+            className="menubar-btn menubar-lang"
+            onClick={() => onLanguageChange?.(currentLanguage === 'zh' ? 'en' : 'zh')}
+          >
           {currentLanguage === 'zh' ? 'EN' : '\u4E2D'}
         </button>
-        <button className="menubar-btn menubar-minimize" onClick={onMinimize} title={t('menu.minimize')}>
+        </Tooltip>
+        <Tooltip title={t('menu.minimize')}>
+          <button className="menubar-btn menubar-minimize" onClick={onMinimize}>
           &#x2212;
         </button>
-        <button
-          className="menubar-btn menubar-maximize"
-          onClick={onMaximize}
-          title={isMaximized ? t('menu.restore') : t('menu.maximize')}
-        >
+        </Tooltip>
+        <Tooltip title={isMaximized ? t('menu.restore') : t('menu.maximize')}>
+          <button
+            className="menubar-btn menubar-maximize"
+            onClick={onMaximize}
+          >
           {isMaximized ? '\u2752' : '\u25A1'}
         </button>
-        <button className="menubar-btn menubar-close" onClick={onClose} title={t('panel.close')}>
+        </Tooltip>
+        <Tooltip title={t('panel.close')}>
+          <button className="menubar-btn menubar-close" onClick={onClose}>
           &#x2715;
         </button>
+        </Tooltip>
       </div>
     </div>
   );

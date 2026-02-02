@@ -1,151 +1,123 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityType } from './VSLayout';
-import FileExplorer from './FileExplorer';
+import { Document, FinetuningJob } from '../../services/api';
 import KnowledgeBaseTree from './KnowledgeBaseTree';
-import RecentKnowledgeList from './RecentKnowledgeList';
-import OverviewStatusList from './OverviewStatusList';
-
-export type ResourceView = 'files' | 'knowledge';
-
-const ACTIVITIES_WITH_SIDEBAR: ActivityType[] = [
-  'dashboard',
-  'fileResources',
-  'knowledgeBase',
-  'datacenter',
-  'training',
-  'production',
-  'evaluation',
-  'chat'
-];
-
-const ITEM_KEYS_BY_ACTIVITY: Record<ActivityType, string[]> = {
-  dashboard: [],
-  fileResources: [],
-  knowledgeBase: ['knowledgeTree', 'knowledgeGraph', 'knowledgeManagement'],
-  datacenter: ['knowledgeCreation', 'knowledgePointsManagement', 'keywordManagement'],
-  training: ['knowledgePoints', 'annotations', 'exportJsonl'],
-  production: ['datasetAndCost', 'jobs', 'logs'],
-  evaluation: ['templates', 'customPrompt', 'compareResult'],
-  chat: ['conversation'],
-  settings: [],
-  explorer: []
-};
-
-const ITEM_TO_VIEW: Record<string, ResourceView> = {
-  fileExplorer: 'files',
-  knowledgeBase: 'knowledge',
-  documentsAndFolders: 'files',
-  knowledgePoints: 'knowledge',
-  knowledgeCreation: 'files',
-  knowledgePointsManagement: 'knowledge',
-  keywordManagement: 'knowledge',
-  knowledgeTree: 'knowledge',
-  knowledgeGraph: 'knowledge',
-  knowledgeManagement: 'knowledge'
-};
+import { SidebarViewType } from './VSLayout';
 
 interface ResourceSidebarProps {
-  activity: ActivityType;
-  activeView: ResourceView;
-  onViewChange?: (view: ResourceView) => void;
-  selectedSubItem?: string;
-  onSubItemChange?: (key: string) => void;
+  documents: Document[];
+  jobs: FinetuningJob[];
+  activeSidebarView: SidebarViewType;
+  onSidebarViewChange: (view: SidebarViewType) => void;
+  onCreateFolder?: (parentId: string | null, name: string) => Promise<void>;
+  onMoveItem?: (itemId: string, targetId: string | null) => Promise<void>;
+  onDeleteItem?: (itemId: string) => Promise<void>;
 }
 
 const ResourceSidebar: React.FC<ResourceSidebarProps> = ({
-  activity,
-  activeView,
-  onViewChange,
-  selectedSubItem,
-  onSubItemChange
+  documents,
+  jobs,
+  activeSidebarView,
+  onSidebarViewChange
 }) => {
   const { t } = useTranslation();
-  const hasSidebar = ACTIVITIES_WITH_SIDEBAR.includes(activity);
-  const itemKeys = hasSidebar ? ITEM_KEYS_BY_ACTIVITY[activity] : [];
-  const isResourceActivity =
-    activity === 'fileResources' || activity === 'datacenter' || activity === 'knowledgeBase';
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    'files': true,
+    'knowledge': true,
+    'jobs': true
+  });
 
-  const handleItemClick = (key: string) => {
-    const view = ITEM_TO_VIEW[key];
-    if (view && onViewChange && isResourceActivity) {
-      onViewChange(view);
-    }
-    if (onSubItemChange) {
-      onSubItemChange(key);
-    }
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
-  const getActiveItem = (): string | undefined => {
-    if (activity === 'knowledgeBase') {
-      return selectedSubItem ?? 'knowledgeTree';
-    }
-    if (activity === 'datacenter') {
-      return selectedSubItem ?? 'knowledgeCreation';
-    }
-    if (isResourceActivity) {
-      if (activeView === 'files') return 'fileExplorer';
-      return 'knowledgeBase';
-    }
-    return selectedSubItem ?? (itemKeys.length ? itemKeys[0] : undefined);
-  };
-
-  const activeItem = getActiveItem();
-
-  if (!hasSidebar) {
-    return (
-      <div className="vs-sidebar-content">
-        {activeView === 'files' ? <FileExplorer /> : <KnowledgeBaseTree />}
-      </div>
-    );
-  }
-
-  const titleKey = `sidebar.activityTitles.${activity}`;
-  const title = t(titleKey);
+  // Switch view based on activeSidebarView if needed, or just show everything in sections?
+  // The original VSLayout had buttons to switch between "files" and "knowledge".
+  // The user asked for "Resource Icon" to switch to "File Library and Knowledge Base content".
+  // Let's implement tabs within the sidebar header to switch views, utilizing the props passed from App.tsx.
 
   return (
     <>
       <div className="vs-sidebar-header">
-        <span className="vs-sidebar-title">{title}</span>
-      </div>
-      {itemKeys.length > 0 && (
-      <div className="sidebar-section">
-        <div className="sidebar-list">
-          {itemKeys.map((key) => {
-            const itemLabelKey = `sidebar.activityItems.${activity}.${key}`;
-            const isActive = activeItem === key;
-            return (
-              <div
-                key={key}
-                className={`sidebar-item ${isActive ? 'active' : ''}`}
-                onClick={() => handleItemClick(key)}
-                style={{ backgroundColor: isActive ? 'var(--vs-list-hover)' : 'transparent' }}
-              >
-                <span className="item-name" style={{ paddingLeft: '8px' }}>
-                  {t(itemLabelKey)}
-                </span>
-              </div>
-            );
-          })}
+        <div className="vs-sidebar-tabs">
+          <button
+            className={`vs-sidebar-tab ${activeSidebarView === 'files' ? 'active' : ''}`}
+            onClick={() => onSidebarViewChange('files')}
+            title={t('sidebar.fileExplorer')}
+          >
+            <span className="vs-sidebar-tab-icon">{'\uD83D\uDCC1'}</span>
+            <span className="vs-sidebar-tab-label">{t('sidebar.fileExplorer')}</span>
+          </button>
+          <button
+            className={`vs-sidebar-tab ${activeSidebarView === 'knowledge' ? 'active' : ''}`}
+            onClick={() => onSidebarViewChange('knowledge')}
+            title={t('sidebar.knowledgeBase')}
+          >
+            <span className="vs-sidebar-tab-icon">{'\uD83D\uDCDA'}</span>
+            <span className="vs-sidebar-tab-label">{t('sidebar.knowledgeBase')}</span>
+          </button>
         </div>
       </div>
-      )}
+      
       <div className="vs-sidebar-content">
-        {activity === 'fileResources' ? (
-          <FileExplorer />
-        ) : activity === 'knowledgeBase' ? (
-          <RecentKnowledgeList />
-        ) : activity === 'datacenter' ? (
-          <div className="vs-sidebar-placeholder">
-            {t('sidebar.selectActivity')}
-          </div>
-        ) : isResourceActivity ? (
-          activeView === 'files' ? <FileExplorer /> : <KnowledgeBaseTree />
-        ) : activity === 'dashboard' ? (
-          <OverviewStatusList />
-        ) : (
-          <div className="vs-sidebar-placeholder">
-            {t('sidebar.selectActivity')}
+        {activeSidebarView === 'files' && (
+          <>
+            <div className="sidebar-section">
+              <h4 onClick={() => toggleSection('files')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <span style={{ transform: expandedSections['files'] ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', marginRight: '4px' }}>▶</span>
+                {t('sidebar.files')}
+              </h4>
+              {expandedSections['files'] && (
+                <div className="sidebar-list">
+                  {documents.length === 0 ? (
+                    <div className="sidebar-empty">{t('sidebar.noFiles')}</div>
+                  ) : (
+                    documents.map(doc => (
+                      <div key={doc.id} className="sidebar-item" title={doc.filename}>
+                        <span className="item-icon">📄</span>
+                        <span className="item-name">{doc.filename}</span>
+                        <span className={`item-status ${doc.processed ? 'processed' : 'pending'}`}>
+                          {doc.processed ? '✓' : '○'}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="sidebar-section">
+              <h4 onClick={() => toggleSection('jobs')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+                <span style={{ transform: expandedSections['jobs'] ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', marginRight: '4px' }}>▶</span>
+                {t('sidebar.jobs')}
+              </h4>
+              {expandedSections['jobs'] && (
+                <div className="sidebar-list">
+                  {jobs.length === 0 ? (
+                    <div className="sidebar-empty">{t('sidebar.noJobs')}</div>
+                  ) : (
+                    jobs.map(job => (
+                      <div key={job.id} className="sidebar-item">
+                        <span className="item-icon">⚙</span>
+                        <span className="item-name">{job.model}</span>
+                        <span className={`item-status status-${job.status}`}>
+                          {job.status}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {activeSidebarView === 'knowledge' && (
+          <div style={{ height: '100%' }}>
+            <KnowledgeBaseTree />
           </div>
         )}
       </div>

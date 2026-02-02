@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import Tooltip from '../Tooltip';
 import {
   selectFolder,
   listSystemDir,
@@ -162,9 +163,9 @@ const FsNodeItem: React.FC<FsNodeItemProps> = ({ node, level }) => {
         onClick={handleToggle}
       >
         {fileIconEl}
-        <span className="fe-tree-name" title={node.name}>
-          {node.name}
-        </span>
+        <Tooltip title={node.name}>
+          <span className="fe-tree-name">{node.name}</span>
+        </Tooltip>
       </div>
       {node.isDirectory && expanded && (
         <div className="fe-tree-children">
@@ -326,19 +327,20 @@ const FileExplorer: React.FC = () => {
                 <span className="fe-tree-icon">
                   {expandedMount === mpKey(mp) ? ICON_FOLDER_OPEN : ICON_FOLDER}
                 </span>
-                <span className="fe-tree-name" title={mp.path}>
-                  {mp.name || mp.path}
-                </span>
-                <button
-                  className="fe-remove-mount"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveMount(mp.id);
-                  }}
-                  title={t('sidebar.removeMountPoint')}
-                >
+                <Tooltip title={mp.path}>
+                  <span className="fe-tree-name">{mp.name || mp.path}</span>
+                </Tooltip>
+                <Tooltip title={t('sidebar.removeMountPoint')}>
+                  <button
+                    className="fe-remove-mount"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveMount(mp.id);
+                    }}
+                  >
                   {'\u00D7'}
                 </button>
+                </Tooltip>
               </div>
               {expandedMount === mpKey(mp) && (
                 <div className="fe-tree-children">

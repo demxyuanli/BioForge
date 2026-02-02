@@ -326,6 +326,22 @@ export async function getDocumentPreview(mpId: number, relativePath: string): Pr
   }
 }
 
+export async function getDocumentSummaryByDocumentId(documentId: number): Promise<{ summary: string }> {
+  const response = await invoke<string>('get_document_summary_by_id', { documentId });
+  const data = await parsePythonResponse(response);
+  return { summary: typeof data?.summary === 'string' ? data.summary : '' };
+}
+
+export async function getDocumentPreviewByDocumentId(documentId: number): Promise<string | null> {
+  try {
+    const response = await invoke<string>('get_document_preview_by_id', { documentId });
+    const data = await parsePythonResponse(response);
+    return typeof data === 'string' ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function selectFolder(): Promise<string | null> {
   try {
     const selected = await open({
@@ -468,11 +484,22 @@ export async function deleteKnowledgePoints(ids: number[]): Promise<{ deleted?: 
 
 export async function updateKnowledgePointWeight(id: number, weight: number): Promise<{ id: number; weight: number }> {
   try {
-    const response = await invoke<string>('update_knowledge_point_weight', { kp_id: id, weight });
+    const response = await invoke<string>('update_knowledge_point_weight', { kpId: id, weight });
     const data = await parsePythonResponse(response);
     return { id: data?.id ?? id, weight: data?.weight ?? weight };
   } catch (error) {
     console.error('Update knowledge point weight error:', error);
+    throw error;
+  }
+}
+
+export async function updateKnowledgePointExcluded(id: number, excluded: boolean): Promise<{ id: number; excluded: boolean }> {
+  try {
+    const response = await invoke<string>('update_knowledge_point_excluded', { kpId: id, excluded });
+    const data = await parsePythonResponse(response);
+    return { id: data?.id ?? id, excluded: data?.excluded ?? excluded };
+  } catch (error) {
+    console.error('Update knowledge point excluded error:', error);
     throw error;
   }
 }

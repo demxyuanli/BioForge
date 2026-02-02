@@ -2,6 +2,7 @@ import React, { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RightPanelTab } from './VSLayout';
 import ChatAssistant from '../ChatAssistant';
+import Tooltip from '../Tooltip';
 
 interface RightPanelProps {
   activeTab: RightPanelTab;
@@ -43,9 +44,11 @@ const RightPanel: React.FC<RightPanelProps> = ({
           ))}
         </div>
         <div className="vs-panel-actions">
-          <button className="vs-panel-action" onClick={onClose} title={t('panel.close')}>
-            &#x2715;
-          </button>
+          <Tooltip title={t('panel.close')}>
+            <button className="vs-panel-action" onClick={onClose}>
+              &#x2715;
+            </button>
+          </Tooltip>
         </div>
       </div>
       <div className="vs-panel-content">

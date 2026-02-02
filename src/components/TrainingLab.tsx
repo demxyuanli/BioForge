@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { generateAnnotations, Annotation, getKnowledgePoints, saveTrainingSet, getLocalModels, type KnowledgePoint } from '../services/api';
+import Tooltip from './Tooltip';
 import { getAIConfig } from '../utils/aiConfig';
 
 const TrainingLab: React.FC = () => {
@@ -128,14 +129,15 @@ const TrainingLab: React.FC = () => {
               <datalist id="local-models-list">
                 {availableLocalModels.map(m => <option key={m} value={m} />)}
               </datalist>
-              <button 
-                onClick={fetchLocalModels} 
-                title={t('trainingLab.refreshModels')}
-                style={{ padding: '0 8px', minWidth: '32px' }}
-                disabled={isFetchingModels}
-              >
+              <Tooltip title={t('trainingLab.refreshModels')}>
+                <button 
+                  onClick={fetchLocalModels} 
+                  style={{ padding: '0 8px', minWidth: '32px' }}
+                  disabled={isFetchingModels}
+                >
                 {isFetchingModels ? '...' : '\u21bb'}
               </button>
+              </Tooltip>
             </div>
           </div>
       </div>

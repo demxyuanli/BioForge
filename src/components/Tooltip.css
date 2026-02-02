@@ -1,0 +1,39 @@
+.app-tooltip-anchor {
+  display: inline-flex;
+  align-items: center;
+}
+
+.app-tooltip-anchor--truncate {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.app-tooltip {
+  position: fixed;
+  z-index: 100000;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--vs-dropdown-fg);
+  background-color: var(--vs-dropdown-bg);
+  border: 1px solid var(--vs-dropdown-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  pointer-events: none;
+  animation: app-tooltip-fade 0.15s ease-out;
+}
+
+@keyframes app-tooltip-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

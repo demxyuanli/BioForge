@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import Tooltip from './Tooltip';
 import {
   getDocuments,
   getMountPoints,
@@ -19,8 +20,9 @@ import {
   type MountPointFiles,
   type RecentAnnotatedFileItem,
 } from '../services/api';
-import { FolderPlus, Pencil, Trash2, X } from 'lucide-react';
+import { FolderPlus, Maximize2, Minimize2, Pencil, Trash2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import PdfViewer from './PdfViewer';
 import { MOUNT_POINTS_CHANGED_EVENT } from './layout/FileExplorer';
 import './FileResourcesWorkspace.css';
 
@@ -64,6 +66,7 @@ const FileResourcesWorkspace: React.FC = () => {
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewBlobUrlRef = useRef<string | null>(null);
   const [bottomHeightPercent, setBottomHeightPercent] = useState(38);
+  const [previewMaximized, setPreviewMaximized] = useState(false);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -477,23 +480,25 @@ const FileResourcesWorkspace: React.FC = () => {
   };
 
   return (
-    <div className="fr-workspace" ref={workspaceRef}>
+    <div className={`fr-workspace ${previewMaximized ? 'fr-workspace-preview-maximized' : ''}`} ref={workspaceRef}>
+      {!previewMaximized && (
       <div className="fr-workspace-top">
         <div className="fr-workspace-left">
           <div className="fr-attachment-list-section">
           <div className="fr-attachment-header">
             <div className="fr-section-title">{t('fileResourcesWorkspace.mountPointList')}</div>
             <div className="fr-mount-header-btns">
-              <button
-                type="button"
-                className="fr-add-mount-btn"
-                onClick={handleAddMountPoint}
-                disabled={addingMp}
-                aria-label={t('fileResourcesWorkspace.addMountPoint')}
-                title={t('fileResourcesWorkspace.addMountPoint')}
-              >
+              <Tooltip title={t('fileResourcesWorkspace.addMountPoint')}>
+                <button
+                  type="button"
+                  className="fr-add-mount-btn"
+                  onClick={handleAddMountPoint}
+                  disabled={addingMp}
+                  aria-label={t('fileResourcesWorkspace.addMountPoint')}
+                >
                 <FolderPlus className="fr-add-mount-icon" size={14} aria-hidden />
               </button>
+              </Tooltip>
             </div>
           </div>
           <div className="fr-cli-panel fr-cli-mount-list" role="listbox" aria-label={t('fileResourcesWorkspace.mountPointList')}>
@@ -512,7 +517,8 @@ const FileResourcesWorkspace: React.FC = () => {
                     role="option"
                     aria-selected={isSelected}
                   >
-                    <span className="fr-cli-mount-name" title={mp.path}>
+                    <Tooltip title={mp.path}>
+                    <span className="fr-cli-mount-name">
                       {isEditing ? (
                         <input
                           type="text"
@@ -533,6 +539,7 @@ const FileResourcesWorkspace: React.FC = () => {
                         </>
                       )}
                     </span>
+                    </Tooltip>
                     {stats != null && (
                       <span className="fr-cli-mount-stats">
                         {stats.total > 0
@@ -541,30 +548,32 @@ const FileResourcesWorkspace: React.FC = () => {
                       </span>
                     )}
                     <span className="fr-cli-mount-actions">
-                      <button
-                        type="button"
-                        className="fr-cli-mount-btn fr-cli-mount-edit"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditingMpId(mp.id);
-                          setEditingName(mp.name || mp.path || '');
-                        }}
-                        disabled={isEditing}
-                        aria-label={t('common.edit')}
-                        title={t('fileResourcesWorkspace.editName')}
-                      >
+                      <Tooltip title={t('fileResourcesWorkspace.editName')}>
+                        <button
+                          type="button"
+                          className="fr-cli-mount-btn fr-cli-mount-edit"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingMpId(mp.id);
+                            setEditingName(mp.name || mp.path || '');
+                          }}
+                          disabled={isEditing}
+                          aria-label={t('common.edit')}
+                        >
                         <Pencil size={12} aria-hidden />
                       </button>
-                      <button
-                        type="button"
-                        className="fr-cli-mount-btn fr-cli-mount-delete"
-                        onClick={(e) => { e.stopPropagation(); handleRemoveMountPoint(mp); }}
-                        disabled={removing}
-                        aria-label={t('fileResourcesWorkspace.removeMountPoint')}
-                        title={t('fileResourcesWorkspace.removeMountPoint')}
-                      >
+                      </Tooltip>
+                      <Tooltip title={t('fileResourcesWorkspace.removeMountPoint')}>
+                        <button
+                          type="button"
+                          className="fr-cli-mount-btn fr-cli-mount-delete"
+                          onClick={(e) => { e.stopPropagation(); handleRemoveMountPoint(mp); }}
+                          disabled={removing}
+                          aria-label={t('fileResourcesWorkspace.removeMountPoint')}
+                        >
                         <Trash2 size={12} aria-hidden />
                       </button>
+                      </Tooltip>
                     </span>
                   </div>
                 );
@@ -584,21 +593,23 @@ const FileResourcesWorkspace: React.FC = () => {
                     {Object.entries(docStats.by_type)
                       .sort((a, b) => b[1] - a[1])
                       .map(([ext, count]) => (
-                        <span
-                          key={ext}
-                          role="button"
-                          tabIndex={0}
-                          className={`fr-stats-bracket-link ${filterByExt === ext ? 'active' : ''}`}
-                          onClick={() => setFilterByExt((prev) => (prev === ext ? null : ext))}
-                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterByExt((prev) => (prev === ext ? null : ext)); } }}
-                          title={t('fileResourcesWorkspace.filterByType', { ext: ext.toUpperCase() })}
-                        >
-                          [ <span className="fr-stats-bracket-underline">{ext.toUpperCase()}_{count}</span> ]
-                        </span>
+                        <Tooltip key={ext} title={t('fileResourcesWorkspace.filterByType', { ext: ext.toUpperCase() })}>
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            className={`fr-stats-bracket-link ${filterByExt === ext ? 'active' : ''}`}
+                            onClick={() => setFilterByExt((prev) => (prev === ext ? null : ext))}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFilterByExt((prev) => (prev === ext ? null : ext)); } }}
+                          >
+                            [ <span className="fr-stats-bracket-underline">{ext.toUpperCase()}_{count}</span> ]
+                          </span>
+                        </Tooltip>
                       ))}
                   </div>
                 ) : null}
-                <span className="fr-stats-mount-path" title={selectedMp.path}>{selectedMp.path}</span>
+                <Tooltip title={selectedMp.path}>
+                  <span className="fr-stats-mount-path">{selectedMp.path}</span>
+                </Tooltip>
               </div>
               <div className="fr-files-panel fr-cli-panel fr-cli-files-panel">
                 {loadingMountPointFiles ? (
@@ -609,7 +620,7 @@ const FileResourcesWorkspace: React.FC = () => {
                       <span className="fr-cli-col-filename">{t('fileResourcesWorkspace.columnFileName')}</span>
                       <span className="fr-cli-col-path">{t('fileResourcesWorkspace.columnPath')}</span>
                       <span className="fr-cli-col-weight">{t('fileResourcesWorkspace.columnWeight')}</span>
-                      <span className="fr-cli-col-notes">{t('fileResourcesWorkspace.columnNotes')}</span>
+                      <span className="fr-cli-col-notes" aria-hidden="true" />
                     </div>
                     {filteredFiles.map((row) => {
                       const rowKey = `${row.ext}:${row.path}`;
@@ -632,12 +643,16 @@ const FileResourcesWorkspace: React.FC = () => {
                             }}
                             aria-pressed={isSelectedFile}
                           >
-                            <span className={`fr-cli-col-filename fr-file-weight-${Math.min(5, Math.max(0, weight))}`} title={row.filename}>
-                              {row.filename}
-                            </span>
-                            <span className="fr-cli-col-path" title={row.path}>
-                              {row.path}
-                            </span>
+                            <Tooltip title={row.filename}>
+                              <span className={`fr-cli-col-filename fr-file-weight-${Math.min(5, Math.max(0, weight))}`}>
+                                {row.filename}
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={row.path}>
+                              <span className="fr-cli-col-path">
+                                {row.path}
+                              </span>
+                            </Tooltip>
                             <span
                               className="fr-cli-col-weight fr-star-row fr-weight-slider"
                               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleWeightMouseDown(rowKey, row.path, weight, e.currentTarget); }}
@@ -649,13 +664,11 @@ const FileResourcesWorkspace: React.FC = () => {
                               aria-label={t('fileResourcesWorkspace.columnWeight')}
                             >
                               {[1, 2, 3, 4, 5].map((s) => (
-                                <span
-                                  key={s}
-                                  className={`fr-star ${s <= weight ? 'filled' : ''}`}
-                                  title={t('fileResourcesWorkspace.slideToSetWeight')}
-                                >
-                                  {s <= weight ? '\u2605' : '\u2606'}
-                                </span>
+                                <Tooltip key={s} title={t('fileResourcesWorkspace.slideToSetWeight')}>
+                                  <span className={`fr-star ${s <= weight ? 'filled' : ''}`}>
+                                    {s <= weight ? '\u2605' : '\u2606'}
+                                  </span>
+                                </Tooltip>
                               ))}
                             </span>
                             <span className="fr-cli-col-notes" onClick={(e) => e.stopPropagation()}>
@@ -714,7 +727,9 @@ const FileResourcesWorkspace: React.FC = () => {
                   <div className="fr-mount-meta">
                     <div className="fr-mount-meta-row">
                       <span className="fr-mount-label">{t('fileResourcesWorkspace.path')}</span>
-                      <span className="fr-mount-value" title={selectedMp.path}>{selectedMp.path}</span>
+                      <Tooltip title={selectedMp.path}>
+                        <span className="fr-mount-value">{selectedMp.path}</span>
+                      </Tooltip>
                     </div>
                     {selectedMp.name && (
                       <div className="fr-mount-meta-row">
@@ -795,12 +810,15 @@ const FileResourcesWorkspace: React.FC = () => {
                     }}
                     role="option"
                     aria-selected={selectedMp?.id === item.mp.id && selectedFile?.relativePath === item.path}
-                    title={item.path}
                   >
-                    <span className="fr-file-name" title={item.filename}>{item.filename}</span>
-                    <span className="fr-file-search-mp" title={item.mp.name || item.mp.path}>
+                    <Tooltip title={item.filename}>
+                      <span className="fr-file-name">{item.filename}</span>
+                    </Tooltip>
+                    <Tooltip title={item.mp.name || item.mp.path}>
+                      <span className="fr-file-search-mp">
                       {item.mp.name || item.mp.path}
                     </span>
+                    </Tooltip>
                   </li>
                 ))
               )
@@ -833,7 +851,9 @@ const FileResourcesWorkspace: React.FC = () => {
                     role="option"
                     aria-selected={isSelected}
                   >
-                    <span className="fr-file-name" title={filename}>{filename}</span>
+                    <Tooltip title={filename}>
+                      <span className="fr-file-name">{filename}</span>
+                    </Tooltip>
                   </li>
                 );
               })
@@ -842,32 +862,51 @@ const FileResourcesWorkspace: React.FC = () => {
         </div>
         </div>
       </div>
+      )}
       {selectedFile ? (
         <>
-          <div
-            className="fr-workspace-resize-handle"
-            onMouseDown={handleBottomResizeStart}
-            role="separator"
-            aria-orientation="horizontal"
-            aria-valuenow={bottomHeightPercent}
-            title={t('fileResourcesWorkspace.resizePanel')}
-          />
+          {!previewMaximized && (
+            <Tooltip title={t('fileResourcesWorkspace.resizePanel')}>
+              <div
+                className="fr-workspace-resize-handle"
+                onMouseDown={handleBottomResizeStart}
+                role="separator"
+                aria-orientation="horizontal"
+                aria-valuenow={bottomHeightPercent}
+              />
+            </Tooltip>
+          )}
           <div
             className="fr-workspace-bottom"
-            style={{ flex: `0 0 ${bottomHeightPercent}%`, minHeight: 200 }}
+            style={previewMaximized ? undefined : { flex: `0 0 ${bottomHeightPercent}%`, minHeight: 200 }}
           >
             <div className="fr-document-detail-section">
             <div className="fr-document-detail-header">
-              <span className="fr-document-detail-title" title={selectedFile.filename}>{selectedFile.filename}</span>
-              <button
-                type="button"
-                className="fr-document-detail-close"
-                onClick={() => setSelectedFile(null)}
-                aria-label={t('common.close')}
-                title={t('common.close')}
-              >
-                <X className="fr-document-detail-close-icon" size={14} aria-hidden />
-              </button>
+              <Tooltip title={selectedFile.filename}>
+                <span className="fr-document-detail-title">{selectedFile.filename}</span>
+              </Tooltip>
+              <div className="fr-document-detail-actions">
+                <Tooltip title={previewMaximized ? t('fileResourcesWorkspace.restorePreview') : t('fileResourcesWorkspace.maximizePreview')}>
+                  <button
+                    type="button"
+                    className="fr-document-detail-maximize"
+                    onClick={() => setPreviewMaximized((m) => !m)}
+                    aria-label={previewMaximized ? t('fileResourcesWorkspace.restorePreview') : t('fileResourcesWorkspace.maximizePreview')}
+                  >
+                    {previewMaximized ? <Minimize2 size={14} aria-hidden /> : <Maximize2 size={14} aria-hidden />}
+                  </button>
+                </Tooltip>
+                <Tooltip title={t('common.close')}>
+                  <button
+                    type="button"
+                    className="fr-document-detail-close"
+                    onClick={() => { setSelectedFile(null); setPreviewMaximized(false); }}
+                    aria-label={t('common.close')}
+                  >
+                    <X className="fr-document-detail-close-icon" size={14} aria-hidden />
+                  </button>
+                </Tooltip>
+              </div>
             </div>
             <div className="fr-document-summary-block">
               {loadingSummary ? (
@@ -884,11 +923,9 @@ const FileResourcesWorkspace: React.FC = () => {
               ) : previewError ? (
                 <div className="fr-document-preview-error">{previewError}</div>
               ) : previewBlobUrl ? (
-                <object
-                  className="fr-document-preview-iframe"
-                  data={previewBlobUrl}
-                  type="application/pdf"
-                  title={selectedFile.filename}
+                <PdfViewer
+                  url={previewBlobUrl}
+                  className="fr-document-preview-pdf"
                 />
               ) : null}
             </div>

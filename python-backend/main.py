@@ -2,11 +2,15 @@
 PrivateTune Pro Python Backend Service
 Main entry point for the Python backend service
 """
+import asyncio
 import json
 import logging
 import os
 import sys
 import uvicorn
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from fastapi import FastAPI
 
 # Load storage config from system config dir or local fallback before importing routes

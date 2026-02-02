@@ -452,6 +452,39 @@ except Exception as e:
 }
 
 #[tauri::command]
+async fn update_knowledge_point_excluded(kp_id: i32, excluded: bool) -> Result<String, String> {
+    let excluded_str = if excluded { "True" } else { "False" };
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+
+try:
+    response = requests.patch('http://127.0.0.1:8778/documents/knowledge-points/{}/excluded', json={{ "excluded": {} }})
+    result = {{
+        "success": response.status_code == 200,
+        "data": response.json() if response.status_code == 200 else None,
+        "error": None if response.status_code == 200 else response.text
+    }}
+    print(json.dumps(result))
+except Exception as e:
+    result = {{"success": False, "data": None, "error": str(e)}}
+    print(json.dumps(result))
+"#,
+        kp_id,
+        excluded_str
+    );
+    let output = Command::new("python")
+        .arg("-c")
+        .arg(python_script)
+        .output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    Ok(output_str.to_string())
+}
+
+#[tauri::command]
 async fn create_knowledge_point(document_id: i32, content: String) -> Result<String, String> {
     let payload = serde_json::json!({
         "document_id": document_id,
@@ -1176,6 +1209,52 @@ except Exception as e:
 }
 
 #[tauri::command]
+async fn get_document_summary_by_id(document_id: i32) -> Result<String, String> {
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+try:
+    r = requests.get('http://127.0.0.1:8778/documents/{}/summary')
+    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
+"#,
+        document_id
+    );
+    let output = Command::new("python").arg("-c").arg(&python_script).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn get_document_preview_by_id(document_id: i32) -> Result<String, String> {
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+import base64
+try:
+    r = requests.get('http://127.0.0.1:8778/documents/{}/preview')
+    if r.status_code != 200:
+        out = {{"success": False, "data": None, "error": r.text}}
+    else:
+        out = {{"success": True, "data": base64.b64encode(r.content).decode(), "error": None}}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
+"#,
+        document_id
+    );
+    let output = Command::new("python").arg("-c").arg(&python_script).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
 async fn delete_mount_point(mp_id: i32) -> Result<String, String> {
     let python_script = format!(
         r#"
@@ -1699,6 +1778,7 @@ pub fn run() {
             create_knowledge_point,
             delete_knowledge_points_batch,
             update_knowledge_point_weight,
+            update_knowledge_point_excluded,
             get_finetuning_jobs,
             get_job_logs,
             get_job_status,
@@ -1725,6 +1805,8 @@ pub fn run() {
             update_mount_point_file_meta,
             get_document_summary,
             get_document_preview,
+            get_document_summary_by_id,
+            get_document_preview_by_id,
             create_mount_point,
             update_mount_point,
             delete_mount_point,
