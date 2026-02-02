@@ -291,6 +291,8 @@
     "noKeywordsInContent": "No keywords found in this content.",
     "selectTextToAddKeyword": "Select text in the content above to add to highlighted keywords.",
     "noKeywordsYet": "No keywords yet. Select text in the content to add.",
+    "addKeyword": "Add Keyword",
+    "knowledgePointKeywordList": "Knowledge Point Keywords",
     "addManual": "Add manual",
     "manualContentPlaceholder": "Enter knowledge point content...",
     "addManualConfirm": "Add",

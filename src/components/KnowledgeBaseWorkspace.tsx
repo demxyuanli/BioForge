@@ -888,10 +888,8 @@ const KnowledgeBaseWorkspace: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <p className="kb-kp-detail-select-hint">{t('knowledgeBaseWorkspace.selectTextToAddKeyword')}</p>
                     <div
                       className="kb-kp-detail-content"
-                      onMouseUp={handleKpContentMouseUp}
                       role="article"
                     >
                       {selectedKp.content}

@@ -292,6 +292,8 @@
     "noKeywordsInContent": "本段内容中未匹配到关键词。",
     "selectTextToAddKeyword": "在上方内容中选中文字可加入高亮关键字列表。",
     "noKeywordsYet": "暂无关键字。在内容中选中文字可添加。",
+    "addKeyword": "加入关键字",
+    "knowledgePointKeywordList": "知识点关键字列表",
     "addManual": "添加人工知识点",
     "manualContentPlaceholder": "输入知识点内容...",
     "addManualConfirm": "添加",

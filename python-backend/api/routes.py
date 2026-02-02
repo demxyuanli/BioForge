@@ -857,8 +857,17 @@ async def list_knowledge_points(page: int = 1, page_size: int = 50, document_id:
                       .all()
         
         result = []
+        import json
         for kp, doc in points:
             if kp.content:
+                keywords_list = []
+                if getattr(kp, "keywords", None):
+                    try:
+                        keywords_list = json.loads(kp.keywords)
+                        if not isinstance(keywords_list, list):
+                            keywords_list = []
+                    except:
+                        keywords_list = []
                 result.append({
                     "id": kp.id,
                     "content": kp.content,
@@ -867,7 +876,8 @@ async def list_knowledge_points(page: int = 1, page_size: int = 50, document_id:
                     "chunk_index": kp.chunk_index,
                     "weight": getattr(kp, "weight", 1.0),
                     "excluded": bool(getattr(kp, "excluded", False)),
-                    "is_manual": bool(getattr(kp, "is_manual", False))
+                    "is_manual": bool(getattr(kp, "is_manual", False)),
+                    "keywords": keywords_list
                 })
                 
         db.close()
@@ -915,6 +925,15 @@ async def create_manual_knowledge_point(body: Dict[str, Any] = Body(...)):
         db.add(kp)
         db.commit()
         db.refresh(kp)
+        import json
+        keywords_list = []
+        if getattr(kp, "keywords", None):
+            try:
+                keywords_list = json.loads(kp.keywords)
+                if not isinstance(keywords_list, list):
+                    keywords_list = []
+            except:
+                keywords_list = []
         out = {
             "id": kp.id,
             "content": kp.content,
@@ -923,7 +942,8 @@ async def create_manual_knowledge_point(body: Dict[str, Any] = Body(...)):
             "chunk_index": kp.chunk_index,
             "weight": getattr(kp, "weight", 1.0),
             "excluded": bool(getattr(kp, "excluded", False)),
-            "is_manual": True
+            "is_manual": True,
+            "keywords": keywords_list
         }
         db.close()
         return out
@@ -1025,6 +1045,117 @@ async def update_knowledge_point_excluded(kp_id: int, body: Dict[str, Any] = Bod
     except Exception as e:
         if db:
             db.rollback()
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/documents/knowledge-points/{kp_id}/keywords")
+async def add_knowledge_point_keyword(kp_id: int, body: Dict[str, Any] = Body(...)):
+    """Add a keyword to a knowledge point."""
+    keyword = body.get("keyword", "").strip()
+    if not keyword:
+        raise HTTPException(status_code=400, detail="keyword is required")
+    db = None
+    try:
+        import json
+        db = get_db_session()
+        kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
+        if not kp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Knowledge point not found")
+        
+        keywords_list = []
+        if kp.keywords:
+            try:
+                keywords_list = json.loads(kp.keywords)
+                if not isinstance(keywords_list, list):
+                    keywords_list = []
+            except:
+                keywords_list = []
+        
+        if keyword not in keywords_list:
+            keywords_list.append(keyword)
+            kp.keywords = json.dumps(keywords_list, ensure_ascii=False)
+            db.commit()
+        
+        db.close()
+        return {"id": kp_id, "keywords": keywords_list}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.rollback()
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/documents/knowledge-points/{kp_id}/keywords")
+async def remove_knowledge_point_keyword(kp_id: int, body: Dict[str, Any] = Body(...)):
+    """Remove a keyword from a knowledge point."""
+    keyword = body.get("keyword", "").strip()
+    if not keyword:
+        raise HTTPException(status_code=400, detail="keyword is required")
+    db = None
+    try:
+        import json
+        db = get_db_session()
+        kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
+        if not kp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Knowledge point not found")
+        
+        keywords_list = []
+        if kp.keywords:
+            try:
+                keywords_list = json.loads(kp.keywords)
+                if not isinstance(keywords_list, list):
+                    keywords_list = []
+            except:
+                keywords_list = []
+        
+        if keyword in keywords_list:
+            keywords_list.remove(keyword)
+            kp.keywords = json.dumps(keywords_list, ensure_ascii=False) if keywords_list else None
+            db.commit()
+        
+        db.close()
+        return {"id": kp_id, "keywords": keywords_list}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
+            db.rollback()
+            db.close()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/documents/knowledge-points/{kp_id}/keywords")
+async def get_knowledge_point_keywords(kp_id: int):
+    """Get keywords for a knowledge point."""
+    db = None
+    try:
+        import json
+        db = get_db_session()
+        kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
+        if not kp:
+            db.close()
+            raise HTTPException(status_code=404, detail="Knowledge point not found")
+        
+        keywords_list = []
+        if kp.keywords:
+            try:
+                keywords_list = json.loads(kp.keywords)
+                if not isinstance(keywords_list, list):
+                    keywords_list = []
+            except:
+                keywords_list = []
+        
+        db.close()
+        return {"id": kp_id, "keywords": keywords_list}
+    except HTTPException:
+        raise
+    except Exception as e:
+        if db:
             db.close()
         raise HTTPException(status_code=500, detail=str(e))
 

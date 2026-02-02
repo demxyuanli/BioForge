@@ -418,6 +418,7 @@ export interface KnowledgePoint {
   weight?: number;
   excluded?: boolean;
   is_manual?: boolean;
+  keywords?: string[];
 }
 
 export interface PaginatedResponse<T> {
@@ -500,6 +501,39 @@ export async function updateKnowledgePointExcluded(id: number, excluded: boolean
     return { id: data?.id ?? id, excluded: data?.excluded ?? excluded };
   } catch (error) {
     console.error('Update knowledge point excluded error:', error);
+    throw error;
+  }
+}
+
+export async function addKnowledgePointKeyword(kpId: number, keyword: string): Promise<{ id: number; keywords: string[] }> {
+  try {
+    const response = await invoke<string>('add_knowledge_point_keyword', { kpId, keyword });
+    const data = await parsePythonResponse(response);
+    return { id: data?.id ?? kpId, keywords: data?.keywords ?? [] };
+  } catch (error) {
+    console.error('Add knowledge point keyword error:', error);
+    throw error;
+  }
+}
+
+export async function removeKnowledgePointKeyword(kpId: number, keyword: string): Promise<{ id: number; keywords: string[] }> {
+  try {
+    const response = await invoke<string>('remove_knowledge_point_keyword', { kpId, keyword });
+    const data = await parsePythonResponse(response);
+    return { id: data?.id ?? kpId, keywords: data?.keywords ?? [] };
+  } catch (error) {
+    console.error('Remove knowledge point keyword error:', error);
+    throw error;
+  }
+}
+
+export async function getKnowledgePointKeywords(kpId: number): Promise<{ id: number; keywords: string[] }> {
+  try {
+    const response = await invoke<string>('get_knowledge_point_keywords', { kpId });
+    const data = await parsePythonResponse(response);
+    return { id: data?.id ?? kpId, keywords: data?.keywords ?? [] };
+  } catch (error) {
+    console.error('Get knowledge point keywords error:', error);
     throw error;
   }
 }

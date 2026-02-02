@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Maximize2, Minimize2, X } from 'lucide-react';
+import { FileText, Maximize2, Minimize2, X, Upload, FolderPlus } from 'lucide-react';
 import Tooltip from './Tooltip';
 import PdfViewer from './PdfViewer';
 import {
@@ -19,6 +19,9 @@ import {
   deleteDocument,
   DirectoryNode,
   KnowledgePoint,
+  addKnowledgePointKeyword,
+  removeKnowledgePointKeyword,
+  getKnowledgePointKeywords,
 } from '../services/api';
 import { loadFileMeta, saveFileMeta, type FileMetaItem } from '../utils/fileMeta';
 import './DataCenter.css';
@@ -77,6 +80,8 @@ const DataCenter: React.FC = () => {
   const [kpPageSize] = useState(50);
   const [selectedKp, setSelectedKp] = useState<KnowledgePoint | null>(null);
   const [highlightedKeywords, setHighlightedKeywords] = useState<string[]>([]);
+  const [selectionToolbar, setSelectionToolbar] = useState<{ visible: boolean; x: number; y: number; text: string } | null>(null);
+  const kpDetailContentRef = useRef<HTMLDivElement>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<string>('');
   const [newDirName, setNewDirName] = useState('');
@@ -119,6 +124,19 @@ const DataCenter: React.FC = () => {
   const [resizingKpVertical, setResizingKpVertical] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(LEFT_PANEL_DEFAULT);
   const [kpListHeight, setKpListHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (selectionToolbar?.visible && kpDetailContentRef.current && !kpDetailContentRef.current.contains(e.target as Node)) {
+        setSelectionToolbar(null);
+        window.getSelection()?.removeAllRanges();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [selectionToolbar]);
 
   useEffect(() => {
     if (!lowerVisible || selectedDocId == null) {
@@ -301,6 +319,7 @@ const DataCenter: React.FC = () => {
       setKpPage(1);
       setSelectedKp(null);
       setHighlightedKeywords([]);
+      setSelectionToolbar(null);
       return;
     }
     setKnowledgePoints([]);
@@ -308,6 +327,7 @@ const DataCenter: React.FC = () => {
     setKpPage(1);
     setSelectedKp(null);
     setHighlightedKeywords([]);
+    setSelectionToolbar(null);
     const docId = selectedDocId;
     getKnowledgePoints(1, kpPageSize, docId)
       .then((data) => {
@@ -321,6 +341,24 @@ const DataCenter: React.FC = () => {
         setKpTotal(0);
       });
   }, [selectedDocId, kpPageSize]);
+
+  useEffect(() => {
+    if (selectedKp?.id != null) {
+      loadKeywords(selectedKp.id);
+    } else {
+      setHighlightedKeywords([]);
+    }
+  }, [selectedKp?.id]);
+
+  const loadKeywords = async (kpId: number) => {
+    try {
+      const data = await getKnowledgePointKeywords(kpId);
+      setHighlightedKeywords(data.keywords ?? []);
+    } catch (error) {
+      console.error('Load keywords error:', error);
+      setHighlightedKeywords([]);
+    }
+  };
 
   useEffect(() => {
     loadKnowledgePoints();
@@ -647,16 +685,103 @@ const DataCenter: React.FC = () => {
     }
   };
 
-  const handleKpContentMouseUp = () => {
+  const handleKpContentMouseUp = (e: React.MouseEvent) => {
     const sel = window.getSelection();
     const text = sel?.toString?.()?.trim();
-    if (text && !highlightedKeywords.includes(text)) {
-      setHighlightedKeywords((prev) => [...prev, text]);
+    if (text && text.length > 0) {
+      const range = sel?.getRangeAt(0);
+      if (range && kpDetailContentRef.current) {
+        const rect = range.getBoundingClientRect();
+        const containerRect = kpDetailContentRef.current.getBoundingClientRect();
+        setSelectionToolbar({
+          visible: true,
+          x: rect.left - containerRect.left + rect.width / 2,
+          y: rect.top - containerRect.top - 30,
+          text: text
+        });
+      }
+    } else {
+      setSelectionToolbar(null);
     }
   };
 
-  const removeKeyword = (index: number) => {
-    setHighlightedKeywords((prev) => prev.filter((_, i) => i !== index));
+  const handleAddKeyword = async () => {
+    if (!selectionToolbar || !selectedKp?.id) return;
+    const keyword = selectionToolbar.text.trim();
+    if (!keyword || highlightedKeywords.includes(keyword)) {
+      setSelectionToolbar(null);
+      return;
+    }
+    try {
+      await addKnowledgePointKeyword(selectedKp.id, keyword);
+      setHighlightedKeywords((prev) => [...prev, keyword]);
+      setSelectionToolbar(null);
+      window.getSelection()?.removeAllRanges();
+    } catch (error) {
+      console.error('Add keyword error:', error);
+    }
+  };
+
+  const removeKeyword = async (keyword: string) => {
+    if (!selectedKp?.id) return;
+    try {
+      await removeKnowledgePointKeyword(selectedKp.id, keyword);
+      setHighlightedKeywords((prev) => prev.filter((kw) => kw !== keyword));
+    } catch (error) {
+      console.error('Remove keyword error:', error);
+    }
+  };
+
+  const highlightKeywords = (content: string, keywords: string[]): React.ReactNode => {
+    if (!content || keywords.length === 0) return content;
+    
+    const parts: Array<{ text: string; isKeyword: boolean }> = [];
+    const sortedKeywords = [...keywords].filter(kw => kw && kw.trim().length > 0).sort((a, b) => b.length - a.length);
+    
+    if (sortedKeywords.length === 0) return content;
+    
+    const findNextKeyword = (startIndex: number): { keyword: string; index: number } | null => {
+      let found: { keyword: string; index: number } | null = null;
+      for (const kw of sortedKeywords) {
+        const index = content.indexOf(kw, startIndex);
+        if (index !== -1 && (!found || index < found.index)) {
+          found = { keyword: kw, index };
+        }
+      }
+      return found;
+    };
+    
+    let currentIndex = 0;
+    while (currentIndex < content.length) {
+      const found = findNextKeyword(currentIndex);
+      if (!found) {
+        if (currentIndex < content.length) {
+          parts.push({ text: content.substring(currentIndex), isKeyword: false });
+        }
+        break;
+      }
+      
+      if (found.index > currentIndex) {
+        parts.push({ text: content.substring(currentIndex, found.index), isKeyword: false });
+      }
+      
+      parts.push({ text: found.keyword, isKeyword: true });
+      currentIndex = found.index + found.keyword.length;
+    }
+    
+    if (parts.length === 0) return content;
+    
+    return (
+      <>
+        {parts.map((part, idx) =>
+          part.isKeyword ? (
+            <mark key={idx} className="dc-kp-keyword-highlight">{part.text}</mark>
+          ) : (
+            <span key={idx}>{part.text}</span>
+          )
+        )}
+      </>
+    );
   };
 
   const breadcrumbs = getBreadcrumbs();
@@ -706,32 +831,53 @@ const DataCenter: React.FC = () => {
               />
             </div>
             <div className="dc-toolbar">
-              <button type="button" onClick={handleFileSelect} disabled={isUploading} className="dc-btn dc-btn-primary">
-                {isUploading ? t('dataCenter.processing') : t('dataCenter.uploadFile')}
-              </button>
-              {!isCreatingDir ? (
-                <button type="button" onClick={() => setIsCreatingDir(true)} className="dc-btn">
-                  {t('dataCenter.newFolder')}
-                </button>
-              ) : (
-                <div className="dc-new-folder">
-                  <input
-                    type="text"
-                    value={newDirName}
-                    onChange={(e) => setNewDirName(e.target.value)}
-                    placeholder={t('dataCenter.folderName')}
-                    onKeyDown={(e) => e.key === 'Enter' && handleCreateDirectory()}
-                    className="dc-input"
-                  />
-                  <button type="button" onClick={handleCreateDirectory} className="dc-btn dc-btn-small">
-                    {t('common.ok')}
-                  </button>
-                  <button type="button" onClick={() => { setIsCreatingDir(false); setNewDirName(''); }} className="dc-btn dc-btn-small">
-                    {t('common.cancel')}
-                  </button>
-                </div>
-              )}
-              {uploadProgress && <span className="dc-upload-status">{uploadProgress}</span>}
+              <div className="dc-toolbar-left">
+                {uploadProgress && <span className="dc-upload-status">{uploadProgress}</span>}
+              </div>
+              <div className="dc-toolbar-right">
+                {!isCreatingDir ? (
+                  <>
+                    <Tooltip title={t('dataCenter.uploadFile')}>
+                      <button
+                        type="button"
+                        onClick={handleFileSelect}
+                        disabled={isUploading}
+                        className="dc-icon-btn dc-icon-btn-primary"
+                        aria-label={t('dataCenter.uploadFile')}
+                      >
+                        <Upload size={14} />
+                      </button>
+                    </Tooltip>
+                    <Tooltip title={t('dataCenter.newFolder')}>
+                      <button
+                        type="button"
+                        onClick={() => setIsCreatingDir(true)}
+                        className="dc-icon-btn"
+                        aria-label={t('dataCenter.newFolder')}
+                      >
+                        <FolderPlus size={14} />
+                      </button>
+                    </Tooltip>
+                  </>
+                ) : (
+                  <div className="dc-new-folder">
+                    <input
+                      type="text"
+                      value={newDirName}
+                      onChange={(e) => setNewDirName(e.target.value)}
+                      placeholder={t('dataCenter.folderName')}
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateDirectory()}
+                      className="dc-input"
+                    />
+                    <button type="button" onClick={handleCreateDirectory} className="dc-btn dc-btn-small">
+                      {t('common.ok')}
+                    </button>
+                    <button type="button" onClick={() => { setIsCreatingDir(false); setNewDirName(''); }} className="dc-btn dc-btn-small">
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="dc-cli-file-table-wrap" role="listbox" aria-label={t('dataCenter.filesAndFolders')}>
               {displayItems.length === 0 ? (
@@ -1154,13 +1300,34 @@ const DataCenter: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    <p className="dc-kp-detail-select-hint">{t('knowledgeBaseWorkspace.selectTextToAddKeyword')}</p>
                     <div
+                      ref={kpDetailContentRef}
                       className="dc-kp-detail-content"
                       onMouseUp={handleKpContentMouseUp}
                       role="article"
+                      style={{ position: 'relative' }}
                     >
-                      {selectedKp.content}
+                      {highlightKeywords(selectedKp.content, highlightedKeywords)}
+                      {selectionToolbar?.visible && (
+                        <div
+                          className="dc-selection-toolbar"
+                          style={{
+                            position: 'absolute',
+                            left: `${selectionToolbar.x}px`,
+                            top: `${selectionToolbar.y}px`,
+                            transform: 'translateX(-50%)'
+                          }}
+                        >
+                          <button
+                            type="button"
+                            className="dc-selection-toolbar-btn"
+                            onClick={handleAddKeyword}
+                            title={t('knowledgeBaseWorkspace.addKeyword')}
+                          >
+                            {t('knowledgeBaseWorkspace.addKeyword')}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="dc-kp-detail-right dc-cli-panel">
@@ -1193,7 +1360,7 @@ const DataCenter: React.FC = () => {
                                 <button
                                   type="button"
                                   className="dc-kp-detail-keyword-remove"
-                                  onClick={() => removeKeyword(i)}
+                                  onClick={() => removeKeyword(kw)}
                                   aria-label={t('common.remove')}
                                 >
                                   &#215;

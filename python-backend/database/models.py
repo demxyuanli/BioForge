@@ -79,6 +79,7 @@ class KnowledgePoint(Base):
     excluded = Column(Boolean, default=False)  # excluded from training (display-only deletion status)
     is_manual = Column(Boolean, default=False)  # True = user-created, False = auto-extracted from document
     tags = Column(Text)  # JSON string of tags
+    keywords = Column(Text)  # JSON string of keywords (user-selected text fragments)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     document = relationship("Document", back_populates="knowledge_points")
@@ -140,7 +141,7 @@ def init_database(db_path: str = "privatetune.db"):
     norm_path = db_path.replace("\\", "/")
     engine = create_engine(f"sqlite:///{norm_path}")
     Base.metadata.create_all(engine)
-    # Add weight column to knowledge_points if missing (migration)
+    # Add missing columns to knowledge_points if missing (migration)
     from sqlalchemy import text, inspect
     insp = inspect(engine)
     if "knowledge_points" in insp.get_table_names():
@@ -156,5 +157,13 @@ def init_database(db_path: str = "privatetune.db"):
         if "is_manual" not in cols:
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE knowledge_points ADD COLUMN is_manual INTEGER DEFAULT 0"))
+                conn.commit()
+        if "tags" not in cols:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE knowledge_points ADD COLUMN tags TEXT"))
+                conn.commit()
+        if "keywords" not in cols:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE knowledge_points ADD COLUMN keywords TEXT"))
                 conn.commit()
     return engine

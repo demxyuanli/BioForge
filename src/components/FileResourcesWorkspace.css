@@ -613,7 +613,7 @@
 
 .fr-cli-file-table-header {
   display: grid;
-  grid-template-columns: 2fr 4.5fr 84px 56px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 84px 56px;
   gap: 8px;
   padding: 4px 0 6px;
   font-size: 11px;
@@ -633,7 +633,7 @@
 
 .fr-cli-file-row {
   display: grid;
-  grid-template-columns: 2fr 4.5fr 84px 56px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 84px 56px;
   gap: 8px;
   padding: 4px 0;
   align-items: center;

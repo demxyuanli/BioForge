@@ -485,6 +485,101 @@ except Exception as e:
 }
 
 #[tauri::command]
+async fn add_knowledge_point_keyword(kp_id: i32, keyword: String) -> Result<String, String> {
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+
+try:
+    response = requests.post('http://127.0.0.1:8778/documents/knowledge-points/{}/keywords', json={{ "keyword": {} }})
+    result = {{
+        "success": response.status_code == 200,
+        "data": response.json() if response.status_code == 200 else None,
+        "error": None if response.status_code == 200 else response.text
+    }}
+    print(json.dumps(result))
+except Exception as e:
+    result = {{"success": False, "data": None, "error": str(e)}}
+    print(json.dumps(result))
+"#,
+        kp_id,
+        serde_json::to_string(&keyword).unwrap()
+    );
+    let output = Command::new("python")
+        .arg("-c")
+        .arg(python_script)
+        .output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    Ok(output_str.to_string())
+}
+
+#[tauri::command]
+async fn remove_knowledge_point_keyword(kp_id: i32, keyword: String) -> Result<String, String> {
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+
+try:
+    response = requests.delete('http://127.0.0.1:8778/documents/knowledge-points/{}/keywords', json={{ "keyword": {} }})
+    result = {{
+        "success": response.status_code == 200,
+        "data": response.json() if response.status_code == 200 else None,
+        "error": None if response.status_code == 200 else response.text
+    }}
+    print(json.dumps(result))
+except Exception as e:
+    result = {{"success": False, "data": None, "error": str(e)}}
+    print(json.dumps(result))
+"#,
+        kp_id,
+        serde_json::to_string(&keyword).unwrap()
+    );
+    let output = Command::new("python")
+        .arg("-c")
+        .arg(python_script)
+        .output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    Ok(output_str.to_string())
+}
+
+#[tauri::command]
+async fn get_knowledge_point_keywords(kp_id: i32) -> Result<String, String> {
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+
+try:
+    response = requests.get('http://127.0.0.1:8778/documents/knowledge-points/{}/keywords')
+    result = {{
+        "success": response.status_code == 200,
+        "data": response.json() if response.status_code == 200 else None,
+        "error": None if response.status_code == 200 else response.text
+    }}
+    print(json.dumps(result))
+except Exception as e:
+    result = {{"success": False, "data": None, "error": str(e)}}
+    print(json.dumps(result))
+"#,
+        kp_id
+    );
+    let output = Command::new("python")
+        .arg("-c")
+        .arg(python_script)
+        .output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    Ok(output_str.to_string())
+}
+
+#[tauri::command]
 async fn create_knowledge_point(document_id: i32, content: String) -> Result<String, String> {
     let payload = serde_json::json!({
         "document_id": document_id,
@@ -1779,6 +1874,9 @@ pub fn run() {
             delete_knowledge_points_batch,
             update_knowledge_point_weight,
             update_knowledge_point_excluded,
+            add_knowledge_point_keyword,
+            remove_knowledge_point_keyword,
+            get_knowledge_point_keywords,
             get_finetuning_jobs,
             get_job_logs,
             get_job_status,
