@@ -6,6 +6,9 @@
   overflow: hidden;
   margin: -16px;
   padding: 0;
+  width: calc(100% + 32px);
+  min-width: calc(100% + 32px);
+  box-sizing: border-box;
   background: var(--vs-sidebar-bg, var(--vs-editor-background));
 }
 
@@ -83,7 +86,7 @@
   padding: 8px 10px;
   border-right: none;
   overflow: hidden;
-  background: transparent;
+  background: var(--vs-list-hover, rgba(0, 0, 0, 0.3));
   border: none;
   border-radius: 0;
 }
@@ -264,9 +267,43 @@
   overflow: hidden;
 }
 
+.data-center-preview-maximized.data-center.data-center-layout {
+  height: 100%;
+  min-height: 100%;
+}
+
 .data-center-preview-maximized .dc-lower {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.data-center-preview-maximized .dc-lower .dc-lower-detail {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100%;
+}
+
+.data-center-preview-maximized .dc-lower-preview-block {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.data-center-preview-maximized .dc-lower-preview-block .dc-lower-preview-pdf,
+.data-center-preview-maximized .dc-lower-preview-pdf {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .data-center-layout .dc-kp-preview-icon-btn {
@@ -339,6 +376,7 @@
   flex-wrap: wrap;
   padding: 8px 10px;
   border-bottom: 1px solid var(--vs-border-subtle);
+  background: var(--vs-list-hover, rgba(0, 0, 0, 0.3));
 }
 
 .data-center-layout .dc-toolbar-left {
@@ -472,6 +510,7 @@
   min-height: 0;
   min-width: 0;
   overflow: auto;
+  background: var(--vs-list-hover, rgba(0, 0, 0, 0.3));
 }
 
 .data-center-layout .dc-cli-file-table-header {
@@ -605,6 +644,39 @@
   color: var(--vs-description-foreground);
   letter-spacing: 0.5px;
   border-bottom: 1px solid var(--vs-border-subtle);
+}
+
+.data-center-layout .dc-kp-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.data-center-layout .dc-kp-view-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 4px;
+  border: none;
+  background: transparent !important;
+  border-radius: 2px;
+  color: var(--vs-description-foreground);
+}
+
+.data-center-layout .dc-kp-view-tab.active {
+  color: var(--vs-fg);
+  background: var(--vs-list-hover);
+}
+
+.data-center-layout .dc-kp-graph-wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .data-center-layout .dc-kp-table-wrap {

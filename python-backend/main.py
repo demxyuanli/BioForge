@@ -9,7 +9,7 @@ import os
 import sys
 import uvicorn
 
-if sys.platform == "win32":
+if sys.platform == "win32" and sys.version_info < (3, 13):
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 from fastapi import FastAPI
 

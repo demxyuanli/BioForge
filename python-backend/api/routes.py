@@ -11,10 +11,11 @@ import logging
 import tempfile
 import random
 import shutil
+import hashlib
 
 logger = logging.getLogger(__name__)
 from datetime import datetime
-from database.models import Document, KnowledgePoint, Annotation as AnnotationModel, FinetuningJob, APIKey, Directory, MountPoint, MountPointFileMeta, init_database
+from database.models import Document, KnowledgePoint, Annotation as AnnotationModel, FinetuningJob, APIKey, Directory, MountPoint, MountPointFileMeta, TrainingItem, TrainingAnnotation, TrainingAnnotationFinetuningLink, init_database
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from services.libreoffice_parser import is_office_extension, convert_to_pdf
@@ -37,6 +38,23 @@ def _get_random_storage_dir() -> str:
     return path
 
 os.makedirs(DOCUMENTS_DIR, exist_ok=True)
+
+# Preview cache: store converted PDFs by (cache_key, version) to avoid reconversion when file unchanged
+PREVIEW_CACHE_DIR = os.getenv("BIOFORGER_PREVIEW_CACHE_DIR") or os.path.join(tempfile.gettempdir(), "bioforger_preview_cache")
+os.makedirs(PREVIEW_CACHE_DIR, exist_ok=True)
+
+
+def _file_version(full_path: str) -> str:
+    """Version stamp from mtime and size so unchanged file reuses cache."""
+    try:
+        st = os.stat(full_path)
+        return hashlib.sha256(f"{st.st_mtime_ns}_{st.st_size}".encode()).hexdigest()[:24]
+    except OSError:
+        return "0"
+
+
+def _preview_cache_path(cache_key: str, version: str) -> str:
+    return os.path.join(PREVIEW_CACHE_DIR, f"{cache_key}_{version}.pdf")
 
 # Training set and log paths
 TRAINING_SET_PATH = os.path.join(BACKEND_DIR, "training_set.json")
@@ -389,7 +407,7 @@ async def get_document_summary(mp_id: int = Query(..., alias="mp_id"), relative_
 
 @router.get("/mount-points/document-preview")
 async def get_document_preview(mp_id: int = Query(..., alias="mp_id"), relative_path: str = Query(..., alias="relative_path")):
-    """Generate document preview via LibreOffice (PDF). Returns PDF file or 404 if unsupported."""
+    """Generate document preview via LibreOffice (PDF). Returns PDF with X-Preview-Version. Uses cache when source file unchanged."""
     db = get_db_session()
     try:
         mp = db.query(MountPoint).filter(MountPoint.id == mp_id).first()
@@ -400,6 +418,7 @@ async def get_document_preview(mp_id: int = Query(..., alias="mp_id"), relative_
         if not os.path.isfile(full_path):
             db.close()
             raise HTTPException(status_code=404, detail="File not found")
+        version = _file_version(full_path)
         ext = (os.path.splitext(relative_path)[1] or "").lstrip(".").lower()
         if ext == "jpeg":
             ext = "jpg"
@@ -407,10 +426,17 @@ async def get_document_preview(mp_id: int = Query(..., alias="mp_id"), relative_
             with open(full_path, "rb") as f:
                 data = f.read()
             db.close()
-            return Response(content=data, media_type="application/pdf")
+            return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
         if not is_office_extension(ext):
             db.close()
             raise HTTPException(status_code=400, detail="Preview not supported for this file type")
+        cache_key = "mp_{}_{}".format(mp_id, hashlib.md5(relative_path.encode()).hexdigest())
+        cache_path = _preview_cache_path(cache_key, version)
+        if os.path.isfile(cache_path):
+            with open(cache_path, "rb") as f:
+                data = f.read()
+            db.close()
+            return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
         out_dir = tempfile.mkdtemp()
         try:
             pdf_path = convert_to_pdf(full_path, out_dir)
@@ -418,7 +444,12 @@ async def get_document_preview(mp_id: int = Query(..., alias="mp_id"), relative_
                 raise HTTPException(status_code=502, detail="LibreOffice conversion failed")
             with open(pdf_path, "rb") as f:
                 data = f.read()
-            return Response(content=data, media_type="application/pdf")
+            try:
+                with open(cache_path, "wb") as cf:
+                    cf.write(data)
+            except OSError:
+                pass
+            return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
         finally:
             try:
                 shutil.rmtree(out_dir, ignore_errors=True)
@@ -796,7 +827,7 @@ async def get_document_summary_by_id(document_id: int):
 
 @router.get("/documents/{document_id}/preview")
 async def get_document_preview_by_id(document_id: int):
-    """Generate document preview by document id (uses file_path). Returns PDF or 404."""
+    """Generate document preview by document id (uses file_path). Returns PDF with X-Preview-Version. Uses cache when source file unchanged."""
     db = get_db_session()
     try:
         doc = db.query(Document).filter(Document.id == document_id).first()
@@ -807,6 +838,7 @@ async def get_document_preview_by_id(document_id: int):
         if not full_path or not os.path.isfile(full_path):
             db.close()
             raise HTTPException(status_code=404, detail="File not found")
+        version = _file_version(full_path)
         ext = (os.path.splitext(full_path)[1] or "").lstrip(".").lower()
         if ext == "jpeg":
             ext = "jpg"
@@ -814,10 +846,17 @@ async def get_document_preview_by_id(document_id: int):
             with open(full_path, "rb") as f:
                 data = f.read()
             db.close()
-            return Response(content=data, media_type="application/pdf")
+            return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
         if not is_office_extension(ext):
             db.close()
             raise HTTPException(status_code=400, detail="Preview not supported for this file type")
+        cache_key = "doc_{}".format(document_id)
+        cache_path = _preview_cache_path(cache_key, version)
+        if os.path.isfile(cache_path):
+            with open(cache_path, "rb") as f:
+                data = f.read()
+            db.close()
+            return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
         out_dir = tempfile.mkdtemp()
         try:
             pdf_path = convert_to_pdf(full_path, out_dir)
@@ -825,7 +864,12 @@ async def get_document_preview_by_id(document_id: int):
                 raise HTTPException(status_code=502, detail="LibreOffice conversion failed")
             with open(pdf_path, "rb") as f:
                 data = f.read()
-            return Response(content=data, media_type="application/pdf")
+            try:
+                with open(cache_path, "wb") as cf:
+                    cf.write(data)
+            except OSError:
+                pass
+            return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
         finally:
             try:
                 shutil.rmtree(out_dir, ignore_errors=True)
@@ -840,8 +884,13 @@ async def get_document_preview_by_id(document_id: int):
 
 
 @router.get("/documents/knowledge-points")
-async def list_knowledge_points(page: int = 1, page_size: int = 50, document_id: Optional[int] = None):
-    """List knowledge points with pagination. Filter by document_id when provided."""
+async def list_knowledge_points(
+    page: int = 1,
+    page_size: int = 50,
+    document_id: Optional[int] = Query(None),
+    min_weight: Optional[float] = Query(None, description="Min weight 1-5, filter points with weight >= this value"),
+):
+    """List knowledge points with pagination. Filter by document_id and/or min_weight when provided."""
     db = None
     try:
         db = get_db_session()
@@ -849,6 +898,10 @@ async def list_knowledge_points(page: int = 1, page_size: int = 50, document_id:
         
         if document_id is not None:
             query = query.filter(KnowledgePoint.document_id == document_id)
+        if min_weight is not None:
+            w = float(min_weight)
+            query = query.filter(KnowledgePoint.weight >= w)
+        query = query.filter(KnowledgePoint.excluded == False)
             
         total = query.count()
         points = query.order_by(KnowledgePoint.document_id, KnowledgePoint.chunk_index)\
@@ -1252,6 +1305,7 @@ async def delete_document(document_id: int):
 async def generate_annotations(body: Dict[str, Any] = Body(...)):
     """Generate instruction pairs from knowledge points"""
     from services.annotation_service import AnnotationService
+    import re
     knowledge_points = body.get("knowledge_points", [])
     if isinstance(knowledge_points, str):
         import json as json_module
@@ -1264,27 +1318,53 @@ async def generate_annotations(body: Dict[str, Any] = Body(...)):
     platform = body.get("platform", "").strip().lower()
     model = body.get("model", "deepseek-chat")
     base_url = body.get("base_url")
+    candidate_count = body.get("candidate_count", 1)
+    try:
+        candidate_count = int(candidate_count)
+    except Exception:
+        candidate_count = 1
+    candidate_count = max(1, min(10, candidate_count))
 
     if not api_key and platform:
         api_key = _resolve_api_key(platform)
 
     logger.info(
-        "annotations/generate: request received, knowledge_points_count=%d, model=%s, api_key_set=%s",
-        len(knowledge_points), model, bool(api_key),
+        "annotations/generate: request received, knowledge_points_count=%d, candidate_count=%d, model=%s, api_key_set=%s",
+        len(knowledge_points), candidate_count, model, bool(api_key),
     )
 
     service = AnnotationService(api_key=api_key if api_key else None, model=model, base_url=base_url)
 
     annotations = []
     errors = []
+    seen_pairs = set()
+
+    def _normalize_text(text: str) -> str:
+        return re.sub(r"\s+", " ", (text or "").strip().lower())
+
     for i, kp in enumerate(knowledge_points):
-        annotation = service.generate_instruction_pair(kp)
-        if "error" not in annotation:
-            annotations.append(annotation)
-        else:
-            err_msg = annotation.get("error", "")
-            errors.append(err_msg)
-            logger.warning("annotations/generate: kp[%d] failed: %s", i, err_msg)
+        candidate_result = service.generate_instruction_candidates(kp, candidate_count)
+        kp_annotations = candidate_result.get("annotations", [])
+        kp_errors = candidate_result.get("errors", [])
+
+        for ann in kp_annotations:
+            instruction = (ann.get("instruction") or "").strip()
+            response = (ann.get("response") or "").strip()
+            if not instruction or not response:
+                continue
+            dedupe_key = f"{_normalize_text(instruction)}|||{_normalize_text(response)}"
+            if dedupe_key in seen_pairs:
+                continue
+            seen_pairs.add(dedupe_key)
+            annotations.append({
+                "instruction": instruction,
+                "response": response
+            })
+
+        for err_msg in kp_errors:
+            if err_msg:
+                errors.append(err_msg)
+                logger.warning("annotations/generate: kp[%d] failed: %s", i, err_msg)
 
     logger.info("annotations/generate: done, annotations_count=%d", len(annotations))
     result = {"annotations": annotations}
@@ -1318,40 +1398,129 @@ async def submit_finetuning_job(body: Dict[str, Any] = Body(...)):
         api_key = _resolve_api_key(platform)
     annotations = training_data.get("annotations", [])
     format_type = training_data.get("format_type", "sft")
+    if not isinstance(annotations, list):
+        annotations = []
+
+    # Server-side guard: tuned data cannot be re-submitted.
+    db = get_db_session()
+    try:
+        submitted_ids: List[int] = []
+        for ann in annotations:
+            if not isinstance(ann, dict):
+                continue
+            ann_id = ann.get("id")
+            if ann_id is None:
+                continue
+            try:
+                ann_id_int = int(ann_id)
+            except Exception:
+                continue
+            if ann_id_int > 0:
+                submitted_ids.append(ann_id_int)
+        if submitted_ids:
+            submitted_ids = list(dict.fromkeys(submitted_ids))
+
+        tuned_ids: set[int] = set()
+        if submitted_ids:
+            tuned_rows = db.query(TrainingAnnotationFinetuningLink.training_annotation_id).filter(
+                TrainingAnnotationFinetuningLink.training_annotation_id.in_(submitted_ids)
+            ).all()
+            tuned_ids = {int(row[0]) for row in tuned_rows}
+
+        tuned_pairs: set[tuple[str, str]] = set()
+        tuned_pair_rows = (
+            db.query(TrainingAnnotation.instruction, TrainingAnnotation.response)
+            .join(
+                TrainingAnnotationFinetuningLink,
+                TrainingAnnotation.id == TrainingAnnotationFinetuningLink.training_annotation_id
+            )
+            .all()
+        )
+        for instruction_text, response_text in tuned_pair_rows:
+            tuned_pairs.add((
+                _normalize_annotation_text(instruction_text),
+                _normalize_annotation_text(response_text)
+            ))
+
+        filtered_annotations: List[Dict[str, Any]] = []
+        filtered_annotation_ids: List[int] = []
+        for ann in annotations:
+            if not isinstance(ann, dict):
+                continue
+
+            instruction = ann.get("instruction", ann.get("question", ""))
+            response = ann.get("response", ann.get("answer", ""))
+            norm_pair = (
+                _normalize_annotation_text(instruction),
+                _normalize_annotation_text(response)
+            )
+            if not norm_pair[0] or not norm_pair[1]:
+                continue
+
+            ann_id = ann.get("id")
+            ann_id_int = None
+            if ann_id is not None:
+                try:
+                    ann_id_int = int(ann_id)
+                except Exception:
+                    ann_id_int = None
+
+            if ann_id_int is not None and ann_id_int in tuned_ids:
+                continue
+            if norm_pair in tuned_pairs:
+                continue
+
+            filtered_annotations.append(ann)
+            if ann_id_int is not None and ann_id_int > 0:
+                filtered_annotation_ids.append(ann_id_int)
+    finally:
+        db.close()
+
+    if not filtered_annotations:
+        raise HTTPException(status_code=400, detail="No untuned annotations available for submission")
 
     logger.info(
         "finetuning/submit: input platform=%s, model=%s, format_type=%s, annotations_count=%d, api_key_set=%s",
-        platform, model, format_type, len(annotations), bool(api_key),
+        platform, model, format_type, len(filtered_annotations), bool(api_key),
     )
-    if annotations:
-        first = annotations[0]
+    if filtered_annotations:
+        first = filtered_annotations[0]
         instr = first.get("instruction", first.get("question", ""))[:80] if isinstance(first, dict) else ""
         logger.info("finetuning/submit: first_instruction_preview=%r", instr + ("..." if len(str(instr)) > 80 else ""))
 
     service = FineTuningService()
 
     # Prepare training data
-    formatted_data = service.prepare_training_data(annotations, format_type)
+    formatted_data = service.prepare_training_data(filtered_annotations, format_type)
     logger.info("finetuning/submit: prepared_data_len=%d chars", len(formatted_data))
 
-    # Save to temp file
-    with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.jsonl') as tmp_file:
+    # Save to temp file using UTF-8 to avoid Windows default codec issues (e.g. gbk)
+    with tempfile.NamedTemporaryFile(mode='w', encoding='utf-8', newline='\n', delete=False, suffix='.jsonl') as tmp_file:
         tmp_file.write(formatted_data)
         tmp_path = tmp_file.name
 
-    job_info = service.submit_finetuning_job(
-        tmp_path,
-        model,
-        platform,
-        api_key
-    )
+    try:
+        job_info = service.submit_finetuning_job(
+            tmp_path,
+            model,
+            platform,
+            api_key
+        )
+    finally:
+        try:
+            if tmp_path and os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        except OSError:
+            pass
 
     logger.info(
         "finetuning/submit: output job_id=%s, status=%s",
         job_info.get("job_id", ""), job_info.get("status", ""),
     )
 
-    # Save to database
+    annotation_ids = list(dict.fromkeys([x for x in filtered_annotation_ids if x > 0]))
+
+    # Save to database and persist annotation-job relations
     db = get_db_session()
     try:
         job_db = FinetuningJob(
@@ -1362,6 +1531,22 @@ async def submit_finetuning_job(body: Dict[str, Any] = Body(...)):
             progress=0.0
         )
         db.add(job_db)
+        db.flush()
+
+        if annotation_ids:
+            existing_rows = db.query(TrainingAnnotation.id).filter(
+                TrainingAnnotation.id.in_(annotation_ids)
+            ).all()
+            existing_ids = {row[0] for row in existing_rows}
+            for ann_id in annotation_ids:
+                if ann_id not in existing_ids:
+                    continue
+                link = TrainingAnnotationFinetuningLink(
+                    training_annotation_id=ann_id,
+                    finetuning_job_id=job_info["job_id"]
+                )
+                db.add(link)
+
         db.commit()
     except Exception as e:
         db.rollback()
@@ -1378,8 +1563,16 @@ async def list_finetuning_jobs():
     """List all fine-tuning jobs"""
     db = None
     try:
+        from services.monitoring_service import MonitoringService
+        monitor = MonitoringService()
         db = get_db_session()
         jobs = db.query(FinetuningJob).all()
+        changed = False
+        for job in jobs:
+            changed = _sync_placeholder_finetuning_job_state(db, job, monitor) or changed
+        if changed:
+            db.commit()
+
         result = [
             {
                 "id": job.job_id,
@@ -1419,8 +1612,13 @@ async def get_job_status(job_id: str):
         
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
-        
-        estimated_time = service.estimate_remaining_time(job_id, job.progress)
+
+        changed = _sync_placeholder_finetuning_job_state(db, job, service)
+        if changed:
+            db.commit()
+
+        normalized_progress = _normalize_progress_for_monitor(job.progress)
+        estimated_time = service.estimate_remaining_time(job_id, normalized_progress)
         cost_tracking = service.get_cost_tracking(job_id)
         
         result = {
@@ -1515,26 +1713,330 @@ def _resolve_api_key(platform: str) -> str:
         db.close()
 
 
+def _serialize_training_item(item: TrainingItem) -> Dict[str, Any]:
+    knowledge_point_keys = []
+    if item.knowledge_point_keys:
+        try:
+            parsed = json.loads(item.knowledge_point_keys)
+            if isinstance(parsed, list):
+                knowledge_point_keys = [str(v) for v in parsed if isinstance(v, str) and v.strip()]
+        except Exception:
+            knowledge_point_keys = []
+    return {
+        "id": item.id,
+        "name": item.name or "",
+        "knowledge_point_keys": knowledge_point_keys,
+        "prompt_template": item.prompt_template or "",
+        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "updated_at": item.updated_at.isoformat() if item.updated_at else None,
+    }
+
+
+def _normalize_progress_for_monitor(progress: Any) -> float:
+    try:
+        p = float(progress or 0.0)
+    except Exception:
+        p = 0.0
+    if p > 1.0:
+        p = p / 100.0
+    if p < 0.0:
+        p = 0.0
+    if p > 1.0:
+        p = 1.0
+    return p
+
+
+def _normalize_annotation_text(value: Any) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _is_placeholder_finetuning_job(job: FinetuningJob) -> bool:
+    jid = (job.job_id or "").strip()
+    if not jid:
+        return False
+    # Current finetuning service returns local placeholder job ids.
+    return "_privatetune_job_" in jid
+
+
+def _sync_placeholder_finetuning_job_state(db: Session, job: FinetuningJob, monitor_service: Any) -> bool:
+    if not _is_placeholder_finetuning_job(job):
+        return False
+    if (job.status or "").lower() in ("completed", "failed", "cancelled"):
+        return False
+
+    now = datetime.utcnow()
+    created_at = job.created_at or now
+    elapsed = max(0.0, (now - created_at).total_seconds())
+
+    warmup_seconds = 8.0
+    complete_seconds = 180.0
+
+    if elapsed < warmup_seconds:
+        next_status = "submitted"
+        next_progress = 0.0
+    elif elapsed < complete_seconds:
+        ratio = (elapsed - warmup_seconds) / max(1.0, (complete_seconds - warmup_seconds))
+        next_status = "running"
+        next_progress = max(1.0, min(95.0, ratio * 95.0))
+    else:
+        next_status = "completed"
+        next_progress = 100.0
+
+    cur_status = (job.status or "").lower()
+    cur_progress = float(job.progress or 0.0)
+    changed = (cur_status != next_status) or (abs(cur_progress - next_progress) >= 1.0)
+    if not changed:
+        return False
+
+    job.status = next_status
+    job.progress = round(next_progress, 2)
+    if next_status == "completed":
+        if not job.completed_at:
+            job.completed_at = now
+        if job.cost_usd is None:
+            job.cost_usd = 0.0
+
+    try:
+        monitor_service.log_job_progress(
+            job.job_id,
+            _normalize_progress_for_monitor(job.progress),
+            job.status,
+            {"source": "placeholder_simulator"}
+        )
+    except Exception:
+        pass
+
+    return True
+
+
+def _collect_training_annotation_link_info(db: Session, annotation_ids: List[int]) -> Dict[int, List[Dict[str, Any]]]:
+    if not annotation_ids:
+        return {}
+    rows = (
+        db.query(TrainingAnnotationFinetuningLink, FinetuningJob)
+        .outerjoin(FinetuningJob, TrainingAnnotationFinetuningLink.finetuning_job_id == FinetuningJob.job_id)
+        .filter(TrainingAnnotationFinetuningLink.training_annotation_id.in_(annotation_ids))
+        .order_by(
+            TrainingAnnotationFinetuningLink.training_annotation_id.asc(),
+            TrainingAnnotationFinetuningLink.used_at.desc(),
+            TrainingAnnotationFinetuningLink.id.desc(),
+        )
+        .all()
+    )
+    by_annotation: Dict[int, List[Dict[str, Any]]] = {}
+    for link, job in rows:
+        by_annotation.setdefault(link.training_annotation_id, []).append({
+            "job_id": link.finetuning_job_id,
+            "used_at": link.used_at.isoformat() if link.used_at else None,
+            "job_status": job.status if job else None,
+            "job_platform": job.platform if job else None,
+            "job_model": job.model if job else None,
+            "job_created_at": job.created_at.isoformat() if job and job.created_at else None,
+        })
+    return by_annotation
+
+
+def _serialize_training_annotation(
+    row: TrainingAnnotation,
+    links: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    linked_jobs = links or []
+    return {
+        "id": row.id,
+        "instruction": row.instruction,
+        "response": row.response,
+        "score": row.score,
+        "training_item_id": row.training_item_id,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "finetuned": len(linked_jobs) > 0,
+        "finetuned_count": len(linked_jobs),
+        "linked_jobs": linked_jobs,
+    }
+
+
+@router.get("/training-items")
+async def list_training_items():
+    """List persisted training items."""
+    db = get_db_session()
+    try:
+        items = db.query(TrainingItem).order_by(TrainingItem.updated_at.desc(), TrainingItem.id.desc()).all()
+        return {"items": [_serialize_training_item(item) for item in items]}
+    finally:
+        db.close()
+
+
+@router.post("/training-items")
+async def save_training_item(body: Dict[str, Any] = Body(...)):
+    """Create or update training item by unique name."""
+    name = (body.get("name") or "").strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+
+    keys = body.get("knowledge_point_keys", [])
+    if isinstance(keys, str):
+        try:
+            keys = json.loads(keys)
+        except Exception:
+            keys = []
+    if not isinstance(keys, list):
+        keys = []
+    knowledge_point_keys = [str(v).strip() for v in keys if str(v).strip()]
+
+    prompt_template = (body.get("prompt_template") or "").strip()
+    if not prompt_template:
+        raise HTTPException(status_code=400, detail="prompt_template is required")
+
+    db = get_db_session()
+    try:
+        existing = db.query(TrainingItem).filter(TrainingItem.name == name).first()
+        if existing:
+            existing.knowledge_point_keys = json.dumps(knowledge_point_keys, ensure_ascii=False)
+            existing.prompt_template = prompt_template
+            db.commit()
+            db.refresh(existing)
+            return _serialize_training_item(existing)
+
+        item = TrainingItem(
+            name=name,
+            knowledge_point_keys=json.dumps(knowledge_point_keys, ensure_ascii=False),
+            prompt_template=prompt_template,
+        )
+        db.add(item)
+        db.commit()
+        db.refresh(item)
+        return _serialize_training_item(item)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/training-items/{item_id}")
+async def delete_training_item(item_id: int):
+    """Delete a training item by id."""
+    db = get_db_session()
+    try:
+        item = db.query(TrainingItem).filter(TrainingItem.id == item_id).first()
+        if not item:
+            raise HTTPException(status_code=404, detail="Training item not found")
+        db.delete(item)
+        db.commit()
+        return {"success": True, "id": item_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
 # --- Training set (for Production Tuning) ---
 @router.post("/training-set")
 async def save_training_set(request: Dict[str, Any]):
-    """Save current annotations for fine-tuning"""
+    """Save current annotations for fine-tuning into database."""
     annotations = request.get("annotations", [])
-    import json
-    data = {"annotations": annotations, "count": len(annotations), "updated_at": datetime.utcnow().isoformat()}
-    with open(TRAINING_SET_PATH, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-    return {"success": True, "count": len(annotations)}
+    training_item_id = request.get("training_item_id")
+    if training_item_id is not None:
+        try:
+            training_item_id = int(training_item_id)
+        except Exception:
+            raise HTTPException(status_code=400, detail="training_item_id must be integer")
+
+    db = get_db_session()
+    try:
+        if training_item_id is not None:
+            item = db.query(TrainingItem).filter(TrainingItem.id == training_item_id).first()
+            if not item:
+                raise HTTPException(status_code=404, detail="Training item not found")
+
+        saved_count = 0
+        for ann in annotations:
+            if not isinstance(ann, dict):
+                continue
+            instruction = (ann.get("instruction") or "").strip()
+            response = (ann.get("response") or "").strip()
+            if not instruction or not response:
+                continue
+
+            score_val = ann.get("score")
+            score = None
+            if score_val is not None and str(score_val).strip() != "":
+                try:
+                    score = int(score_val)
+                except Exception:
+                    score = None
+
+            db.add(TrainingAnnotation(
+                training_item_id=training_item_id,
+                instruction=instruction,
+                response=response,
+                score=score
+            ))
+            saved_count += 1
+
+        db.commit()
+        return {"success": True, "count": saved_count}
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 @router.get("/training-set")
-async def get_training_set():
-    """Get saved training set for fine-tuning"""
-    import json
-    if not os.path.exists(TRAINING_SET_PATH):
-        return {"annotations": [], "count": 0}
-    with open(TRAINING_SET_PATH, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return {"annotations": data.get("annotations", []), "count": data.get("count", 0)}
+async def get_training_set(training_item_id: Optional[int] = Query(None)):
+    """Get saved training set from database, optionally by training item."""
+    db = get_db_session()
+    try:
+        if training_item_id is None:
+            existing_count = db.query(TrainingAnnotation).count()
+            if existing_count == 0 and os.path.exists(TRAINING_SET_PATH):
+                try:
+                    with open(TRAINING_SET_PATH, "r", encoding="utf-8") as f:
+                        legacy_data = json.load(f)
+                    legacy_annotations = legacy_data.get("annotations", []) if isinstance(legacy_data, dict) else []
+                    for ann in legacy_annotations:
+                        if not isinstance(ann, dict):
+                            continue
+                        instruction = (ann.get("instruction") or "").strip()
+                        response = (ann.get("response") or "").strip()
+                        if not instruction or not response:
+                            continue
+                        score_val = ann.get("score")
+                        score = None
+                        if score_val is not None and str(score_val).strip() != "":
+                            try:
+                                score = int(score_val)
+                            except Exception:
+                                score = None
+                        db.add(TrainingAnnotation(
+                            training_item_id=None,
+                            instruction=instruction,
+                            response=response,
+                            score=score
+                        ))
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
+        query = db.query(TrainingAnnotation)
+        if training_item_id is not None:
+            query = query.filter(TrainingAnnotation.training_item_id == training_item_id)
+
+        rows = query.order_by(TrainingAnnotation.created_at.desc(), TrainingAnnotation.id.desc()).all()
+        row_ids = [row.id for row in rows if row.id is not None]
+        link_map = _collect_training_annotation_link_info(db, row_ids)
+        annotations = [
+            _serialize_training_annotation(row, link_map.get(row.id, []))
+            for row in rows
+        ]
+        return {"annotations": annotations, "count": len(annotations)}
+    finally:
+        db.close()
 
 # --- Audit log & Desensitization log ---
 @router.get("/audit-log")

@@ -53,7 +53,7 @@
 .fr-workspace-bottom {
   flex-shrink: 0;
   min-height: 200px;
-  max-height: 70%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -133,9 +133,61 @@
   background: var(--vs-list-hover);
 }
 
+/* Maximized: root wrapper is flex child (flex:1), workspace fills wrapper. */
+.fr-workspace-maximized-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fr-workspace-preview-maximized.fr-workspace {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .fr-workspace-preview-maximized .fr-workspace-bottom {
   flex: 1;
   min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fr-workspace-preview-maximized .fr-workspace-bottom .fr-document-detail-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fr-workspace-preview-maximized .fr-document-preview-block {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fr-workspace-preview-maximized .fr-document-preview-block .fr-document-preview-pdf,
+.fr-workspace-preview-maximized .fr-document-preview-pdf {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fr-workspace-preview-maximized .fr-document-preview-block .pdf-viewer-canvas-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .fr-document-summary-block {
@@ -168,7 +220,7 @@
 
 .fr-document-preview-block {
   flex: 1;
-  min-height: 200px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: 8px 12px;
@@ -190,6 +242,8 @@
   border-radius: 4px;
   background: var(--vs-editor-background);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .fr-search-section {

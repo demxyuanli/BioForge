@@ -8,7 +8,18 @@ import {
   getDesensitizationLog,
   getLocalModels
 } from '../services/api';
-import { getStoredTheme, applyTheme, AppTheme } from '../utils/theme';
+import { 
+  getStoredTheme, 
+  applyTheme, 
+  AppTheme,
+  getStoredFontFamily,
+  getStoredFontScale,
+  applyFontFamily,
+  applyFontScale,
+  setupThemeListener,
+  FONT_FAMILY_OPTIONS,
+  FONT_SCALE_OPTIONS
+} from '../utils/theme';
 import './Settings.css';
 
 export type SettingsTab = 'general' | 'models' | 'privacy' | 'context';
@@ -34,6 +45,8 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
   const [documentsDir, setDocumentsDir] = useState<string | null>(null);
   const [dbPath, setDbPath] = useState<string | null>(null);
   const [theme, setTheme] = useState<AppTheme>(getStoredTheme());
+  const [fontFamily, setFontFamily] = useState<string>(getStoredFontFamily());
+  const [fontScale, setFontScale] = useState<number>(getStoredFontScale());
 
   // Model Settings State
   const [localModelName, setLocalModelName] = useState(localStorage.getItem('ollama_model') || 'qwen2.5:7b');
@@ -172,11 +185,48 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
                       const v = e.target.value as AppTheme;
                       setTheme(v);
                       applyTheme(v);
+                      setupThemeListener();
                     }}
                   >
                     <option value="system">{t('settings.general.themeSystem')}</option>
                     <option value="light">{t('settings.general.themeLight')}</option>
                     <option value="dark">{t('settings.general.themeDark')}</option>
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label>{t('settings.general.fontFamily')}</label>
+                  <select
+                    className="settings-select"
+                    value={fontFamily}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setFontFamily(v);
+                      applyFontFamily(v);
+                    }}
+                  >
+                    {FONT_FAMILY_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {t(option.labelKey)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="settings-field">
+                  <label>{t('settings.general.fontSize')}</label>
+                  <select
+                    className="settings-select"
+                    value={fontScale}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setFontScale(v);
+                      applyFontScale(v);
+                    }}
+                  >
+                    {FONT_SCALE_OPTIONS.map(scale => (
+                      <option key={scale} value={scale}>
+                        {scale}%
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="settings-field">

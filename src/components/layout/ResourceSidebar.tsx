@@ -1,100 +1,124 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Document, FinetuningJob } from '../../services/api';
+import { ActivityType } from './VSLayout';
+import FileExplorer from './FileExplorer';
 import KnowledgeBaseTree from './KnowledgeBaseTree';
-import { SidebarViewType } from './VSLayout';
+import OverviewStatusList from './OverviewStatusList';
+import RecentKnowledgeList from './RecentKnowledgeList';
 
 interface ResourceSidebarProps {
   documents: Document[];
   jobs: FinetuningJob[];
-  activeSidebarView: SidebarViewType;
-  onSidebarViewChange: (view: SidebarViewType) => void;
-  onCreateFolder?: (parentId: string | null, name: string) => Promise<void>;
-  onMoveItem?: (itemId: string, targetId: string | null) => Promise<void>;
-  onDeleteItem?: (itemId: string) => Promise<void>;
+  activity: ActivityType;
+  selectedSubItem: string;
+  onSubItemChange: (subItem: string) => void;
 }
 
 const ResourceSidebar: React.FC<ResourceSidebarProps> = ({
-  documents,
+  documents: _documents,
   jobs,
-  activeSidebarView,
-  onSidebarViewChange
+  activity,
+  selectedSubItem,
+  onSubItemChange
 }) => {
   const { t } = useTranslation();
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    'files': true,
-    'knowledge': true,
-    'jobs': true
-  });
 
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+  const getSubItems = (act: ActivityType): string[] => {
+    const items = t(`sidebar.activityItems.${act}`, { returnObjects: true }) as Record<string, string>;
+    return items ? Object.keys(items) : [];
   };
 
-  // Switch view based on activeSidebarView if needed, or just show everything in sections?
-  // The original VSLayout had buttons to switch between "files" and "knowledge".
-  // The user asked for "Resource Icon" to switch to "File Library and Knowledge Base content".
-  // Let's implement tabs within the sidebar header to switch views, utilizing the props passed from App.tsx.
+  const getSubItemLabel = (act: ActivityType, key: string): string => {
+    return t(`sidebar.activityItems.${act}.${key}`, { defaultValue: key });
+  };
 
-  return (
-    <>
-      <div className="vs-sidebar-header">
-        <div className="vs-sidebar-tabs">
-          <button
-            className={`vs-sidebar-tab ${activeSidebarView === 'files' ? 'active' : ''}`}
-            onClick={() => onSidebarViewChange('files')}
-            title={t('sidebar.fileExplorer')}
-          >
-            <span className="vs-sidebar-tab-icon">{'\uD83D\uDCC1'}</span>
-            <span className="vs-sidebar-tab-label">{t('sidebar.fileExplorer')}</span>
-          </button>
-          <button
-            className={`vs-sidebar-tab ${activeSidebarView === 'knowledge' ? 'active' : ''}`}
-            onClick={() => onSidebarViewChange('knowledge')}
-            title={t('sidebar.knowledgeBase')}
-          >
-            <span className="vs-sidebar-tab-icon">{'\uD83D\uDCDA'}</span>
-            <span className="vs-sidebar-tab-label">{t('sidebar.knowledgeBase')}</span>
-          </button>
-        </div>
-      </div>
-      
-      <div className="vs-sidebar-content">
-        {activeSidebarView === 'files' && (
-          <>
-            <div className="sidebar-section">
-              <h4 onClick={() => toggleSection('files')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                <span style={{ transform: expandedSections['files'] ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', marginRight: '4px' }}>▶</span>
-                {t('sidebar.files')}
-              </h4>
-              {expandedSections['files'] && (
+  const subItems = getSubItems(activity);
+
+  const renderContent = () => {
+    if (subItems.length === 0) {
+      return null;
+    }
+
+    switch (activity) {
+      case 'dashboard':
+        switch (selectedSubItem) {
+          case 'overview':
+            return <OverviewStatusList />;
+          case 'recentDocuments':
+            return <RecentKnowledgeList />;
+          case 'recentJobs':
+            return (
+              <div className="sidebar-section">
                 <div className="sidebar-list">
-                  {documents.length === 0 ? (
-                    <div className="sidebar-empty">{t('sidebar.noFiles')}</div>
+                  {jobs.length === 0 ? (
+                    <div className="sidebar-empty">{t('sidebar.noJobs')}</div>
                   ) : (
-                    documents.map(doc => (
-                      <div key={doc.id} className="sidebar-item" title={doc.filename}>
-                        <span className="item-icon">📄</span>
-                        <span className="item-name">{doc.filename}</span>
-                        <span className={`item-status ${doc.processed ? 'processed' : 'pending'}`}>
-                          {doc.processed ? '✓' : '○'}
+                    jobs.slice(0, 20).map(job => (
+                      <div key={job.id} className="sidebar-item">
+                        <span className="item-icon">⚙</span>
+                        <span className="item-name">{job.model}</span>
+                        <span className={`item-status status-${job.status}`}>
+                          {job.status}
                         </span>
                       </div>
                     ))
                   )}
                 </div>
-              )}
-            </div>
-            
-            <div className="sidebar-section">
-              <h4 onClick={() => toggleSection('jobs')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                <span style={{ transform: expandedSections['jobs'] ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', marginRight: '4px' }}>▶</span>
-                {t('sidebar.jobs')}
-              </h4>
-              {expandedSections['jobs'] && (
+              </div>
+            );
+          default:
+            return <OverviewStatusList />;
+        }
+      case 'fileResources':
+        switch (selectedSubItem) {
+          case 'fileExplorer':
+            return <FileExplorer />;
+          case 'knowledgeBase':
+            return <KnowledgeBaseTree />;
+          default:
+            return <FileExplorer />;
+        }
+      case 'datacenter':
+        switch (selectedSubItem) {
+          case 'knowledgeCreation':
+            return <FileExplorer />;
+          case 'knowledgePointsManagement':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          case 'keywordManagement':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          default:
+            return <FileExplorer />;
+        }
+      case 'knowledgeBase':
+        switch (selectedSubItem) {
+          case 'knowledgeTree':
+            return <KnowledgeBaseTree />;
+          case 'knowledgeGraph':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          case 'knowledgeManagement':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          default:
+            return <KnowledgeBaseTree />;
+        }
+      case 'training':
+        switch (selectedSubItem) {
+          case 'knowledgePoints':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          case 'annotations':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          case 'exportJsonl':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          default:
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+        }
+      case 'production':
+        switch (selectedSubItem) {
+          case 'datasetAndCost':
+            return <div className="sidebar-empty"></div>;
+          case 'jobs':
+            return (
+              <div className="sidebar-section">
                 <div className="sidebar-list">
                   {jobs.length === 0 ? (
                     <div className="sidebar-empty">{t('sidebar.noJobs')}</div>
@@ -110,16 +134,67 @@ const ResourceSidebar: React.FC<ResourceSidebarProps> = ({
                     ))
                   )}
                 </div>
-              )}
-            </div>
-          </>
-        )}
+              </div>
+            );
+          case 'logs':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          default:
+            return <div className="sidebar-empty"></div>;
+        }
+      case 'evaluation':
+        switch (selectedSubItem) {
+          case 'templates':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          case 'customPrompt':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          case 'compareResult':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          default:
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+        }
+      case 'chat':
+        switch (selectedSubItem) {
+          case 'conversation':
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+          default:
+            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
+        }
+      default:
+        return <FileExplorer />;
+    }
+  };
 
-        {activeSidebarView === 'knowledge' && (
-          <div style={{ height: '100%' }}>
-            <KnowledgeBaseTree />
+  if (subItems.length === 0) {
+    return (
+      <div className="vs-sidebar-content">
+        <FileExplorer />
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="vs-sidebar-header">
+        <span className="vs-sidebar-title">{t(`sidebar.activityTitles.${activity}`)}</span>
+      </div>
+      <div className="vs-sidebar-content">
+        <div className="sidebar-section">
+          <div className="sidebar-list">
+            {subItems.map((itemKey) => (
+              <div
+                key={itemKey}
+                className={`sidebar-item ${selectedSubItem === itemKey ? 'active' : ''}`}
+                onClick={() => onSubItemChange(itemKey)}
+                style={{ backgroundColor: selectedSubItem === itemKey ? 'var(--vs-list-hover)' : 'transparent' }}
+              >
+                <span className="item-name" style={{ paddingLeft: '8px' }}>
+                  {getSubItemLabel(activity, itemKey)}
+                </span>
+              </div>
+            ))}
           </div>
-        )}
+        </div>
+        {renderContent()}
       </div>
     </>
   );

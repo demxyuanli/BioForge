@@ -3,6 +3,7 @@ Annotation Service
 Handles automatic generation of instruction pairs and Q&A pairs via DeepSeek API (OpenAI-compatible)
 """
 import logging
+import re
 from typing import List, Dict, Any
 from openai import OpenAI
 import requests
@@ -36,13 +37,45 @@ class AnnotationService:
                 )
         return self._client
 
-    def generate_instruction_pair(self, knowledge_point: str) -> Dict[str, Any]:
+    def generate_instruction_pair(
+        self,
+        knowledge_point: str,
+        candidate_index: int = 1,
+        candidate_total: int = 1,
+        existing_candidates: List[Dict[str, str]] = None
+    ) -> Dict[str, Any]:
         """
         Generate instruction pair from knowledge point using DeepSeek API
         Returns dict with 'instruction' and 'response' fields
         """
+        candidate_hint = ""
+        if candidate_total > 1:
+            candidate_hint = (
+                f"\nCandidate target: {candidate_index}/{candidate_total}.\n"
+                "Make this candidate meaningfully different from other candidates by question angle, phrasing, and response structure."
+            )
+
+        existing_hint = ""
+        if existing_candidates:
+            samples = []
+            for idx, item in enumerate(existing_candidates[:3], start=1):
+                instruction = (item.get("instruction") or "").strip()
+                response = (item.get("response") or "").strip()
+                if instruction or response:
+                    samples.append(f"{idx}. Instruction: {instruction}\n   Response: {response}")
+            if samples:
+                existing_hint = (
+                    "\nExisting candidates (avoid semantic duplicates):\n"
+                    + "\n".join(samples)
+                )
+
         prompt = f"""Based on the following knowledge point, generate a high-quality instruction-response pair for fine-tuning.
 The output MUST be in Chinese (Simplified).
+{candidate_hint}
+{existing_hint}
+
+If the input includes a "Keywords:" line (or equivalent keyword hints), you MUST treat those keywords as core terms and reflect them explicitly in both the instruction and the response.
+Ensure terminology consistency with those keywords.
 
 Knowledge Point:
 {knowledge_point}
@@ -73,6 +106,50 @@ Response: [response text in Chinese]"""
         except Exception as e:
             logger.warning("AnnotationService: DeepSeek API error: %s", e)
             return {"error": str(e)}
+
+    def generate_instruction_candidates(self, knowledge_point: str, candidate_count: int = 1) -> Dict[str, Any]:
+        """
+        Generate multiple instruction-response candidates for one knowledge point,
+        then deduplicate them automatically.
+        """
+        target_count = max(1, min(10, int(candidate_count or 1)))
+        annotations: List[Dict[str, str]] = []
+        errors: List[str] = []
+        seen = set()
+        max_attempts = max(target_count * 4, target_count)
+
+        for _ in range(max_attempts):
+            if len(annotations) >= target_count:
+                break
+            result = self.generate_instruction_pair(
+                knowledge_point=knowledge_point,
+                candidate_index=len(annotations) + 1,
+                candidate_total=target_count,
+                existing_candidates=annotations
+            )
+            if "error" in result:
+                errors.append(str(result.get("error", "")))
+                continue
+
+            instruction = (result.get("instruction") or "").strip()
+            response = (result.get("response") or "").strip()
+            if not instruction or not response:
+                errors.append("Empty instruction or response generated")
+                continue
+
+            dedupe_key = f"{self._normalize_text(instruction)}|||{self._normalize_text(response)}"
+            if dedupe_key in seen:
+                continue
+            seen.add(dedupe_key)
+            annotations.append({
+                "instruction": instruction,
+                "response": response
+            })
+
+        return {
+            "annotations": annotations,
+            "errors": errors
+        }
 
     def generate_qa_pair(self, context: str, question: str = None) -> Dict[str, Any]:
         """
@@ -162,6 +239,10 @@ Answer: [answer text in Chinese]"""
             "instruction": instruction.strip(),
             "response": response.strip()
         }
+
+    def _normalize_text(self, text: str) -> str:
+        normalized = re.sub(r"\s+", " ", (text or "").strip().lower())
+        return normalized
 
     def _parse_qa_pair(self, content: str) -> Dict[str, Any]:
         """Parse Q&A pair from model response"""

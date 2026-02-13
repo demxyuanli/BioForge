@@ -266,10 +266,7 @@ const FileResourcesWorkspace: React.FC = () => {
       setDocumentSummary('');
       setLoadingSummary(false);
       setPreviewError(null);
-      if (previewBlobUrlRef.current) {
-        URL.revokeObjectURL(previewBlobUrlRef.current);
-        previewBlobUrlRef.current = null;
-      }
+      previewBlobUrlRef.current = null;
       setPreviewBlobUrl(null);
       setLoadingPreview(false);
       return;
@@ -282,38 +279,19 @@ const FileResourcesWorkspace: React.FC = () => {
       .finally(() => setLoadingSummary(false));
     setLoadingPreview(true);
     setPreviewError(null);
-    if (previewBlobUrlRef.current) {
-      URL.revokeObjectURL(previewBlobUrlRef.current);
-      previewBlobUrlRef.current = null;
-    }
+    previewBlobUrlRef.current = null;
     setPreviewBlobUrl(null);
     getDocumentPreview(selectedFile.mpId, selectedFile.relativePath)
-      .then((base64) => {
-        if (!base64) {
+      .then((url) => {
+        if (!url) {
           setPreviewError('Preview not available');
           return;
         }
-        try {
-          const bin = atob(base64);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          const blob = new Blob([bytes], { type: 'application/pdf' });
-          const url = URL.createObjectURL(blob);
-          if (previewBlobUrlRef.current) URL.revokeObjectURL(previewBlobUrlRef.current);
-          previewBlobUrlRef.current = url;
-          setPreviewBlobUrl(url);
-        } catch {
-          setPreviewError('Preview failed');
-        }
+        previewBlobUrlRef.current = url;
+        setPreviewBlobUrl(url);
       })
       .catch(() => setPreviewError('Preview failed'))
       .finally(() => setLoadingPreview(false));
-    return () => {
-      if (previewBlobUrlRef.current) {
-        URL.revokeObjectURL(previewBlobUrlRef.current);
-        previewBlobUrlRef.current = null;
-      }
-    };
   }, [selectedFile?.mpId, selectedFile?.relativePath]);
 
   useEffect(() => {
@@ -479,7 +457,7 @@ const FileResourcesWorkspace: React.FC = () => {
     }
   };
 
-  return (
+  const workspace = (
     <div className={`fr-workspace ${previewMaximized ? 'fr-workspace-preview-maximized' : ''}`} ref={workspaceRef}>
       {!previewMaximized && (
       <div className="fr-workspace-top">
@@ -935,6 +913,25 @@ const FileResourcesWorkspace: React.FC = () => {
       ) : null}
     </div>
   );
+
+  if (previewMaximized) {
+    return (
+      <div
+        className="fr-workspace-maximized-root"
+        style={{
+          flex: 1,
+          minHeight: 0,
+          margin: -16,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {workspace}
+      </div>
+    );
+  }
+  return workspace;
 };
 
 export default FileResourcesWorkspace;

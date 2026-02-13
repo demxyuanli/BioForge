@@ -4,7 +4,6 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import ActivityBar from './ActivityBar';
 import BottomPanel from './BottomPanel';
 import FileExplorer from './FileExplorer';
-import KnowledgeBaseTree from './KnowledgeBaseTree';
 import MenuBar from './MenuBar';
 import Tooltip from '../Tooltip';
 import './VSLayout.css';
@@ -13,6 +12,19 @@ export type ActivityType = 'dashboard' | 'datacenter' | 'fileResources' | 'knowl
 export type SidebarViewType = 'files' | 'knowledge';
 export type BottomPanelTab = 'output' | 'logs' | 'problems';
 export type RightPanelTab = 'details' | 'chat';
+
+const NAV_TITLE_KEY_BY_ACTIVITY: Record<ActivityType, string> = {
+  dashboard: 'nav.dashboard',
+  datacenter: 'nav.dataCenter',
+  fileResources: 'nav.fileResources',
+  knowledgeBase: 'nav.knowledgeBase',
+  training: 'nav.trainingLab',
+  production: 'nav.productionTuning',
+  evaluation: 'nav.evaluation',
+  chat: 'nav.chat',
+  settings: 'nav.settings',
+  explorer: 'nav.fileResources'
+};
 
 interface VSLayoutProps {
   children: ReactNode;
@@ -37,7 +49,6 @@ const VSLayout: React.FC<VSLayoutProps> = ({
   const SIDEBAR_MIN_WIDTH = 200;
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_MIN_WIDTH);
   const [bottomPanelTab, setBottomPanelTab] = useState<BottomPanelTab>('output');
-  const [sidebarView, setSidebarView] = useState<SidebarViewType>('files');
   const [isMaximized, setIsMaximized] = useState(false);
   const floatingSidebarRef = useRef<HTMLDivElement>(null);
 
@@ -225,33 +236,9 @@ const VSLayout: React.FC<VSLayoutProps> = ({
             {sidebarContent ? (
               <>{sidebarContent}</>
             ) : (
-              <>
-                <div className="vs-sidebar-header">
-                  <div className="vs-sidebar-tabs">
-                    <Tooltip title={t('sidebar.fileExplorer')}>
-                      <button
-                        className={`vs-sidebar-tab ${sidebarView === 'files' ? 'active' : ''}`}
-                        onClick={() => setSidebarView('files')}
-                      >
-                        <span className="vs-sidebar-tab-icon">{'\uD83D\uDCC1'}</span>
-                        <span className="vs-sidebar-tab-label">{t('sidebar.fileExplorer')}</span>
-                      </button>
-                    </Tooltip>
-                    <Tooltip title={t('sidebar.knowledgeBase')}>
-                      <button
-                        className={`vs-sidebar-tab ${sidebarView === 'knowledge' ? 'active' : ''}`}
-                        onClick={() => setSidebarView('knowledge')}
-                      >
-                        <span className="vs-sidebar-tab-icon">{'\uD83D\uDCDA'}</span>
-                        <span className="vs-sidebar-tab-label">{t('sidebar.knowledgeBase')}</span>
-                      </button>
-                    </Tooltip>
-                  </div>
-                </div>
-                <div className="vs-sidebar-content">
-                  {sidebarView === 'files' ? <FileExplorer /> : <KnowledgeBaseTree />}
-                </div>
-              </>
+              <div className="vs-sidebar-content">
+                <FileExplorer />
+              </div>
             )}
             <div className="vs-resize-handle vs-resize-horizontal" onMouseDown={handleSidebarResize} />
           </div>
@@ -290,33 +277,9 @@ const VSLayout: React.FC<VSLayoutProps> = ({
             {sidebarContent ? (
               <>{sidebarContent}</>
             ) : (
-              <>
-                <div className="vs-sidebar-header">
-                  <div className="vs-sidebar-tabs">
-                    <Tooltip title={t('sidebar.fileExplorer')}>
-                      <button
-                        className={`vs-sidebar-tab ${sidebarView === 'files' ? 'active' : ''}`}
-                        onClick={() => setSidebarView('files')}
-                      >
-                        <span className="vs-sidebar-tab-icon">{'\uD83D\uDCC1'}</span>
-                        <span className="vs-sidebar-tab-label">{t('sidebar.fileExplorer')}</span>
-                      </button>
-                    </Tooltip>
-                    <Tooltip title={t('sidebar.knowledgeBase')}>
-                      <button
-                        className={`vs-sidebar-tab ${sidebarView === 'knowledge' ? 'active' : ''}`}
-                        onClick={() => setSidebarView('knowledge')}
-                      >
-                        <span className="vs-sidebar-tab-icon">{'\uD83D\uDCDA'}</span>
-                        <span className="vs-sidebar-tab-label">{t('sidebar.knowledgeBase')}</span>
-                      </button>
-                    </Tooltip>
-                  </div>
-                </div>
-                <div className="vs-sidebar-content">
-                  {sidebarView === 'files' ? <FileExplorer /> : <KnowledgeBaseTree />}
-                </div>
-              </>
+              <div className="vs-sidebar-content">
+                <FileExplorer />
+              </div>
             )}
           </div>
         )}
@@ -330,7 +293,7 @@ const VSLayout: React.FC<VSLayoutProps> = ({
             <div className="vs-editor-tabs">
               <div className="vs-tab vs-tab-active">
                 <span className="vs-tab-icon">&#128196;</span>
-                <span className="vs-tab-title">{t(`nav.${activeActivity}`)}</span>
+                <span className="vs-tab-title">{t(NAV_TITLE_KEY_BY_ACTIVITY[activeActivity])}</span>
                 <button className="vs-tab-close">&#x2715;</button>
               </div>
               {['training', 'production', 'evaluation'].includes(activeActivity) && (

@@ -1,8 +1,9 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 use std::process::{Command, Child};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::net::TcpListener;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::fs;
 use tauri::Manager;
 
@@ -96,6 +97,7 @@ async fn generate_annotations(
     model: String,
     base_url: Option<String>,
     platform: Option<String>,
+    candidate_count: Option<i32>,
 ) -> Result<String, String> {
     let kp_json = serde_json::to_string(&knowledge_points).unwrap_or_else(|_| "[]".to_string());
     let kp_escaped = kp_json.replace('\\', "\\\\").replace('"', "\\\"");
@@ -105,6 +107,7 @@ async fn generate_annotations(
     let base_url_escaped = base_url_val.replace('\\', "\\\\").replace('"', "\\\"");
     let platform_val = platform.unwrap_or_default();
     let platform_escaped = platform_val.replace('\\', "\\\\").replace('"', "\\\"");
+    let candidate_count_val = candidate_count.unwrap_or(1).clamp(1, 10);
 
     let python_script = format!(
         r#"
@@ -118,10 +121,12 @@ api_key = "{}"
 model = "{}"
 base_url = "{}"
 platform = "{}"
+candidate_count = {}
 
 payload = {{"knowledge_points": knowledge_points, "api_key": api_key, "model": model, "base_url": base_url if base_url else None}}
 if platform:
     payload["platform"] = platform
+payload["candidate_count"] = candidate_count
 
 try:
     response = requests.post(
@@ -147,7 +152,8 @@ except Exception as e:
         api_key_escaped,
         model_escaped,
         base_url_escaped,
-        platform_escaped
+        platform_escaped,
+        candidate_count_val
     );
 
     let output = Command::new("python")
@@ -213,55 +219,62 @@ async fn submit_finetuning_job(
     api_key: String,
     format_type: String
 ) -> Result<String, String> {
-    let python_script = format!(
-        r#"
+    let payload = serde_json::json!({
+        "training_data": {
+            "annotations": annotations,
+            "format_type": format_type
+        },
+        "platform": platform,
+        "model": model,
+        "api_key": api_key
+    });
+    let payload_str = serde_json::to_string(&payload).unwrap_or_else(|_| "{}".to_string());
+    let ts = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let payload_path = std::env::temp_dir().join(format!("bioforger_finetune_submit_{}_{}.json", std::process::id(), ts));
+    fs::write(&payload_path, payload_str).map_err(|e| format!("Failed to write temp payload: {}", e))?;
+
+    let python_script = r#"
 import sys
 import requests
 import json
 
-annotations = {}
-platform = "{}"
-model = "{}"
-api_key = "{}"
-format_type = "{}"
-
 try:
+    payload_path = sys.argv[1]
+    with open(payload_path, "r", encoding="utf-8") as f:
+        payload = json.load(f)
     response = requests.post(
         'http://127.0.0.1:8778/finetuning/submit',
-        json={{
-            "training_data": {{
-                "annotations": annotations,
-                "format_type": format_type
-            }},
-            "platform": platform,
-            "model": model,
-            "api_key": api_key
-        }}
+        json=payload
     )
     
-    result = {{
+    result = {
         "success": response.status_code == 200,
         "data": response.json() if response.status_code == 200 else None,
         "error": None if response.status_code == 200 else response.text
-    }}
+    }
     print(json.dumps(result))
 except Exception as e:
-    result = {{
+    result = {
         "success": False,
         "data": None,
         "error": str(e)
-    }}
+    }
     print(json.dumps(result))
-"#,
-        serde_json::to_string(&annotations).unwrap(),
-        platform, model, api_key, format_type
-    );
+"#;
 
     let output = Command::new("python")
         .arg("-c")
-        .arg(&python_script)
+        .arg(python_script)
+        .arg(payload_path.to_string_lossy().to_string())
         .output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+        .map_err(|e| {
+            let _ = fs::remove_file(&payload_path);
+            format!("Failed to execute Python: {}", e)
+        })?;
+    let _ = fs::remove_file(&payload_path);
 
     let output_str = String::from_utf8_lossy(&output.stdout);
     Ok(output_str.to_string())
@@ -341,7 +354,12 @@ except Exception as e:
 }
 
 #[tauri::command]
-async fn get_knowledge_points(page: Option<i32>, page_size: Option<i32>, document_id: Option<i32>) -> Result<String, String> {
+async fn get_knowledge_points(
+    page: Option<i32>,
+    page_size: Option<i32>,
+    document_id: Option<i32>,
+    min_weight: Option<f64>,
+) -> Result<String, String> {
     let page_val = page.unwrap_or(1);
     let page_size_val = page_size.unwrap_or(50);
     
@@ -350,6 +368,58 @@ async fn get_knowledge_points(page: Option<i32>, page_size: Option<i32>, documen
     if let Some(doc_id) = document_id {
         url.push_str(&format!("&document_id={}", doc_id));
     }
+    if let Some(w) = min_weight {
+        url.push_str(&format!("&min_weight={}", w));
+    }
+
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+
+try:
+    response = requests.get('{}')
+    result = {{
+        "success": response.status_code == 200,
+        "data": response.json() if response.status_code == 200 else None,
+        "error": None if response.status_code == 200 else response.text
+    }}
+    print(json.dumps(result))
+except Exception as e:
+    result = {{
+        "success": False,
+        "data": None,
+        "error": str(e)
+    }}
+    print(json.dumps(result))
+"#,
+        url
+    );
+
+    let output = Command::new("python")
+        .arg("-c")
+        .arg(python_script)
+        .output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+
+    let output_str = String::from_utf8_lossy(&output.stdout);
+    Ok(output_str.to_string())
+}
+
+const GRAPH_PAGE_SIZE: i32 = 500;
+
+#[tauri::command]
+async fn get_knowledge_points_for_graph(page: Option<i32>, min_weight: Option<f64>) -> Result<String, String> {
+    let page_val = page.unwrap_or(1);
+    let min_val = min_weight.unwrap_or(1.0);
+    let min_val = if min_val < 1.0 { 1.0 } else if min_val > 5.0 { 5.0 } else { min_val };
+    let url = format!(
+        "http://127.0.0.1:8778/documents/knowledge-points?page={}&page_size={}&min_weight={}",
+        page_val,
+        GRAPH_PAGE_SIZE,
+        min_val
+    );
 
     let python_script = format!(
         r#"
@@ -766,22 +836,50 @@ except Exception as e:
 }
 
 #[tauri::command]
-async fn save_training_set(annotations: Vec<serde_json::Value>) -> Result<String, String> {
-    let annotations_str = serde_json::to_string(&annotations).unwrap_or_else(|_| "[]".to_string());
-    let python_script = format!(
-        r#"
+async fn save_training_set(annotations: Vec<serde_json::Value>, training_item_id: Option<i32>) -> Result<String, String> {
+    let payload = serde_json::json!({
+        "annotations": annotations,
+        "training_item_id": training_item_id
+    });
+    let payload_str = serde_json::to_string(&payload).unwrap_or_else(|_| "{}".to_string());
+    let python_script = r#"
 import sys
 import requests
 import json
 try:
-    annotations = {}
-    r = requests.post('http://127.0.0.1:8778/training-set', json={{"annotations": annotations}})
+    payload = json.loads(sys.argv[1])
+    r = requests.post('http://127.0.0.1:8778/training-set', json=payload)
+    out = {"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({"success": False, "data": None, "error": str(e)}))
+"#;
+    let output = Command::new("python").arg("-c").arg(python_script).arg(&payload_str).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn get_training_set(training_item_id: Option<i32>) -> Result<String, String> {
+    let training_item_id_val = training_item_id
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "".to_string());
+    let python_script = format!(r#"
+import sys
+import requests
+import json
+try:
+    params = {{}}
+    training_item_id = "{}"
+    if training_item_id:
+        params["training_item_id"] = training_item_id
+    r = requests.get('http://127.0.0.1:8778/training-set', params=params)
     out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
     print(json.dumps(out))
 except Exception as e:
     print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
 "#,
-        annotations_str
+        training_item_id_val
     );
     let output = Command::new("python").arg("-c").arg(&python_script).output()
         .map_err(|e| format!("Failed to execute Python: {}", e))?;
@@ -789,19 +887,69 @@ except Exception as e:
 }
 
 #[tauri::command]
-async fn get_training_set() -> Result<String, String> {
+async fn get_training_items() -> Result<String, String> {
     let python_script = r#"
 import sys
 import requests
 import json
 try:
-    r = requests.get('http://127.0.0.1:8778/training-set')
+    r = requests.get('http://127.0.0.1:8778/training-items')
     out = {"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}
     print(json.dumps(out))
 except Exception as e:
     print(json.dumps({"success": False, "data": None, "error": str(e)}))
 "#;
     let output = Command::new("python").arg("-c").arg(python_script).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn save_training_item(
+    name: String,
+    knowledge_point_keys: Vec<String>,
+    prompt_template: String
+) -> Result<String, String> {
+    let payload = serde_json::json!({
+        "name": name,
+        "knowledge_point_keys": knowledge_point_keys,
+        "prompt_template": prompt_template
+    });
+    let payload_str = serde_json::to_string(&payload).unwrap_or_else(|_| "{}".to_string());
+    let python_script = r#"
+import sys
+import requests
+import json
+try:
+    payload = json.loads(sys.argv[1])
+    r = requests.post('http://127.0.0.1:8778/training-items', json=payload)
+    out = {"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({"success": False, "data": None, "error": str(e)}))
+"#;
+    let output = Command::new("python").arg("-c").arg(python_script).arg(&payload_str).output()
+        .map_err(|e| format!("Failed to execute Python: {}", e))?;
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+async fn delete_training_item(item_id: i32) -> Result<String, String> {
+    let python_script = format!(
+        r#"
+import sys
+import requests
+import json
+try:
+    r = requests.delete('http://127.0.0.1:8778/training-items/{}')
+    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
+    print(json.dumps(out))
+except Exception as e:
+    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
+"#,
+        item_id
+    );
+    let output = Command::new("python").arg("-c").arg(&python_script).output()
         .map_err(|e| format!("Failed to execute Python: {}", e))?;
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
@@ -1288,9 +1436,10 @@ import base64
 try:
     r = requests.get('http://127.0.0.1:8778/mount-points/document-preview', params={{"mp_id": {}, "relative_path": "{}"}})
     if r.status_code != 200:
-        out = {{"success": False, "data": None, "error": r.text}}
+        out = {{"success": False, "data": None, "version": "", "error": r.text}}
     else:
-        out = {{"success": True, "data": base64.b64encode(r.content).decode(), "error": None}}
+        ver = r.headers.get("X-Preview-Version") or r.headers.get("x-preview-version") or ""
+        out = {{"success": True, "data": base64.b64encode(r.content).decode(), "version": ver if isinstance(ver, str) else "", "error": None}}
     print(json.dumps(out))
 except Exception as e:
     print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
@@ -1335,9 +1484,10 @@ import base64
 try:
     r = requests.get('http://127.0.0.1:8778/documents/{}/preview')
     if r.status_code != 200:
-        out = {{"success": False, "data": None, "error": r.text}}
+        out = {{"success": False, "data": None, "version": "", "error": r.text}}
     else:
-        out = {{"success": True, "data": base64.b64encode(r.content).decode(), "error": None}}
+        ver = r.headers.get("X-Preview-Version") or r.headers.get("x-preview-version") or ""
+        out = {{"success": True, "data": base64.b64encode(r.content).decode(), "version": ver if isinstance(ver, str) else "", "error": None}}
     print(json.dumps(out))
 except Exception as e:
     print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
@@ -1432,9 +1582,95 @@ except Exception as e:
 }
 
 const CONFIG_FILENAME: &str = "bioforger-config.json";
+const DEFAULT_BACKEND_PORT: u16 = 8778;
+const BACKEND_PORT_CONFIG_KEY: &str = "backendPort";
 
 fn get_config_path_from_app(app: &tauri::AppHandle) -> Option<PathBuf> {
     app.path().app_config_dir().ok().map(|d| d.join(CONFIG_FILENAME))
+}
+
+fn get_backend_port_from_env() -> u16 {
+    std::env::var("BIOFORGER_BACKEND_PORT")
+        .ok()
+        .and_then(|v| v.parse::<u16>().ok())
+        .filter(|p| *p > 0)
+        .unwrap_or(DEFAULT_BACKEND_PORT)
+}
+
+fn is_port_available(port: u16) -> bool {
+    TcpListener::bind(("127.0.0.1", port)).is_ok()
+}
+
+fn pick_available_backend_port(preferred: u16) -> u16 {
+    if is_port_available(preferred) {
+        return preferred;
+    }
+    let end = preferred.saturating_add(200);
+    let mut p = preferred.saturating_add(1);
+    while p <= end {
+        if is_port_available(p) {
+            return p;
+        }
+        p = p.saturating_add(1);
+    }
+    preferred
+}
+
+fn read_backend_port_from_config(config_path: &PathBuf) -> Option<u16> {
+    let contents = fs::read_to_string(config_path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&contents).ok()?;
+    json.get(BACKEND_PORT_CONFIG_KEY)
+        .and_then(|v| v.as_u64())
+        .and_then(|v| u16::try_from(v).ok())
+        .filter(|p| *p > 0)
+}
+
+fn write_backend_port_to_config(config_path: &PathBuf, backend_port: u16) -> Result<(), String> {
+    let mut config = if config_path.exists() {
+        let raw = fs::read_to_string(config_path).map_err(|e| e.to_string())?;
+        serde_json::from_str::<serde_json::Value>(&raw).unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+    if !config.is_object() {
+        config = serde_json::json!({});
+    }
+    if let Some(obj) = config.as_object_mut() {
+        obj.insert(BACKEND_PORT_CONFIG_KEY.to_string(), serde_json::json!(backend_port));
+    }
+    let parent = config_path.parent().ok_or("Invalid config path")?;
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    fs::write(config_path, config.to_string()).map_err(|e| e.to_string())
+}
+
+fn resolve_backend_port(config_path: Option<&PathBuf>) -> u16 {
+    if let Some(cfg) = config_path {
+        if let Some(p) = read_backend_port_from_config(cfg) {
+            return p;
+        }
+        let chosen = pick_available_backend_port(DEFAULT_BACKEND_PORT);
+        let _ = write_backend_port_to_config(cfg, chosen);
+        return chosen;
+    }
+    DEFAULT_BACKEND_PORT
+}
+
+fn configure_python_env(backend_dir: &Path, backend_port: u16) {
+    std::env::set_var("BIOFORGER_BACKEND_PORT", backend_port.to_string());
+    let backend_dir_str = backend_dir.to_string_lossy().to_string();
+    let sep = if cfg!(windows) { ';' } else { ':' };
+    let existing = std::env::var("PYTHONPATH").unwrap_or_default();
+    let exists = existing
+        .split(sep)
+        .any(|item| !item.trim().is_empty() && item == backend_dir_str);
+    if !exists {
+        let merged = if existing.trim().is_empty() {
+            backend_dir_str
+        } else {
+            format!("{}{}{}", backend_dir_str, sep, existing)
+        };
+        std::env::set_var("PYTHONPATH", merged);
+    }
 }
 
 fn migrate_config_from_legacy(app_config_path: &PathBuf) {
@@ -1482,10 +1718,25 @@ fn save_storage_config(app: tauri::AppHandle, documents_dir: String, db_path: St
         .parent()
         .ok_or("Invalid config path")?;
     fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    let config = serde_json::json!({
-        "documentsDir": documents_dir,
-        "dbPath": db_path
-    });
+    let mut config = if config_path.exists() {
+        let raw = fs::read_to_string(&config_path).unwrap_or_default();
+        serde_json::from_str::<serde_json::Value>(&raw).unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+    if !config.is_object() {
+        config = serde_json::json!({});
+    }
+    if let Some(obj) = config.as_object_mut() {
+        obj.insert("documentsDir".to_string(), serde_json::json!(documents_dir));
+        obj.insert("dbPath".to_string(), serde_json::json!(db_path));
+        if !obj.contains_key(BACKEND_PORT_CONFIG_KEY) {
+            obj.insert(
+                BACKEND_PORT_CONFIG_KEY.to_string(),
+                serde_json::json!(get_backend_port_from_env())
+            );
+        }
+    }
     fs::write(config_path, config.to_string()).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -1548,8 +1799,14 @@ fn kill_process_on_port(port: u16) {
 }
 
 async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<Option<BackendProcess>, String> {
-    const BACKEND_PORT: u16 = 8778;
-    let health_url = format!("http://127.0.0.1:{}/health", BACKEND_PORT);
+    let python_path = find_main_py_path()
+        .ok_or("Python backend main.py not found. Please ensure python-backend/main.py exists.")?;
+    let backend_dir = python_path.parent()
+        .ok_or("Invalid path")?
+        .to_path_buf();
+    let backend_port = resolve_backend_port(config_path.as_ref());
+    configure_python_env(&backend_dir, backend_port);
+    let health_url = format!("http://127.0.0.1:{}/health", backend_port);
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(2))
@@ -1562,15 +1819,8 @@ async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<O
         }
     }
 
-    kill_process_on_port(BACKEND_PORT);
+    kill_process_on_port(backend_port);
     std::thread::sleep(Duration::from_millis(500));
-
-    let python_path = find_main_py_path()
-        .ok_or("Python backend main.py not found. Please ensure python-backend/main.py exists.")?;
-
-    let backend_dir = python_path.parent()
-        .ok_or("Invalid path")?
-        .to_path_buf();
 
     #[cfg(windows)]
     {
@@ -1604,6 +1854,8 @@ async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<O
         let mut cmd = Command::new("python");
         cmd.arg(python_path.to_str().ok_or("Invalid path")?);
         cmd.current_dir(&backend_dir);
+        cmd.env("PORT", backend_port.to_string());
+        cmd.env("BIOFORGER_BACKEND_PORT", backend_port.to_string());
         if let Some(ref cfg_path) = config_path {
             cmd.env("BIOFORGER_CONFIG_PATH", cfg_path.to_string_lossy().to_string());
             if cfg_path.exists() {
@@ -1645,6 +1897,8 @@ async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<O
         let mut cmd = Command::new("python");
         cmd.arg(python_path.to_str().ok_or("Invalid path")?);
         cmd.current_dir(&backend_dir);
+        cmd.env("PORT", backend_port.to_string());
+        cmd.env("BIOFORGER_BACKEND_PORT", backend_port.to_string());
         if let Some(ref cfg_path) = config_path {
             cmd.env("BIOFORGER_CONFIG_PATH", cfg_path.to_string_lossy().to_string());
             if cfg_path.exists() {
@@ -1687,7 +1941,7 @@ async fn stop_python_backend(state: tauri::State<'_, BackendState>) -> Result<St
     if let Ok(mut guard) = state.process.lock() {
         *guard = None;
     }
-    kill_process_on_port(8778);
+    kill_process_on_port(get_backend_port_from_env());
     Ok("Python backend stopped".to_string())
 }
 
@@ -1815,7 +2069,7 @@ pub fn run() {
                                         *g = None;
                                     }
                                 }
-                                kill_process_on_port(8778);
+                                kill_process_on_port(get_backend_port_from_env());
                             }
                             "start_ollama" => {
                                 let app = app.clone();
@@ -1870,6 +2124,7 @@ pub fn run() {
             get_documents,
             delete_document,
             get_knowledge_points,
+            get_knowledge_points_for_graph,
             create_knowledge_point,
             delete_knowledge_points_batch,
             update_knowledge_point_weight,
@@ -1884,6 +2139,9 @@ pub fn run() {
             get_api_keys,
             save_training_set,
             get_training_set,
+            get_training_items,
+            save_training_item,
+            delete_training_item,
             get_audit_log,
             get_desensitization_log,
             evaluation_generate,

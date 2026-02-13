@@ -133,6 +133,41 @@ class APIKey(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class TrainingItem(Base):
+    __tablename__ = "training_items"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), unique=True, nullable=False)
+    knowledge_point_keys = Column(Text, nullable=False)  # JSON string list
+    prompt_template = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TrainingAnnotation(Base):
+    __tablename__ = "training_annotations"
+
+    id = Column(Integer, primary_key=True)
+    training_item_id = Column(Integer, ForeignKey("training_items.id", ondelete="CASCADE"), nullable=True)
+    instruction = Column(Text, nullable=False)
+    response = Column(Text, nullable=False)
+    score = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TrainingAnnotationFinetuningLink(Base):
+    __tablename__ = "training_annotation_finetuning_links"
+    __table_args__ = (
+        UniqueConstraint("training_annotation_id", "finetuning_job_id", name="uq_training_annotation_finetuning_job"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    training_annotation_id = Column(Integer, ForeignKey("training_annotations.id", ondelete="CASCADE"), nullable=False)
+    finetuning_job_id = Column(String(255), ForeignKey("finetuning_jobs.job_id", ondelete="CASCADE"), nullable=False)
+    used_at = Column(DateTime, default=datetime.utcnow)
+
+
 def init_database(db_path: str = "privatetune.db"):
     """Initialize database and create tables"""
     db_dir = os.path.dirname(db_path)

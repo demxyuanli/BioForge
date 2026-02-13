@@ -20,7 +20,6 @@ function App() {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<ActivityType>("fileResources");
   const [settingsTab, setSettingsTab] = useState<SettingsTab>("general");
-  const [resourceView, setResourceView] = useState<'files' | 'knowledge'>('files');
   const [sidebarSubItem, setSidebarSubItem] = useState<string>('overview');
   const [backendStarted, setBackendStarted] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
@@ -67,6 +66,23 @@ function App() {
     loadSidebarData();
     const interval = setInterval(loadSidebarData, 10000);
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const handleSettingsTabChange = (event: CustomEvent) => {
+      const tab = event.detail as SettingsTab;
+      setSettingsTab(tab);
+    };
+    window.addEventListener('settings-tab-change', handleSettingsTabChange as EventListener);
+    return () => {
+      window.removeEventListener('settings-tab-change', handleSettingsTabChange as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleOpenWizard = () => setShowWizard(true);
+    window.addEventListener('open-wizard', handleOpenWizard);
+    return () => window.removeEventListener('open-wizard', handleOpenWizard);
   }, []);
 
   const loadSidebarData = async () => {
@@ -124,7 +140,7 @@ function App() {
       case "training":
         return <TrainingLab />;
       case "production":
-        return <ProductionTuning />;
+        return <ProductionTuning activeSubItem={sidebarSubItem} />;
       case "evaluation":
         return <Evaluation />;
       case "chat":
@@ -135,11 +151,6 @@ function App() {
         return <Dashboard />;
     }
   };
-
-  useEffect(() => {
-    if (activeTab === 'knowledgeBase') setResourceView('knowledge');
-    else if (activeTab === 'fileResources' || activeTab === 'datacenter') setResourceView('files');
-  }, [activeTab]);
 
   const firstSubItemByActivity: Record<string, string> = {
     datacenter: 'knowledgeCreation',
@@ -165,9 +176,9 @@ function App() {
     }
     return (
       <ResourceSidebar
+        documents={documents}
+        jobs={jobs}
         activity={activeTab}
-        activeView={resourceView}
-        onViewChange={setResourceView}
         selectedSubItem={sidebarSubItem}
         onSubItemChange={setSidebarSubItem}
       />

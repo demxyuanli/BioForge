@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, Maximize2, Minimize2, X, Upload, FolderPlus } from 'lucide-react';
+import { FileText, List, Maximize2, Minimize2, Network, X, Upload, FolderPlus } from 'lucide-react';
 import Tooltip from './Tooltip';
 import PdfViewer from './PdfViewer';
+import KnowledgeGraph from './KnowledgeGraph';
 import {
   selectFile,
   uploadDocument,
@@ -94,6 +95,7 @@ const DataCenter: React.FC = () => {
   const [fileWeightDragging, setFileWeightDragging] = useState<{ docId: number; value: number } | null>(null);
   const [deletedKpIds, setDeletedKpIds] = useState<Set<number>>(new Set());
   const [kpWeightDragging, setKpWeightDragging] = useState<{ kpId: number; value: number } | null>(null);
+  const [kpViewMode, setKpViewMode] = useState<'list' | 'graph'>('list');
   const fileWeightSliderRef = useRef<HTMLSpanElement | null>(null);
   const fileWeightDragValueRef = useRef(1);
   const kpWeightSliderRef = useRef<HTMLSpanElement | null>(null);
@@ -143,10 +145,7 @@ const DataCenter: React.FC = () => {
       setDocumentSummary('');
       setLoadingSummary(false);
       setPreviewError(null);
-      if (previewBlobUrlRef.current) {
-        URL.revokeObjectURL(previewBlobUrlRef.current);
-        previewBlobUrlRef.current = null;
-      }
+      previewBlobUrlRef.current = null;
       setPreviewBlobUrl(null);
       setLoadingPreview(false);
       return;
@@ -159,38 +158,19 @@ const DataCenter: React.FC = () => {
       .finally(() => setLoadingSummary(false));
     setLoadingPreview(true);
     setPreviewError(null);
-    if (previewBlobUrlRef.current) {
-      URL.revokeObjectURL(previewBlobUrlRef.current);
-      previewBlobUrlRef.current = null;
-    }
+    previewBlobUrlRef.current = null;
     setPreviewBlobUrl(null);
     getDocumentPreviewByDocumentId(selectedDocId)
-      .then((base64) => {
-        if (!base64) {
+      .then((url) => {
+        if (!url) {
           setPreviewError('Preview not available');
           return;
         }
-        try {
-          const bin = atob(base64);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          const blob = new Blob([bytes], { type: 'application/pdf' });
-          const url = URL.createObjectURL(blob);
-          if (previewBlobUrlRef.current) URL.revokeObjectURL(previewBlobUrlRef.current);
-          previewBlobUrlRef.current = url;
-          setPreviewBlobUrl(url);
-        } catch {
-          setPreviewError('Preview failed');
-        }
+        previewBlobUrlRef.current = url;
+        setPreviewBlobUrl(url);
       })
       .catch(() => setPreviewError('Preview failed'))
       .finally(() => setLoadingPreview(false));
-    return () => {
-      if (previewBlobUrlRef.current) {
-        URL.revokeObjectURL(previewBlobUrlRef.current);
-        previewBlobUrlRef.current = null;
-      }
-    };
   }, [lowerVisible, selectedDocId]);
 
   useEffect(() => {
@@ -332,7 +312,9 @@ const DataCenter: React.FC = () => {
     getKnowledgePoints(1, kpPageSize, docId)
       .then((data) => {
         if (selectedDocIdRef.current !== docId) return;
-        setKnowledgePoints(data.knowledge_points ?? []);
+        const raw = data.knowledge_points ?? [];
+        const forDoc = raw.filter((kp) => kp.document_id === docId);
+        setKnowledgePoints(forDoc);
         setKpTotal(data.total ?? 0);
       })
       .catch(() => {
@@ -359,6 +341,17 @@ const DataCenter: React.FC = () => {
       setHighlightedKeywords([]);
     }
   };
+
+  const handleSelectKnowledgePoint = useCallback((kp: KnowledgePoint) => {
+    setSelectedKp((prev) => {
+      if (prev?.id != null && kp.id != null && prev.id === kp.id) {
+        return null;
+      }
+      return kp;
+    });
+    setHighlightedKeywords([]);
+    setSelectionToolbar(null);
+  }, []);
 
   useEffect(() => {
     loadKnowledgePoints();
@@ -392,7 +385,9 @@ const DataCenter: React.FC = () => {
     try {
       const data = await getKnowledgePoints(kpPage, kpPageSize, docId);
       if (selectedDocIdRef.current !== docId) return;
-      setKnowledgePoints(data.knowledge_points ?? []);
+      const raw = data.knowledge_points ?? [];
+      const forDoc = raw.filter((kp) => kp.document_id === docId);
+      setKnowledgePoints(forDoc);
       setKpTotal(data.total ?? 0);
     } catch (e) {
       if (selectedDocIdRef.current !== docId) return;
@@ -685,7 +680,7 @@ const DataCenter: React.FC = () => {
     }
   };
 
-  const handleKpContentMouseUp = (e: React.MouseEvent) => {
+  const handleKpContentMouseUp = (_e: React.MouseEvent) => {
     const sel = window.getSelection();
     const text = sel?.toString?.()?.trim();
     if (text && text.length > 0) {
@@ -1113,7 +1108,7 @@ const DataCenter: React.FC = () => {
               className="dc-upper-left-right-top dc-cli-panel"
               style={
                 kpListHeight != null
-                  ? { height: kpListHeight, flexShrink: 0 }
+                  ? { height: kpListHeight, flex: '0 0 auto' }
                   : undefined
               }
             >
@@ -1123,7 +1118,33 @@ const DataCenter: React.FC = () => {
                     ? `${t('dataCenter.knowledgePointsList')} (${kpTotal})`
                     : t('dataCenter.selectDocumentForKp')}
                 </span>
-                {selectedDocId != null && !lowerVisible && (
+                <div className="dc-kp-view-toggle" role="tablist" aria-label={t('knowledgeGraph.viewMode')}>
+                  <Tooltip title={t('knowledgeGraph.listView')}>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={kpViewMode === 'list'}
+                      aria-label={t('knowledgeGraph.listView')}
+                      className={kpViewMode === 'list' ? 'dc-kp-view-tab active' : 'dc-kp-view-tab'}
+                      onClick={() => setKpViewMode('list')}
+                    >
+                      <List size={15} aria-hidden />
+                    </button>
+                  </Tooltip>
+                  <Tooltip title={t('knowledgeGraph.graphView')}>
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={kpViewMode === 'graph'}
+                      aria-label={t('knowledgeGraph.graphView')}
+                      className={kpViewMode === 'graph' ? 'dc-kp-view-tab active' : 'dc-kp-view-tab'}
+                      onClick={() => setKpViewMode('graph')}
+                    >
+                      <Network size={15} aria-hidden />
+                    </button>
+                  </Tooltip>
+                </div>
+                {selectedDocId != null && !lowerVisible && kpViewMode === 'list' && (
                   <Tooltip title={t('knowledgeBaseWorkspace.documentPreview')}>
                     <button
                       type="button"
@@ -1145,7 +1166,14 @@ const DataCenter: React.FC = () => {
                   </Tooltip>
                 )}
               </div>
-              {selectedDocId == null ? (
+              {kpViewMode === 'graph' ? (
+                <div className="dc-kp-graph-wrap">
+                  <KnowledgeGraph
+                    selectedKnowledgePointId={selectedKp?.id ?? null}
+                    onSelectKnowledgePoint={handleSelectKnowledgePoint}
+                  />
+                </div>
+              ) : selectedDocId == null ? (
                 <p className="dc-placeholder">{t('dataCenter.selectDocumentFirst')}</p>
               ) : knowledgePoints.length === 0 && kpTotal === 0 ? (
                 <p className="dc-placeholder">{t('knowledgeBaseWorkspace.noKnowledgePointsForFile')}</p>
@@ -1165,7 +1193,9 @@ const DataCenter: React.FC = () => {
                         knowledgePoints.map((kp, idx) => {
                           const baseWeight = Math.max(1, Math.min(5, Math.round(kp.weight ?? 1)));
                           const weight = (kpWeightDragging && kpWeightDragging.kpId === kp.id) ? kpWeightDragging.value : baseWeight;
-                          const isSelected = selectedKp === kp;
+                          const isSelected = selectedKp?.id != null && kp.id != null
+                            ? selectedKp.id === kp.id
+                            : selectedKp === kp;
                           const isDeleted = kp.excluded || (kp.id != null && deletedKpIds.has(kp.id));
                           const contentText = (kp.content || '').trim();
                           return (
@@ -1175,7 +1205,7 @@ const DataCenter: React.FC = () => {
                               role="option"
                               aria-selected={isSelected}
                               aria-label={isDeleted ? t('knowledgeBaseWorkspace.deletedState') : undefined}
-                              onClick={() => { setSelectedKp(isSelected ? null : kp); setHighlightedKeywords([]); }}
+                              onClick={() => handleSelectKnowledgePoint(kp)}
                             >
                               <Tooltip title={t('knowledgeBaseWorkspace.setWeight')}>
                                 <span className="dc-kp-col-state" aria-label={t('knowledgeBaseWorkspace.setWeight')}>

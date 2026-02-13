@@ -21,7 +21,7 @@ interface MenuBarProps {
   currentLanguage?: string;
 }
 
-type MenuId = 'file' | 'edit' | 'selection' | 'view' | 'layout' | 'goTo' | 'run' | 'terminal' | 'help';
+type MenuId = 'file' | 'knowledge' | 'training' | 'production' | 'view' | 'layout' | 'settings' | 'help';
 
 const MenuBar: React.FC<MenuBarProps> = ({
   activeActivity,
@@ -41,7 +41,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
 }) => {
   const { t } = useTranslation();
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
-  const [dropdownPos, setDropdownPos] = useState({ left: 0 });
+  const [dropdownPos, setDropdownPos] = useState({ left: 0, top: 32 });
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,11 +57,11 @@ const MenuBar: React.FC<MenuBarProps> = ({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpenMenu(null);
-      if (e.altKey && ['f', 'e', 's', 'v', 'l', 'g', 'r', 't', 'h'].includes(e.key.toLowerCase())) {
+      if (e.altKey && ['f', 'k', 't', 'p', 'v', 'l', 's', 'h'].includes(e.key.toLowerCase())) {
         e.preventDefault();
         const map: Record<string, MenuId> = {
-          f: 'file', e: 'edit', s: 'selection', v: 'view', l: 'layout',
-          g: 'goTo', r: 'run', t: 'terminal', h: 'help'
+          f: 'file', k: 'knowledge', t: 'training', p: 'production',
+          v: 'view', l: 'layout', s: 'settings', h: 'help'
         };
         setOpenMenu((m) => (m === map[e.key.toLowerCase()] ? null : map[e.key.toLowerCase()]));
       }
@@ -72,24 +72,23 @@ const MenuBar: React.FC<MenuBarProps> = ({
 
   const menuItems: { id: MenuId; key: string; labelKey: string }[] = [
     { id: 'file', key: 'F', labelKey: 'menu.file' },
-    { id: 'edit', key: 'E', labelKey: 'menu.edit' },
-    { id: 'selection', key: 'S', labelKey: 'menu.selection' },
+    { id: 'knowledge', key: 'K', labelKey: 'menu.knowledge' },
+    { id: 'training', key: 'T', labelKey: 'menu.training' },
+    { id: 'production', key: 'P', labelKey: 'menu.production' },
     { id: 'view', key: 'V', labelKey: 'menu.view' },
     { id: 'layout', key: 'L', labelKey: 'menu.layout' },
-    { id: 'goTo', key: 'G', labelKey: 'menu.goTo' },
-    { id: 'run', key: 'R', labelKey: 'menu.run' },
-    { id: 'terminal', key: 'T', labelKey: 'menu.terminal' },
+    { id: 'settings', key: 'S', labelKey: 'menu.settings' },
     { id: 'help', key: 'H', labelKey: 'menu.help' }
   ];
 
   const handleNavBack = () => {
-    const order: ActivityType[] = ['fileResources', 'knowledgeBase', 'dashboard', 'datacenter', 'training', 'production', 'evaluation', 'chat'];
+    const order: ActivityType[] = ['dashboard', 'fileResources', 'knowledgeBase', 'datacenter', 'training', 'production', 'evaluation', 'chat'];
     const idx = order.indexOf(activeActivity);
     if (idx > 0) onActivityChange(order[idx - 1]);
   };
 
   const handleNavForward = () => {
-    const order: ActivityType[] = ['fileResources', 'knowledgeBase', 'dashboard', 'datacenter', 'training', 'production', 'evaluation', 'chat'];
+    const order: ActivityType[] = ['dashboard', 'fileResources', 'knowledgeBase', 'datacenter', 'training', 'production', 'evaluation', 'chat'];
     const idx = order.indexOf(activeActivity);
     if (idx >= 0 && idx < order.length - 1) onActivityChange(order[idx + 1]);
   };
@@ -98,48 +97,78 @@ const MenuBar: React.FC<MenuBarProps> = ({
     switch (id) {
       case 'file':
         return [
-          { key: 'newFile', action: () => {} },
-          { key: 'open', action: () => {} },
-          { key: 'save', action: () => {} }
+          { key: 'openWizard', action: () => window.dispatchEvent(new CustomEvent('open-wizard')) },
+          { key: 'uploadDocument', action: () => {} },
+          { key: 'importKnowledge', action: () => {} },
+          { key: 'exportData', action: () => {} }
         ];
-      case 'edit':
+      case 'knowledge':
         return [
-          { key: 'undo', action: () => {} },
-          { key: 'redo', action: () => {} },
-          { key: 'cut', action: () => {} },
-          { key: 'copy', action: () => {} },
-          { key: 'paste', action: () => {} }
+          { key: 'createKnowledgePoint', action: () => {} },
+          { key: 'manageKnowledgeBase', action: () => onActivityChange('knowledgeBase') },
+          { key: 'knowledgeGraph', action: () => {} },
+          { key: 'dataCenter', action: () => onActivityChange('datacenter') }
         ];
-      case 'selection':
-        return [{ key: 'selectAll', action: () => {} }];
+      case 'training':
+        return [
+          { key: 'startTraining', action: () => {} },
+          { key: 'trainingJobs', action: () => onActivityChange('training') },
+          { key: 'exportDataset', action: () => {} }
+        ];
+      case 'production':
+        return [
+          { key: 'deployModel', action: () => {} },
+          { key: 'productionJobs', action: () => onActivityChange('production') },
+          { key: 'monitor', action: () => {} }
+        ];
       case 'view':
         return [
-          { key: 'zoomIn', action: () => {} },
-          { key: 'zoomOut', action: () => {} },
-          { key: 'resetZoom', action: () => {} },
-          { key: 'language', action: () => onLanguageChange?.(currentLanguage === 'zh' ? 'en' : 'zh') }
+          { key: 'dashboard', action: () => onActivityChange('dashboard') },
+          { key: 'fileResources', action: () => onActivityChange('fileResources') },
+          { key: 'knowledgeBase', action: () => onActivityChange('knowledgeBase') },
+          { key: 'dataCenter', action: () => onActivityChange('datacenter') },
+          { key: 'trainingLab', action: () => onActivityChange('training') },
+          { key: 'productionTuning', action: () => onActivityChange('production') },
+          { key: 'evaluation', action: () => onActivityChange('evaluation') },
+          { key: 'chat', action: () => onActivityChange('chat') }
         ];
       case 'layout':
         return [
           { key: 'toggleSidebar', action: () => onToggleSidebar?.(), checked: sidebarVisible },
-          { key: 'togglePanel', action: () => onTogglePanel?.(), checked: bottomPanelVisible }
+          { key: 'togglePanel', action: () => onTogglePanel?.(), checked: bottomPanelVisible },
+          { key: 'language', action: () => onLanguageChange?.(currentLanguage === 'zh' ? 'en' : 'zh') }
         ];
-      case 'goTo':
+      case 'settings':
         return [
-          { key: 'dashboard', action: () => onActivityChange('dashboard') },
-          { key: 'dataCenter', action: () => onActivityChange('datacenter') },
-          { key: 'fileResources', action: () => onActivityChange('fileResources') },
-          { key: 'knowledgeBase', action: () => onActivityChange('knowledgeBase') },
-          { key: 'trainingLab', action: () => onActivityChange('training') },
-          { key: 'productionTuning', action: () => onActivityChange('production') },
-          { key: 'evaluation', action: () => onActivityChange('evaluation') },
-          { key: 'chat', action: () => onActivityChange('chat') },
-          { key: 'settings', action: () => onActivityChange('settings') }
+          { 
+            key: 'general', 
+            action: () => {
+              onActivityChange('settings');
+              window.dispatchEvent(new CustomEvent('settings-tab-change', { detail: 'general' }));
+            }
+          },
+          { 
+            key: 'models', 
+            action: () => {
+              onActivityChange('settings');
+              window.dispatchEvent(new CustomEvent('settings-tab-change', { detail: 'models' }));
+            }
+          },
+          { 
+            key: 'privacy', 
+            action: () => {
+              onActivityChange('settings');
+              window.dispatchEvent(new CustomEvent('settings-tab-change', { detail: 'privacy' }));
+            }
+          },
+          { 
+            key: 'context', 
+            action: () => {
+              onActivityChange('settings');
+              window.dispatchEvent(new CustomEvent('settings-tab-change', { detail: 'context' }));
+            }
+          }
         ];
-      case 'run':
-        return [{ key: 'runCurrent', action: () => {} }];
-      case 'terminal':
-        return [{ key: 'newTerminal', action: () => {} }];
       case 'help':
         return [
           { key: 'documentation', action: () => {} },
@@ -157,17 +186,20 @@ const MenuBar: React.FC<MenuBarProps> = ({
       onMouseDown={onTitleBarDrag}
       onDoubleClick={onTitleBarDoubleClick}
     >
-      <div className="menubar-left">
+      <div className="menubar-left" onMouseDown={(e) => e.stopPropagation()}>
         <span className="menubar-icon">&#9830;</span>
         {menuItems.map((item) => (
           <div
             key={item.id}
             className={`menubar-item ${openMenu === item.id ? 'active' : ''}`}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+            }}
             onClick={(e) => {
               e.stopPropagation();
-              const rect = (e.target as HTMLElement).getBoundingClientRect();
-        setDropdownPos({ left: rect.left });
-        setOpenMenu(openMenu === item.id ? null : item.id);
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+              setDropdownPos({ left: rect.left, top: rect.bottom });
+              setOpenMenu(openMenu === item.id ? null : item.id);
             }}
           >
             {t(item.labelKey)}({item.key})
@@ -191,7 +223,7 @@ const MenuBar: React.FC<MenuBarProps> = ({
       {openMenu && getMenuItems(openMenu).length > 0 && (
         <div
           className="menubar-dropdown"
-          style={{ left: dropdownPos.left }}
+          style={{ left: `${dropdownPos.left}px`, top: `${dropdownPos.top}px` }}
           onMouseDown={(e) => e.stopPropagation()}
         >
           {getMenuItems(openMenu).map((sub) => {

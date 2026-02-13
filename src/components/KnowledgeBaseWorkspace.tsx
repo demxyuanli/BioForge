@@ -3,14 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { FileText, X, Maximize2, Minimize2 } from 'lucide-react';
 import Tooltip from './Tooltip';
 import PdfViewer from './PdfViewer';
-import { getDocuments, getDirectories, getKnowledgePoints, updateKnowledgePointWeight, updateKnowledgePointExcluded, getDocumentSummaryByDocumentId, getDocumentPreviewByDocumentId, type Document, type DirectoryNode, type KnowledgePoint } from '../services/api';
+import { getDocuments, getDirectories, getKnowledgePoints, updateKnowledgePointWeight, updateKnowledgePointExcluded, getDocumentSummaryByDocumentId, getDocumentPreviewByDocumentId, getKnowledgePointKeywords, addKnowledgePointKeyword, removeKnowledgePointKeyword, type Document, type DirectoryNode, type KnowledgePoint } from '../services/api';
 import { loadFileMeta, saveFileMeta, type FileMetaItem } from '../utils/fileMeta';
 import './KnowledgeBaseWorkspace.css';
 
 const UPPER_MIN = 40;
 const UPPER_MAX_OFFSET = 40;
 const UPPER_DEFAULT = 48;
-const RECENT_LIMIT = 20;
 const LOWER_VISIBLE_DEFAULT = false;
 const KP_PAGE_SIZE = 50;
 const LEFT_PANEL_MIN = 280;
@@ -77,10 +76,7 @@ const KnowledgeBaseWorkspace: React.FC = () => {
       setDocumentSummary('');
       setLoadingSummary(false);
       setPreviewError(null);
-      if (previewBlobUrlRef.current) {
-        URL.revokeObjectURL(previewBlobUrlRef.current);
-        previewBlobUrlRef.current = null;
-      }
+      previewBlobUrlRef.current = null;
       setPreviewBlobUrl(null);
       setLoadingPreview(false);
       return;
@@ -93,38 +89,19 @@ const KnowledgeBaseWorkspace: React.FC = () => {
       .finally(() => setLoadingSummary(false));
     setLoadingPreview(true);
     setPreviewError(null);
-    if (previewBlobUrlRef.current) {
-      URL.revokeObjectURL(previewBlobUrlRef.current);
-      previewBlobUrlRef.current = null;
-    }
+    previewBlobUrlRef.current = null;
     setPreviewBlobUrl(null);
     getDocumentPreviewByDocumentId(selectedDocId)
-      .then((base64) => {
-        if (!base64) {
+      .then((url) => {
+        if (!url) {
           setPreviewError('Preview not available');
           return;
         }
-        try {
-          const bin = atob(base64);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          const blob = new Blob([bytes], { type: 'application/pdf' });
-          const url = URL.createObjectURL(blob);
-          if (previewBlobUrlRef.current) URL.revokeObjectURL(previewBlobUrlRef.current);
-          previewBlobUrlRef.current = url;
-          setPreviewBlobUrl(url);
-        } catch {
-          setPreviewError('Preview failed');
-        }
+        previewBlobUrlRef.current = url;
+        setPreviewBlobUrl(url);
       })
       .catch(() => setPreviewError('Preview failed'))
       .finally(() => setLoadingPreview(false));
-    return () => {
-      if (previewBlobUrlRef.current) {
-        URL.revokeObjectURL(previewBlobUrlRef.current);
-        previewBlobUrlRef.current = null;
-      }
-    };
   }, [lowerVisible, selectedDocId]);
 
   function getMeta(docId: number): FileMetaItem {
@@ -235,7 +212,9 @@ const KnowledgeBaseWorkspace: React.FC = () => {
     getKnowledgePoints(page, KP_PAGE_SIZE, docId)
       .then((res) => {
         if (selectedDocIdRef.current !== docId) return;
-        setKnowledgePoints(res.knowledge_points ?? []);
+        const raw = res.knowledge_points ?? [];
+        const forDoc = raw.filter((kp) => kp.document_id === docId);
+        setKnowledgePoints(forDoc);
         setKpTotal(res.total ?? 0);
       })
       .catch(() => {
@@ -358,11 +337,18 @@ const KnowledgeBaseWorkspace: React.FC = () => {
     return documents.filter((d) => d.filename.toLowerCase().includes(q));
   }, [documents, searchQuery]);
 
-  const recentFiles = useMemo(() => {
-    return [...documents]
-      .sort((a, b) => (b.uploadTime || '').localeCompare(a.uploadTime || ''))
-      .slice(0, RECENT_LIMIT);
-  }, [documents]);
+  const displayFileList = useMemo(() => {
+    const q = (searchQuery || '').trim().toLowerCase();
+    if (q) {
+      return searchResults.map((d) => ({
+        id: d.id,
+        name: d.filename,
+        type: 'file' as const,
+        processed: d.processed
+      }));
+    }
+    return fileListInDir;
+  }, [searchQuery, searchResults, fileListInDir]);
 
   const selectedDoc = useMemo(
     () => (selectedDocId != null ? documents.find((d) => d.id === selectedDocId) ?? null : null),
@@ -466,20 +452,100 @@ const KnowledgeBaseWorkspace: React.FC = () => {
   };
 
   useEffect(() => {
-    setHighlightedKeywords([]);
-  }, [selectedKp]);
+    if (selectedKp?.id != null) {
+      loadKeywords(selectedKp.id);
+    } else {
+      setHighlightedKeywords([]);
+    }
+  }, [selectedKp?.id]);
 
-  const handleKpContentMouseUp = useCallback(() => {
+  const loadKeywords = async (kpId: number) => {
+    try {
+      const data = await getKnowledgePointKeywords(kpId);
+      setHighlightedKeywords(data.keywords ?? []);
+    } catch (error) {
+      console.error('Load keywords error:', error);
+      setHighlightedKeywords([]);
+    }
+  };
+
+  const handleKpContentMouseUp = useCallback(async () => {
+    if (!selectedKp?.id) return;
     const sel = window.getSelection();
     const text = sel?.toString?.()?.trim();
     if (text && !highlightedKeywords.includes(text)) {
-      setHighlightedKeywords((prev) => [...prev, text]);
+      try {
+        await addKnowledgePointKeyword(selectedKp.id, text);
+        setHighlightedKeywords((prev) => [...prev, text]);
+      } catch (error) {
+        console.error('Add keyword error:', error);
+      }
     }
-  }, [highlightedKeywords]);
+  }, [highlightedKeywords, selectedKp?.id]);
 
-  const removeHighlightedKeyword = useCallback((index: number) => {
-    setHighlightedKeywords((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  const removeHighlightedKeyword = useCallback(async (index: number) => {
+    if (!selectedKp?.id) return;
+    const keyword = highlightedKeywords[index];
+    if (!keyword) return;
+    try {
+      await removeKnowledgePointKeyword(selectedKp.id, keyword);
+      setHighlightedKeywords((prev) => prev.filter((_, i) => i !== index));
+    } catch (error) {
+      console.error('Remove keyword error:', error);
+    }
+  }, [highlightedKeywords, selectedKp?.id]);
+
+  const highlightKeywords = (content: string, keywords: string[]): React.ReactNode => {
+    if (!content || keywords.length === 0) return content;
+    
+    const parts: Array<{ text: string; isKeyword: boolean }> = [];
+    const sortedKeywords = [...keywords].filter(kw => kw && kw.trim().length > 0).sort((a, b) => b.length - a.length);
+    
+    if (sortedKeywords.length === 0) return content;
+    
+    const findNextKeyword = (startIndex: number): { keyword: string; index: number } | null => {
+      let found: { keyword: string; index: number } | null = null;
+      for (const kw of sortedKeywords) {
+        const index = content.indexOf(kw, startIndex);
+        if (index !== -1 && (!found || index < found.index)) {
+          found = { keyword: kw, index };
+        }
+      }
+      return found;
+    };
+    
+    let currentIndex = 0;
+    while (currentIndex < content.length) {
+      const found = findNextKeyword(currentIndex);
+      if (!found) {
+        if (currentIndex < content.length) {
+          parts.push({ text: content.substring(currentIndex), isKeyword: false });
+        }
+        break;
+      }
+      
+      if (found.index > currentIndex) {
+        parts.push({ text: content.substring(currentIndex, found.index), isKeyword: false });
+      }
+      
+      parts.push({ text: found.keyword, isKeyword: true });
+      currentIndex = found.index + found.keyword.length;
+    }
+    
+    if (parts.length === 0) return content;
+    
+    return (
+      <>
+        {parts.map((part, idx) =>
+          part.isKeyword ? (
+            <mark key={idx} className="kb-kp-keyword-highlight">{part.text}</mark>
+          ) : (
+            <span key={idx}>{part.text}</span>
+          )
+        )}
+      </>
+    );
+  };
 
   return (
     <div className={`kb-workspace ${previewMaximized ? 'kb-workspace-preview-maximized' : ''}`} ref={workspaceRef}>
@@ -522,12 +588,21 @@ const KnowledgeBaseWorkspace: React.FC = () => {
             className="kb-upper-left-filelist kb-cli-panel"
             style={{ width: leftPanelWidth, minWidth: LEFT_PANEL_MIN }}
           >
-            <div className="kb-section-title kb-cli-title">
-              {t('knowledgeBaseWorkspace.documentList')}
+            <div className="kb-filelist-search">
+              <input
+                type="text"
+                className="kb-search-input"
+                placeholder={t('knowledgeBaseWorkspace.searchFiles')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label={t('knowledgeBaseWorkspace.searchFiles')}
+              />
             </div>
             <div className="kb-cli-file-table-wrap" role="listbox" aria-label={t('knowledgeBaseWorkspace.documentList')}>
-              {fileListInDir.length === 0 ? (
-                <div className="kb-cli-line kb-cli-empty">{t('knowledgeBaseWorkspace.emptyDirectory')}</div>
+              {displayFileList.length === 0 ? (
+                <div className="kb-cli-line kb-cli-empty">
+                  {searchQuery.trim() ? t('knowledgeBaseWorkspace.noResults') : t('knowledgeBaseWorkspace.emptyDirectory')}
+                </div>
               ) : (
                 <>
                   <div className="kb-cli-file-table-header">
@@ -536,7 +611,7 @@ const KnowledgeBaseWorkspace: React.FC = () => {
                     <span className="kb-cli-col-weight">{t('fileResourcesWorkspace.columnWeight')}</span>
                     <span className="kb-cli-col-notes" aria-hidden="true" />
                   </div>
-                  {fileListInDir.map((item) => {
+                  {displayFileList.map((item) => {
                     const meta = getMeta(item.id);
                     const weight = Math.min(5, Math.max(0, meta.weight));
                     const noteExpanded = expandedNoteDocId === item.id;
@@ -709,7 +784,7 @@ const KnowledgeBaseWorkspace: React.FC = () => {
               className="kb-upper-left-right-top kb-cli-panel"
               style={
                 kpListHeight != null
-                  ? { height: kpListHeight, flexShrink: 0 }
+                  ? { height: kpListHeight, flex: '0 0 auto' }
                   : undefined
               }
             >
@@ -891,8 +966,9 @@ const KnowledgeBaseWorkspace: React.FC = () => {
                     <div
                       className="kb-kp-detail-content"
                       role="article"
+                      onMouseUp={handleKpContentMouseUp}
                     >
-                      {selectedKp.content}
+                      {highlightKeywords(selectedKp.content, highlightedKeywords)}
                     </div>
                   </div>
                   <div className="kb-kp-detail-right kb-cli-panel">
@@ -926,62 +1002,6 @@ const KnowledgeBaseWorkspace: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-        <div className="kb-upper-right">
-          <div className="kb-upper-right-search">
-            <input
-              type="text"
-              className="kb-search-input"
-              placeholder={t('knowledgeBaseWorkspace.searchFiles')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label={t('knowledgeBaseWorkspace.searchFiles')}
-            />
-          </div>
-          <div className="kb-upper-right-results">
-            <div className="kb-section-title">{t('knowledgeBaseWorkspace.searchResults')}</div>
-            <ul className="kb-file-list" role="listbox" aria-label={t('knowledgeBaseWorkspace.searchResults')}>
-              {!searchQuery.trim() ? (
-                <li className="kb-file-item kb-empty">{t('knowledgeBaseWorkspace.typeToSearch')}</li>
-              ) : searchResults.length === 0 ? (
-                <li className="kb-file-item kb-empty">{t('knowledgeBaseWorkspace.noResults')}</li>
-              ) : (
-                searchResults.map((doc) => (
-                  <li key={doc.id} className="kb-file-item" role="option">
-                    <Tooltip title={doc.filename}>
-                      <span className="kb-file-name">{doc.filename}</span>
-                    </Tooltip>
-                    {doc.processed && (
-                      <Tooltip title={t('knowledgeBaseWorkspace.fileProcessedBadge')}>
-                        <span className="kb-file-badge" aria-label={t('knowledgeBaseWorkspace.fileProcessedBadge')}>&#10003;</span>
-                      </Tooltip>
-                    )}
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
-          <div className="kb-upper-right-recent">
-            <div className="kb-section-title">{t('knowledgeBaseWorkspace.recentFiles')}</div>
-            <ul className="kb-file-list" role="listbox" aria-label={t('knowledgeBaseWorkspace.recentFiles')}>
-              {recentFiles.length === 0 ? (
-                <li className="kb-file-item kb-empty">{t('knowledgeBaseWorkspace.noRecentFiles')}</li>
-              ) : (
-                recentFiles.map((doc) => (
-                  <li key={doc.id} className="kb-file-item" role="option">
-                    <Tooltip title={doc.filename}>
-                      <span className="kb-file-name">{doc.filename}</span>
-                    </Tooltip>
-                    {doc.processed && (
-                      <Tooltip title={t('knowledgeBaseWorkspace.fileProcessedBadge')}>
-                        <span className="kb-file-badge" aria-label={t('knowledgeBaseWorkspace.fileProcessedBadge')}>&#10003;</span>
-                      </Tooltip>
-                    )}
-                  </li>
-                ))
-              )}
-            </ul>
           </div>
         </div>
         </div>

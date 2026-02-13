@@ -14,9 +14,33 @@ export function applyTheme(theme: AppTheme): void {
   localStorage.setItem(THEME_STORAGE_KEY, theme);
   const root = document.documentElement;
   if (theme === 'system') {
-    root.removeAttribute('data-theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
   } else {
     root.setAttribute('data-theme', theme);
+  }
+}
+
+let themeListener: ((e: MediaQueryListEvent) => void) | null = null;
+
+export function setupThemeListener(): void {
+  if (themeListener) {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.removeEventListener('change', themeListener);
+    themeListener = null;
+  }
+  
+  const theme = getStoredTheme();
+  if (theme === 'system') {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    themeListener = (e: MediaQueryListEvent) => {
+      const root = document.documentElement;
+      if (getStoredTheme() === 'system') {
+        root.setAttribute('data-theme', e.matches ? 'dark' : 'light');
+      }
+    };
+    mediaQuery.addEventListener('change', themeListener);
+    applyTheme('system');
   }
 }
 

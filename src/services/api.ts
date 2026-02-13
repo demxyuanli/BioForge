@@ -21,6 +21,18 @@ export interface Annotation {
   answer?: string;
   score?: number;
   formatType?: string;
+  training_item_id?: number | null;
+  created_at?: string | null;
+  finetuned?: boolean;
+  finetuned_count?: number;
+  linked_jobs?: Array<{
+    job_id: string;
+    used_at?: string | null;
+    job_status?: string | null;
+    job_platform?: string | null;
+    job_model?: string | null;
+    job_created_at?: string | null;
+  }>;
 }
 
 export interface FinetuningJob {
@@ -31,6 +43,15 @@ export interface FinetuningJob {
   progress: number;
   costUsd?: number;
   createdAt?: string;
+}
+
+export interface TrainingItem {
+  id: number;
+  name: string;
+  knowledge_point_keys: string[];
+  prompt_template: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface DirectoryNode {
@@ -114,6 +135,15 @@ export async function parsePythonResponse(response: string): Promise<any> {
   } catch (error) {
     throw new Error(`Failed to parse response: ${error}`);
   }
+}
+
+const previewCache = new Map<string, { blobUrl: string; version: string }>();
+
+function base64ToBlob(base64: string, mime: string = 'application/pdf'): Blob {
+  const bin = atob(base64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return new Blob([buf], { type: mime });
 }
 
 export interface StorageConfig {
@@ -319,8 +349,18 @@ export async function getDocumentSummary(mpId: number, relativePath: string): Pr
 export async function getDocumentPreview(mpId: number, relativePath: string): Promise<string | null> {
   try {
     const response = await invoke<string>('get_document_preview', { mpId, relativePath });
-    const data = await parsePythonResponse(response);
-    return typeof data === 'string' ? data : null;
+    const result = JSON.parse(response.trim());
+    if (!result.success || typeof result.data !== 'string') return null;
+    const data = result.data as string;
+    const version = typeof result.version === 'string' ? result.version : '';
+    const key = `mp_${mpId}_${relativePath}`;
+    const cached = previewCache.get(key);
+    if (cached && cached.version === version) return cached.blobUrl;
+    const blob = base64ToBlob(data);
+    const blobUrl = URL.createObjectURL(blob);
+    if (cached) URL.revokeObjectURL(cached.blobUrl);
+    previewCache.set(key, { blobUrl, version });
+    return blobUrl;
   } catch {
     return null;
   }
@@ -335,8 +375,18 @@ export async function getDocumentSummaryByDocumentId(documentId: number): Promis
 export async function getDocumentPreviewByDocumentId(documentId: number): Promise<string | null> {
   try {
     const response = await invoke<string>('get_document_preview_by_id', { documentId });
-    const data = await parsePythonResponse(response);
-    return typeof data === 'string' ? data : null;
+    const result = JSON.parse(response.trim());
+    if (!result.success || typeof result.data !== 'string') return null;
+    const data = result.data as string;
+    const version = typeof result.version === 'string' ? result.version : '';
+    const key = `doc_${documentId}`;
+    const cached = previewCache.get(key);
+    if (cached && cached.version === version) return cached.blobUrl;
+    const blob = base64ToBlob(data);
+    const blobUrl = URL.createObjectURL(blob);
+    if (cached) URL.revokeObjectURL(cached.blobUrl);
+    previewCache.set(key, { blobUrl, version });
+    return blobUrl;
   } catch {
     return null;
   }
@@ -428,13 +478,22 @@ export interface PaginatedResponse<T> {
   page_size: number;
 }
 
-export async function getKnowledgePoints(page: number = 1, pageSize: number = 50, documentId?: number): Promise<PaginatedResponse<KnowledgePoint>> {
+export async function getKnowledgePoints(
+  page: number = 1,
+  pageSize: number = 50,
+  documentId?: number,
+  minWeight?: number
+): Promise<PaginatedResponse<KnowledgePoint>> {
   try {
-    const response = await invoke<string>('get_knowledge_points', {
-        page,
-        page_size: pageSize,
-        document_id: documentId ?? null
-    });
+    const payload: { page: number; page_size: number; document_id?: number | null; min_weight?: number | null } = {
+      page,
+      page_size: pageSize,
+      min_weight: minWeight ?? null
+    };
+    if (documentId !== undefined && documentId !== null) {
+      payload.document_id = Number(documentId);
+    }
+    const response = await invoke<string>('get_knowledge_points', payload);
     const data = await parsePythonResponse(response);
     return {
         knowledge_points: data?.knowledge_points ?? [],
@@ -446,6 +505,36 @@ export async function getKnowledgePoints(page: number = 1, pageSize: number = 50
     console.error('Get knowledge points error:', error);
     return { knowledge_points: [], total: 0, page: 1, page_size: 50 };
   }
+}
+
+const GRAPH_PAGE_SIZE = 500;
+const GRAPH_MAX_POINTS = 2000;
+
+async function fetchKnowledgePointsPageForGraph(page: number, minWeight: number): Promise<PaginatedResponse<KnowledgePoint>> {
+  const w = Math.max(1, Math.min(5, Number(minWeight)));
+  const response = await invoke<string>('get_knowledge_points_for_graph', { page, min_weight: w });
+  const data = await parsePythonResponse(response);
+  return {
+    knowledge_points: data?.knowledge_points ?? [],
+    total: data?.total ?? 0,
+    page: data?.page ?? 1,
+    page_size: data?.page_size ?? GRAPH_PAGE_SIZE,
+  };
+}
+
+export async function getKnowledgePointsForGraph(minWeight: number = 1): Promise<KnowledgePoint[]> {
+  const out: KnowledgePoint[] = [];
+  let page = 1;
+  let total = 0;
+  const w = Math.max(1, Math.min(5, Number(minWeight)));
+  do {
+    const res = await fetchKnowledgePointsPageForGraph(page, w);
+    out.push(...(res.knowledge_points ?? []));
+    total = res.total ?? 0;
+    if ((res.knowledge_points?.length ?? 0) === 0 || out.length >= GRAPH_MAX_POINTS) break;
+    page += 1;
+  } while ((page - 1) * GRAPH_PAGE_SIZE < total && out.length < GRAPH_MAX_POINTS);
+  return out;
 }
 
 export async function createKnowledgePoint(documentId: number, content: string): Promise<KnowledgePoint> {
@@ -543,18 +632,21 @@ export async function generateAnnotations(
   apiKeyOrPlatform: string,
   model: string = 'deepseek-chat',
   baseUrl?: string,
-  platform?: string
+  platform?: string,
+  candidateCount: number = 1
 ): Promise<Annotation[]> {
   const kpContents = knowledgePoints.map(kp =>
     typeof kp === 'string' ? kp : kp.content
   );
+  const safeCandidateCount = Math.max(1, Math.min(10, Number(candidateCount) || 1));
   try {
     const response = await invoke<string>('generate_annotations', {
       knowledgePoints: kpContents,
       apiKey: apiKeyOrPlatform,
       model,
       baseUrl: baseUrl ?? null,
-      platform: platform ?? null
+      platform: platform ?? null,
+      candidateCount: safeCandidateCount
     });
     const data = await parsePythonResponse(response);
     if (data?.error) {
@@ -597,7 +689,7 @@ export async function submitFinetuningJob(
       annotations,
       platform,
       model,
-      apiKey: apiKey || null,
+      apiKey: apiKey ?? '',
       formatType
     });
     return await parsePythonResponse(response);
@@ -663,15 +755,21 @@ export async function getApiKeys(): Promise<{ platform: string; encrypted: boole
   }
 }
 
-export async function saveTrainingSet(annotations: Annotation[]): Promise<{ count: number }> {
-  const response = await invoke<string>('save_training_set', { annotations });
+export async function saveTrainingSet(
+  annotations: Annotation[],
+  trainingItemId?: number
+): Promise<{ count: number }> {
+  const response = await invoke<string>('save_training_set', {
+    annotations,
+    trainingItemId: trainingItemId ?? null
+  });
   const data = await parsePythonResponse(response);
   return { count: data?.count ?? annotations.length };
 }
 
-export async function getTrainingSet(): Promise<{ annotations: Annotation[]; count: number }> {
+export async function getTrainingSet(trainingItemId?: number): Promise<{ annotations: Annotation[]; count: number }> {
   try {
-    const response = await invoke<string>('get_training_set');
+    const response = await invoke<string>('get_training_set', { trainingItemId: trainingItemId ?? null });
     const data = await parsePythonResponse(response);
     return {
       annotations: data?.annotations ?? [],
@@ -681,6 +779,39 @@ export async function getTrainingSet(): Promise<{ annotations: Annotation[]; cou
     console.error('Get training set error:', error);
     return { annotations: [], count: 0 };
   }
+}
+
+export async function getTrainingItems(): Promise<TrainingItem[]> {
+  try {
+    const response = await invoke<string>('get_training_items');
+    const data = await parsePythonResponse(response);
+    return Array.isArray(data?.items) ? data.items : [];
+  } catch (error) {
+    console.error('Get training items error:', error);
+    return [];
+  }
+}
+
+export async function saveTrainingItem(payload: {
+  name: string;
+  knowledgePointKeys: string[];
+  promptTemplate: string;
+}): Promise<TrainingItem> {
+  const response = await invoke<string>('save_training_item', {
+    name: payload.name,
+    knowledgePointKeys: payload.knowledgePointKeys,
+    promptTemplate: payload.promptTemplate
+  });
+  const data = await parsePythonResponse(response);
+  if (!data?.id) {
+    throw new Error('Save training item failed');
+  }
+  return data as TrainingItem;
+}
+
+export async function deleteTrainingItem(itemId: number): Promise<void> {
+  const response = await invoke<string>('delete_training_item', { itemId });
+  await parsePythonResponse(response);
 }
 
 export async function getAuditLog(limit: number = 200): Promise<{ entries: any[] }> {
