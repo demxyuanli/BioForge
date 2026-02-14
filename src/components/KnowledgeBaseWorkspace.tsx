@@ -684,7 +684,7 @@ const KnowledgeBaseWorkspace: React.FC = () => {
                                 aria-expanded={noteExpanded}
                                 aria-label={t('knowledgeBaseWorkspace.note')}
                               >
-                              &#x25BC;
+                              {noteExpanded ? '\u2190' : '\u2192'}
                             </button>
                             </Tooltip>
                             <span className="kb-file-item-tags">

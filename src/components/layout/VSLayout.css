@@ -755,10 +755,16 @@
 .vs-editor-content .kb-workspace,
 .vs-editor-content .training-lab,
 .vs-editor-content .production-tuning,
-.vs-editor-content .privacy-center,
-.vs-editor-content .evaluation {
+.vs-editor-content .privacy-center {
   max-width: 100%;
   margin: -16px;
+  background: transparent;
+}
+
+.vs-editor-content .evaluation {
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
   background: transparent;
 }
 

@@ -6,6 +6,7 @@ import FileExplorer from './FileExplorer';
 import KnowledgeBaseTree from './KnowledgeBaseTree';
 import OverviewStatusList from './OverviewStatusList';
 import RecentKnowledgeList from './RecentKnowledgeList';
+import ChatHistorySidebar from '../ChatHistorySidebar';
 
 interface ResourceSidebarProps {
   documents: Document[];
@@ -34,6 +35,19 @@ const ResourceSidebar: React.FC<ResourceSidebarProps> = ({
   };
 
   const subItems = getSubItems(activity);
+
+  if (activity === 'chat') {
+    return (
+      <>
+        <div className="vs-sidebar-header">
+          <span className="vs-sidebar-title">{t(`sidebar.activityTitles.${activity}`)}</span>
+        </div>
+        <div className="vs-sidebar-content">
+          <ChatHistorySidebar />
+        </div>
+      </>
+    );
+  }
 
   const renderContent = () => {
     if (subItems.length === 0) {
@@ -148,13 +162,6 @@ const ResourceSidebar: React.FC<ResourceSidebarProps> = ({
           case 'customPrompt':
             return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
           case 'compareResult':
-            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
-          default:
-            return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
-        }
-      case 'chat':
-        switch (selectedSubItem) {
-          case 'conversation':
             return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
           default:
             return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;

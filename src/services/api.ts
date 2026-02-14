@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { open } from '@tauri-apps/plugin-dialog';
+import { open, save } from '@tauri-apps/plugin-dialog';
 
 export interface Document {
   id: number;
@@ -836,6 +836,39 @@ export async function getDesensitizationLog(limit: number = 100): Promise<{ entr
   }
 }
 
+export async function selectMdTemplateFile(): Promise<string | null> {
+  try {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: 'Markdown', extensions: ['md'] }]
+    });
+    if (selected && typeof selected === 'string') return selected;
+    return null;
+  } catch (error) {
+    console.error('Select MD template error:', error);
+    return null;
+  }
+}
+
+export async function readTemplateFileContent(filePath: string): Promise<string> {
+  const content = await invoke<string>('read_template_file', { filePath });
+  return content;
+}
+
+export async function saveExportFile(filePath: string, contentsBase64: string): Promise<void> {
+  await invoke('write_export_file', { filePath, contentsBase64 });
+}
+
+export async function selectExportPath(format: 'word' | 'pdf'): Promise<string | null> {
+  const ext = format === 'word' ? 'docx' : 'pdf';
+  const defaultName = `evaluation-report.${ext}`;
+  const selected = await save({
+    defaultPath: defaultName,
+    filters: [{ name: format === 'word' ? 'Word' : 'PDF', extensions: [ext] }]
+  });
+  return selected && typeof selected === 'string' ? selected : null;
+}
+
 export async function evaluationGenerate(
   prompt: string,
   template: string = 'custom',
@@ -877,5 +910,13 @@ export async function chatQuery(
     platform: platform ?? null
   });
   return await parsePythonResponse(response);
+}
+
+export async function readChatHistory(): Promise<string> {
+  return invoke<string>('read_chat_history');
+}
+
+export async function writeChatHistory(contents: string): Promise<void> {
+  await invoke('write_chat_history', { contents });
 }
 

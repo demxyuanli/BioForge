@@ -67,7 +67,7 @@ const ActivityBar: React.FC<ActivityBarProps> = ({
             className="vs-activity-item"
             onClick={onToggleSidebar}
           >
-            <span className="vs-activity-icon" style={{ fontSize: '12px' }}>{sidebarVisible ? '◀' : '▶'}</span>
+            <span className="vs-activity-icon" style={{ fontSize: '12px' }}>{sidebarVisible ? '\u2190' : '\u2192'}</span>
           </button>
         </Tooltip>
         <Tooltip title={t('panel.settings')}>

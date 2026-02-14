@@ -150,3 +150,96 @@
   background-color: var(--vs-error);
   color: #ffffff;
 }
+
+.menubar-help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+}
+
+.menubar-help-dialog {
+  width: min(880px, 88vw);
+  max-height: 84vh;
+  background: var(--vs-dropdown-bg);
+  color: var(--vs-dropdown-fg);
+  border: 1px solid var(--vs-dropdown-border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.menubar-about-dialog {
+  width: min(680px, 80vw);
+}
+
+.menubar-help-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--vs-dropdown-border);
+}
+
+.menubar-help-header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.menubar-help-header p {
+  margin: 6px 0 0;
+  opacity: 0.88;
+  font-size: 12px;
+}
+
+.menubar-help-header button {
+  border: 1px solid var(--vs-dropdown-border);
+  background: transparent;
+  color: inherit;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.menubar-help-header button:hover {
+  background: var(--vs-dropdown-hover);
+}
+
+.menubar-help-body {
+  padding: 14px 16px 18px;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.menubar-help-body section {
+  border: 1px solid var(--vs-dropdown-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.menubar-help-body h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+}
+
+.menubar-help-body p,
+.menubar-help-body li {
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.menubar-help-body ul,
+.menubar-help-body ol {
+  margin: 0;
+  padding-left: 18px;
+}

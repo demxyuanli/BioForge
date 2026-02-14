@@ -5,6 +5,7 @@ import {
   submitFinetuningJob,
   getFinetuningJobs,
   getTrainingSet,
+  saveTrainingSet,
   getJobLogs,
   getJobStatus,
   FinetuningJob,
@@ -428,7 +429,7 @@ const ProductionTuning: React.FC<ProductionTuningProps> = ({ activeSubItem }) =>
     setInstructionEditState(null);
   }, []);
 
-  const handleSaveInstructionEdit = useCallback(() => {
+  const handleSaveInstructionEdit = useCallback(async () => {
     if (!instructionEditState) return;
     const nextInstruction = instructionEditState.draft.trim();
     if (!nextInstruction) {
@@ -438,14 +439,23 @@ const ProductionTuning: React.FC<ProductionTuningProps> = ({ activeSubItem }) =>
       });
       return;
     }
-    setSavedAnnotations((prev) => prev.map((item) => {
+    const nextResponse = (instructionEditState.response ?? '').trim();
+    const next = savedAnnotations.map((item) => {
       const idMatched = instructionEditState.annotationId != null && item.id === instructionEditState.annotationId;
       const refMatched = instructionEditState.annotationId == null && item === instructionEditState.annotationRef;
       if (!idMatched && !refMatched) return item;
-      return { ...item, instruction: nextInstruction };
-    }));
+      return { ...item, instruction: nextInstruction, response: nextResponse };
+    });
+    setSavedAnnotations(next);
     setInstructionEditState(null);
-  }, [instructionEditState, t]);
+    try {
+      await saveTrainingSet(next);
+      setNotice({ type: 'success', message: t('trainingLab.savedForFinetuning') });
+    } catch (err) {
+      console.error('Save training set error:', err);
+      setNotice({ type: 'error', message: t('productionTuning.failedToLoadSavedData') });
+    }
+  }, [instructionEditState, savedAnnotations, t]);
 
   const handleSplitResizeStart = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -616,24 +626,38 @@ const ProductionTuning: React.FC<ProductionTuningProps> = ({ activeSubItem }) =>
                       <tr key={ann.id ?? `${savedDataPage}-${idx}`}>
                         <td>{(savedDataPage - 1) * SAVED_DATA_PAGE_SIZE + idx + 1}</td>
                         <td className="production-cell-text" title={ann.instruction ?? ''}>
-                          <button
-                            type="button"
+                          <div
                             className="production-cell-edit-trigger"
+                            role="button"
+                            tabIndex={0}
                             title={t('trainingLab.clickToEditInstruction')}
                             onClick={() => openInstructionEditor(ann)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                openInstructionEditor(ann);
+                              }
+                            }}
                           >
                             <div className="production-cell-text-content">{ann.instruction}</div>
-                          </button>
+                          </div>
                         </td>
                         <td className="production-cell-text" title={ann.response ?? ''}>
-                          <button
-                            type="button"
+                          <div
                             className="production-cell-edit-trigger"
+                            role="button"
+                            tabIndex={0}
                             title={t('trainingLab.clickToEditInstruction')}
                             onClick={() => openInstructionEditor(ann)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                openInstructionEditor(ann);
+                              }
+                            }}
                           >
                             <div className="production-cell-text-content">{ann.response}</div>
-                          </button>
+                          </div>
                         </td>
                         <td>{ann.score ?? '-'}</td>
                         <td className="production-state-cell">
@@ -760,7 +784,10 @@ const ProductionTuning: React.FC<ProductionTuningProps> = ({ activeSubItem }) =>
                               <div>{t('productionTuning.estimatedTime')}: {String(jobStatusDetail.estimated_time_remaining)}</div>
                             )}
                             {jobStatusDetail.cost_tracking && (
-                              <div>{t('dashboard.cost')}: {JSON.stringify(jobStatusDetail.cost_tracking)}</div>
+                              <div className="production-job-cost">
+                                <span className="production-job-cost-label">{t('dashboard.cost')}:</span>
+                                <pre className="production-job-cost-json">{JSON.stringify(jobStatusDetail.cost_tracking, null, 2)}</pre>
+                              </div>
                             )}
                           </div>
                         )}
@@ -811,10 +838,14 @@ const ProductionTuning: React.FC<ProductionTuningProps> = ({ activeSubItem }) =>
                 ))}
                 placeholder={t('trainingLab.instructionPlaceholder')}
               />
-              <div className="annotation-edit-preview">
-                <strong>{t('trainingLab.response')}:</strong>
-                <div>{instructionEditState.response || '-'}</div>
-              </div>
+              <label>{t('trainingLab.response')}</label>
+              <textarea
+                value={instructionEditState.response ?? ''}
+                onChange={(e) => setInstructionEditState((prev) => (
+                  prev ? { ...prev, response: e.target.value } : prev
+                ))}
+                placeholder={t('trainingLab.responsePlaceholder')}
+              />
             </div>
             <div className="annotation-edit-footer">
               <button type="button" onClick={closeInstructionEditor}>

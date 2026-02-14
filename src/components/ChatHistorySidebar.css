@@ -1,0 +1,110 @@
+.chat-history-sidebar-in-menu {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0 8px 8px;
+}
+
+.chat-history-sidebar-new {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 4px;
+  padding: 8px 12px;
+  background-color: var(--vs-accent);
+  color: var(--vs-accent-fg);
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.chat-history-sidebar-new:hover {
+  filter: brightness(1.05);
+}
+
+.chat-history-sidebar-new-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.chat-history-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.chat-history-sidebar-group {
+  margin-bottom: 12px;
+}
+
+.chat-history-sidebar-group-title {
+  font-size: 11px;
+  color: var(--vs-muted);
+  padding: 6px 10px 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.chat-history-sidebar-loading {
+  padding: 12px 4px;
+  font-size: 12px;
+  color: var(--vs-muted);
+}
+
+.chat-history-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  margin: 2px 0;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.15s;
+}
+
+.chat-history-sidebar-item:hover {
+  background-color: var(--vs-list-hoverBackground, var(--vs-list-hover));
+}
+
+.chat-history-sidebar-item.active {
+  background-color: var(--vs-list-activeSelectionBackground, var(--vs-list-hover));
+}
+
+.chat-history-sidebar-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vs-fg);
+}
+
+.chat-history-sidebar-item-delete {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.5;
+  color: var(--vs-fg);
+}
+
+.chat-history-sidebar-item-delete:hover {
+  opacity: 1;
+  background-color: var(--vs-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+}
+
+.chat-history-sidebar-item-delete::after {
+  content: '\00D7';
+  font-size: 16px;
+  line-height: 20px;
+  display: block;
+  text-align: center;
+}

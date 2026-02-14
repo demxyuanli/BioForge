@@ -657,7 +657,7 @@ const FileResourcesWorkspace: React.FC = () => {
                                 aria-expanded={notesExpanded}
                                 aria-label={t('fileResourcesWorkspace.columnNotes')}
                               >
-                                &#x25BC;
+                                {notesExpanded ? '\u2190' : '\u2192'}
                               </button>
                             </span>
                           </div>
@@ -698,7 +698,7 @@ const FileResourcesWorkspace: React.FC = () => {
                   aria-expanded={descriptionExpanded}
                   aria-controls="fr-description-body"
                 >
-                  <span className="fr-description-collapse-chevron">{descriptionExpanded ? '\u25BC' : '\u25B6'}</span>
+                  <span className="fr-description-collapse-chevron">{descriptionExpanded ? '\u2190' : '\u2192'}</span>
                   {t('fileResourcesWorkspace.descriptionNotes')}
                 </button>
                 <div id="fr-description-body" className={`fr-description-collapse-body ${descriptionExpanded ? 'expanded' : ''}`} hidden={!descriptionExpanded}>

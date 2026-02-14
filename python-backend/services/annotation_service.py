@@ -171,12 +171,15 @@ Generate a comprehensive answer based on the context. The answer MUST be in Chin
                     ],
                     stream=False,
                 )
-                content = response.choices[0].message.content
+                raw_content = response.choices[0].message.content if response.choices else None
+                content = (raw_content or "").strip()
+                logger.info("generate_qa_pair (with question): raw_content type=%s len=%s", type(raw_content).__name__, len(content) if content else 0)
                 return {
                     "question": question,
-                    "answer": content.strip()
+                    "answer": content or "(No content returned)"
                 }
             except Exception as e:
+                logger.exception("generate_qa_pair error (with question): %s", e)
                 return {"error": str(e)}
         else:
             prompt = f"""Based on the following context, generate a question-answer pair.
@@ -200,10 +203,13 @@ Answer: [answer text in Chinese]"""
                     ],
                     stream=False,
                 )
-                content = response.choices[0].message.content
-                qa_pair = self._parse_qa_pair(content)
+                raw_content = response.choices[0].message.content if response.choices else None
+                content = (raw_content or "").strip()
+                logger.info("generate_qa_pair (no question): raw_content len=%s", len(content))
+                qa_pair = self._parse_qa_pair(content) if content else {"question": "", "answer": "(No content returned)"}
                 return qa_pair
             except Exception as e:
+                logger.exception("generate_qa_pair error (no question): %s", e)
                 return {"error": str(e)}
 
     def generate_dpo_format(self, instruction: str, chosen_response: str, rejected_response: str) -> Dict[str, Any]:

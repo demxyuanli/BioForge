@@ -42,6 +42,8 @@ const MenuBar: React.FC<MenuBarProps> = ({
   const { t } = useTranslation();
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const [dropdownPos, setDropdownPos] = useState({ left: 0, top: 32 });
+  const [showDocumentation, setShowDocumentation] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -171,8 +173,8 @@ const MenuBar: React.FC<MenuBarProps> = ({
         ];
       case 'help':
         return [
-          { key: 'documentation', action: () => {} },
-          { key: 'about', action: () => {} }
+          { key: 'documentation', action: () => setShowDocumentation(true) },
+          { key: 'about', action: () => setShowAbout(true) }
         ];
       default:
         return [];
@@ -208,12 +210,12 @@ const MenuBar: React.FC<MenuBarProps> = ({
         <div className="menubar-nav" onMouseDown={(e) => e.stopPropagation()}>
           <Tooltip title={t('menu.back')}>
             <button className="menubar-nav-btn" onClick={handleNavBack}>
-              &#x25C0;
+              {'\u2190'}
             </button>
           </Tooltip>
           <Tooltip title={t('menu.forward')}>
             <button className="menubar-nav-btn" onClick={handleNavForward}>
-              &#x25B6;
+              {'\u2192'}
             </button>
           </Tooltip>
         </div>
@@ -303,6 +305,162 @@ const MenuBar: React.FC<MenuBarProps> = ({
         </button>
         </Tooltip>
       </div>
+
+      {showDocumentation && (
+        <div
+          className="menubar-help-overlay"
+          onClick={() => setShowDocumentation(false)}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div
+            className="menubar-help-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('helpDocs.title')}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="menubar-help-header">
+              <div>
+                <h3>{t('helpDocs.title')}</h3>
+                <p>{t('helpDocs.subtitle')}</p>
+              </div>
+              <button type="button" onClick={() => setShowDocumentation(false)}>
+                {t('common.close')}
+              </button>
+            </div>
+            <div className="menubar-help-body">
+              <section>
+                <h4>{t('helpDocs.quickStartTitle')}</h4>
+                <ol>
+                  <li>{t('helpDocs.quickStart1')}</li>
+                  <li>{t('helpDocs.quickStart2')}</li>
+                  <li>{t('helpDocs.quickStart3')}</li>
+                  <li>{t('helpDocs.quickStart4')}</li>
+                  <li>{t('helpDocs.quickStart5')}</li>
+                </ol>
+              </section>
+
+              <section>
+                <h4>{t('helpDocs.setupDetailTitle')}</h4>
+                <ul>
+                  <li>{t('helpDocs.setupDetail1')}</li>
+                  <li>{t('helpDocs.setupDetail2')}</li>
+                  <li>{t('helpDocs.setupDetail3')}</li>
+                  <li>{t('helpDocs.setupDetail4')}</li>
+                </ul>
+              </section>
+
+              <section>
+                <h4>{t('helpDocs.workspaceTitle')}</h4>
+                <ul>
+                  <li>{t('helpDocs.workspaceFileResources')}</li>
+                  <li>{t('helpDocs.workspaceKnowledgeBase')}</li>
+                  <li>{t('helpDocs.workspaceDataCenter')}</li>
+                  <li>{t('helpDocs.workspaceTrainingLab')}</li>
+                  <li>{t('helpDocs.workspaceProduction')}</li>
+                  <li>{t('helpDocs.workspaceEvaluation')}</li>
+                  <li>{t('helpDocs.workspaceChat')}</li>
+                </ul>
+              </section>
+
+              <section>
+                <h4>{t('helpDocs.operationTitle')}</h4>
+                <ol>
+                  <li>{t('helpDocs.operationDocument')}</li>
+                  <li>{t('helpDocs.operationKnowledge')}</li>
+                  <li>{t('helpDocs.operationAnnotation')}</li>
+                  <li>{t('helpDocs.operationFinetuning')}</li>
+                  <li>{t('helpDocs.operationEvaluation')}</li>
+                </ol>
+              </section>
+
+              <section>
+                <h4>{t('helpDocs.acceptanceTitle')}</h4>
+                <ul>
+                  <li>{t('helpDocs.acceptance1')}</li>
+                  <li>{t('helpDocs.acceptance2')}</li>
+                  <li>{t('helpDocs.acceptance3')}</li>
+                  <li>{t('helpDocs.acceptance4')}</li>
+                  <li>{t('helpDocs.acceptance5')}</li>
+                </ul>
+              </section>
+
+              <section>
+                <h4>{t('helpDocs.retryTitle')}</h4>
+                <ul>
+                  <li>{t('helpDocs.retry1')}</li>
+                  <li>{t('helpDocs.retry2')}</li>
+                  <li>{t('helpDocs.retry3')}</li>
+                  <li>{t('helpDocs.retry4')}</li>
+                </ul>
+              </section>
+
+              <section>
+                <h4>{t('helpDocs.shortcutTitle')}</h4>
+                <ul>
+                  <li>{t('helpDocs.shortcutOpenHelp')}</li>
+                  <li>{t('helpDocs.shortcutMenu')}</li>
+                  <li>{t('helpDocs.shortcutEscape')}</li>
+                  <li>{t('helpDocs.shortcutLanguage')}</li>
+                </ul>
+              </section>
+
+              <section>
+                <h4>{t('helpDocs.troubleshootTitle')}</h4>
+                <ul>
+                  <li>{t('helpDocs.troubleshootBackend')}</li>
+                  <li>{t('helpDocs.troubleshootModel')}</li>
+                  <li>{t('helpDocs.troubleshootGenerate')}</li>
+                  <li>{t('helpDocs.troubleshootJob')}</li>
+                </ul>
+              </section>
+
+              <section>
+                <h4>{t('helpDocs.dataSafetyTitle')}</h4>
+                <ul>
+                  <li>{t('helpDocs.dataSafety1')}</li>
+                  <li>{t('helpDocs.dataSafety2')}</li>
+                  <li>{t('helpDocs.dataSafety3')}</li>
+                </ul>
+              </section>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAbout && (
+        <div
+          className="menubar-help-overlay"
+          onClick={() => setShowAbout(false)}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div
+            className="menubar-help-dialog menubar-about-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('aboutDialog.title')}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="menubar-help-header">
+              <h3>{t('aboutDialog.title')}</h3>
+              <button type="button" onClick={() => setShowAbout(false)}>
+                {t('common.close')}
+              </button>
+            </div>
+            <div className="menubar-help-body">
+              <p><strong>{t('aboutDialog.product')}</strong></p>
+              <p>{t('aboutDialog.description')}</p>
+              <h4>{t('aboutDialog.capabilitiesTitle')}</h4>
+              <ul>
+                <li>{t('aboutDialog.capability1')}</li>
+                <li>{t('aboutDialog.capability2')}</li>
+                <li>{t('aboutDialog.capability3')}</li>
+                <li>{t('aboutDialog.capability4')}</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

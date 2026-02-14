@@ -443,9 +443,10 @@ const TrainingLab: React.FC = () => {
       alert(t('trainingLab.instructionCannotBeEmpty'));
       return;
     }
+    const nextResponse = (instructionEditState.response ?? '').trim();
     setAnnotations((prev) => prev.map((item, idx) => (
       idx === instructionEditState.index
-        ? { ...item, instruction: nextInstruction }
+        ? { ...item, instruction: nextInstruction, response: nextResponse }
         : item
     )));
     setInstructionEditState(null);
@@ -765,10 +766,14 @@ const TrainingLab: React.FC = () => {
                 ))}
                 placeholder={t('trainingLab.instructionPlaceholder')}
               />
-              <div className="annotation-edit-preview">
-                <strong>{t('trainingLab.response')}:</strong>
-                <div>{instructionEditState.response || '-'}</div>
-              </div>
+              <label>{t('trainingLab.response')}</label>
+              <textarea
+                value={instructionEditState.response ?? ''}
+                onChange={(e) => setInstructionEditState((prev) => (
+                  prev ? { ...prev, response: e.target.value } : prev
+                ))}
+                placeholder={t('trainingLab.responsePlaceholder')}
+              />
             </div>
             <div className="annotation-edit-footer">
               <button type="button" onClick={closeInstructionEditor}>

@@ -8,6 +8,7 @@ import ProductionTuning from "./components/ProductionTuning";
 import Dashboard from "./components/Dashboard";
 import Evaluation from "./components/Evaluation";
 import ChatAssistant from "./components/ChatAssistant";
+import { ChatProvider } from "./contexts/ChatContext";
 import Settings, { SettingsTab } from "./components/Settings";
 import Wizard from "./components/Wizard";
 import { VSLayout, ActivityType } from "./components/layout";
@@ -212,14 +213,16 @@ function App() {
           onStorageComplete={handleStorageComplete}
         />
       )}
-      <VSLayout
-        activeActivity={activeTab}
-        onActivityChange={setActiveTab}
-        bottomPanelContent={renderBottomPanelContent()}
-        sidebarContent={renderSidebarContent()}
-      >
-        {renderMainContent()}
-      </VSLayout>
+      <ChatProvider>
+        <VSLayout
+          activeActivity={activeTab}
+          onActivityChange={setActiveTab}
+          bottomPanelContent={renderBottomPanelContent()}
+          sidebarContent={renderSidebarContent()}
+        >
+          {renderMainContent()}
+        </VSLayout>
+      </ChatProvider>
     </>
   );
 }
