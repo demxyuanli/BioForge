@@ -1,6 +1,6 @@
-# PrivateTune Pro
+# BioForge
 
-PrivateTune Pro is a desktop client application for private large language model fine-tuning in the cloud. It enables users to transform their professional documents into private models without requiring local GPU hardware.
+BioForge is a desktop client application for private large language model fine-tuning in the cloud. It enables users to transform their professional documents into private models without requiring local GPU hardware.
 
 ## Features
 
