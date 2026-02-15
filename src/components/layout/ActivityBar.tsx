@@ -83,4 +83,4 @@ const ActivityBar: React.FC<ActivityBarProps> = ({
   );
 };
 
-export default ActivityBar;
+export default React.memo(ActivityBar);

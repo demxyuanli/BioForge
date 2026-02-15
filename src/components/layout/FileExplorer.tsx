@@ -12,3 +12,4 @@ const FileExplorer: React.FC = () => {
 export default FileExplorer;
 
 export const MOUNT_POINTS_CHANGED_EVENT = 'mount-points-changed';
+export const DOCUMENTS_CHANGED_EVENT = 'documents-changed';

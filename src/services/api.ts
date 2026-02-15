@@ -11,6 +11,7 @@ export interface Document {
   processingMessage?: string;
   textContent?: string;
   chunks?: string[];
+  knowledgePointCount?: number;
 }
 
 export interface Annotation {
@@ -64,6 +65,7 @@ export interface DirectoryNode {
   children?: DirectoryNode[];
   parentId?: number | null;
   directoryId?: number | null;
+  knowledgePointCount?: number;
 }
 
 export async function getDirectories(): Promise<DirectoryNode[]> {
@@ -137,7 +139,18 @@ export async function parsePythonResponse(response: string): Promise<any> {
   }
 }
 
+const PREVIEW_CACHE_MAX_SIZE = 20;
 const previewCache = new Map<string, { blobUrl: string; version: string }>();
+
+function evictPreviewCache(): void {
+  if (previewCache.size <= PREVIEW_CACHE_MAX_SIZE) return;
+  const keysToRemove = Array.from(previewCache.keys()).slice(0, previewCache.size - PREVIEW_CACHE_MAX_SIZE);
+  for (const key of keysToRemove) {
+    const entry = previewCache.get(key);
+    if (entry) URL.revokeObjectURL(entry.blobUrl);
+    previewCache.delete(key);
+  }
+}
 
 function base64ToBlob(base64: string, mime: string = 'application/pdf'): Blob {
   const bin = atob(base64);
@@ -359,7 +372,9 @@ export async function getDocumentPreview(mpId: number, relativePath: string): Pr
     const blob = base64ToBlob(data);
     const blobUrl = URL.createObjectURL(blob);
     if (cached) URL.revokeObjectURL(cached.blobUrl);
+    previewCache.delete(key);
     previewCache.set(key, { blobUrl, version });
+    evictPreviewCache();
     return blobUrl;
   } catch {
     return null;
@@ -385,7 +400,9 @@ export async function getDocumentPreviewByDocumentId(documentId: number): Promis
     const blob = base64ToBlob(data);
     const blobUrl = URL.createObjectURL(blob);
     if (cached) URL.revokeObjectURL(cached.blobUrl);
+    previewCache.delete(key);
     previewCache.set(key, { blobUrl, version });
+    evictPreviewCache();
     return blobUrl;
   } catch {
     return null;
@@ -438,6 +455,27 @@ export async function uploadDocument(filePath: string): Promise<any> {
   }
 }
 
+export async function importFileToDataCenter(
+  mountPointPath: string,
+  relativePath: string,
+  targetDirectoryId?: number | null
+): Promise<{ documentId: number }> {
+  const separator = mountPointPath.includes('/') ? '/' : '\\';
+  const cleanMount = mountPointPath.replace(/[/\\]+$/, '');
+  const cleanRelative = relativePath.replace(/^[/\\]+/, '');
+  const fullPath = `${cleanMount}${separator}${cleanRelative}`;
+
+  const result = await uploadDocument(fullPath);
+  const documentId = result?.document_id ?? result?.id;
+  if (documentId == null) throw new Error('Upload succeeded but no document ID returned');
+
+  if (targetDirectoryId != null) {
+    await moveDocument(documentId, targetDirectoryId);
+  }
+
+  return { documentId };
+}
+
 export async function getDocuments(): Promise<Document[]> {
   try {
     const response = await invoke<string>('get_documents');
@@ -485,13 +523,13 @@ export async function getKnowledgePoints(
   minWeight?: number
 ): Promise<PaginatedResponse<KnowledgePoint>> {
   try {
-    const payload: { page: number; page_size: number; document_id?: number | null; min_weight?: number | null } = {
+    const payload: { page: number; pageSize: number; documentId?: number | null; minWeight?: number | null } = {
       page,
-      page_size: pageSize,
-      min_weight: minWeight ?? null
+      pageSize,
+      minWeight: minWeight ?? null
     };
     if (documentId !== undefined && documentId !== null) {
-      payload.document_id = Number(documentId);
+      payload.documentId = Number(documentId);
     }
     const response = await invoke<string>('get_knowledge_points', payload);
     const data = await parsePythonResponse(response);
@@ -512,7 +550,7 @@ const GRAPH_MAX_POINTS = 2000;
 
 async function fetchKnowledgePointsPageForGraph(page: number, minWeight: number): Promise<PaginatedResponse<KnowledgePoint>> {
   const w = Math.max(1, Math.min(5, Number(minWeight)));
-  const response = await invoke<string>('get_knowledge_points_for_graph', { page, min_weight: w });
+  const response = await invoke<string>('get_knowledge_points_for_graph', { page, minWeight: w });
   const data = await parsePythonResponse(response);
   return {
     knowledge_points: data?.knowledge_points ?? [],
@@ -540,7 +578,7 @@ export async function getKnowledgePointsForGraph(minWeight: number = 1): Promise
 export async function createKnowledgePoint(documentId: number, content: string): Promise<KnowledgePoint> {
   try {
     const response = await invoke<string>('create_knowledge_point', {
-      document_id: documentId,
+      documentId,
       content: content.trim()
     });
     const data = await parsePythonResponse(response);

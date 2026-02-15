@@ -207,4 +207,4 @@ const ResourceSidebar: React.FC<ResourceSidebarProps> = ({
   );
 };
 
-export default ResourceSidebar;
+export default React.memo(ResourceSidebar);

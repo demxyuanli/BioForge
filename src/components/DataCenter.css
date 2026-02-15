@@ -438,7 +438,7 @@
   color: var(--vs-fg);
   background: var(--vs-input-bg);
   border: 1px solid var(--vs-border);
-  border-radius: 0;
+  border-radius: 2px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -486,7 +486,7 @@
   min-width: 20px;
   min-height: 20px;
   padding: 0;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   background: transparent;
   border: none;
@@ -515,7 +515,7 @@
 
 .data-center-layout .dc-cli-file-table-header {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 84px 72px;
+  grid-template-columns: 24px minmax(0, 1fr) 56px 72px;
   gap: 8px;
   padding: 4px 0 6px;
   font-size: 11px;
@@ -540,7 +540,7 @@
 
 .data-center-layout .dc-cli-file-row {
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) 84px 72px;
+  grid-template-columns: 24px minmax(0, 1fr) 56px 72px;
   gap: 8px;
   padding: 4px 0;
   align-items: center;
@@ -690,7 +690,7 @@
 
 .data-center-layout .dc-kp-table-header {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 84px 56px;
+  grid-template-columns: 20px minmax(0, 1fr) 56px 56px;
   gap: 6px;
   padding: 4px 0 6px;
   font-size: 11px;
@@ -730,7 +730,7 @@
 
 .data-center-layout .dc-kp-item {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 84px 56px;
+  grid-template-columns: 20px minmax(0, 1fr) 56px 56px;
   gap: 6px;
   padding: 4px 0;
   align-items: center;
@@ -784,7 +784,7 @@
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: 1px;
+  gap: 0;
   cursor: default;
   user-select: none;
 }
@@ -803,7 +803,7 @@
 }
 
 .data-center-layout .dc-kp-star {
-  font-size: 14px;
+  font-size: 10px;
   line-height: 1;
   color: var(--kb-cli-muted, #505050);
   cursor: pointer;
@@ -830,7 +830,7 @@
   min-width: 20px;
   min-height: 20px;
   padding: 0;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   background: transparent;
   border: none;
@@ -868,8 +868,15 @@
   min-width: 14px;
   min-height: 14px;
   padding: 2px 8px;
-  font-size: 14px;
+  font-size: 12px;
+  border-radius: 2px;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.data-center-layout .dc-kp-pagination-btn:hover:not(:disabled) {
+  background: var(--vs-list-hover);
+  color: var(--vs-fg);
 }
 
 .data-center-layout .dc-kp-pagination-btn:disabled {
@@ -933,7 +940,7 @@
 
 .data-center-layout .dc-kp-keyword-highlight {
   background-color: transparent;
-  color: var(--vs-accent, #007acc);
+  color: var(--vs-highlight-fg, var(--vs-accent, #007acc));
   font-weight: 600;
   padding: 0;
   border-radius: 0;
@@ -1177,6 +1184,22 @@
   flex: 1;
 }
 
+.data-center-layout .dc-file-kp-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--vs-badge-background, #4d4d4d);
+  color: var(--vs-badge-foreground, #ccc);
+  margin-left: 6px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
 .data-center-layout .dc-file-weight-0 {
   color: var(--kb-cli-muted, #6e6e6e);
 }
@@ -1205,13 +1228,13 @@
 .data-center-layout .dc-cli-col-weight {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
+  gap: 0;
   cursor: default;
   user-select: none;
 }
 
 .data-center-layout .dc-cli-col-weight .dc-star {
-  font-size: 14px;
+  font-size: 10px;
   line-height: 1;
   color: var(--kb-cli-muted, #505050);
   cursor: pointer;
@@ -1250,7 +1273,7 @@
   min-width: 14px;
   min-height: 14px;
   padding: 0;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   color: var(--kb-cli-muted, #858585);
   background: transparent !important;

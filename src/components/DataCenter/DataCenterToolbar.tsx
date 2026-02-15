@@ -80,4 +80,4 @@ const DataCenterToolbar: React.FC<DataCenterToolbarProps> = ({
   );
 };
 
-export default DataCenterToolbar;
+export default React.memo(DataCenterToolbar);

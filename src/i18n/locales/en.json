@@ -415,7 +415,17 @@
     "documentPreview": "Document preview",
     "resizePanel": "Drag to resize",
     "maximizePreview": "Maximize",
-    "restorePreview": "Restore"
+    "restorePreview": "Restore",
+    "importToDataCenter": "Import to Data Center",
+    "importing": "Importing...",
+    "importSuccess": "File imported to Data Center successfully!",
+    "importFailed": "Failed to import file",
+    "selectTargetDirectory": "Select target directory",
+    "rootDirectory": "Root (no directory)",
+    "importDialogTitle": "Import to Data Center",
+    "importDialogDesc": "Copy this file into the Data Center for knowledge point processing.",
+    "confirmImport": "Import",
+    "cancelImport": "Cancel"
   },
   "trainingLab": {
     "title": "Smart Annotation",

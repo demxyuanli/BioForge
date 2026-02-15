@@ -81,6 +81,9 @@ function buildGraphData(kps: KnowledgePoint[], mode: GraphMode): GraphData {
   const linkKey = (a: string, b: string) => (a < b ? `${a}-${b}` : `${b}-${a}`);
   const seenLinks = new Set<string>();
 
+  const kpNodeById = new Map<string, KpNode>();
+  for (const n of kpNodes) kpNodeById.set(n.id, n);
+
   const byDoc = new Map<number, { id: string }[]>();
   for (const n of kpNodes) {
     const docId = n.kp.document_id;
@@ -89,7 +92,7 @@ function buildGraphData(kps: KnowledgePoint[], mode: GraphMode): GraphData {
   }
   for (const [, list] of byDoc) {
     const withChunk = list
-      .map((x) => ({ id: x.id, chunk: (kpNodes.find((m) => m.id === x.id)?.kp as KnowledgePoint).chunk_index }))
+      .map((x) => ({ id: x.id, chunk: (kpNodeById.get(x.id)?.kp as KnowledgePoint).chunk_index }))
       .sort((a, b) => (a.chunk ?? 0) - (b.chunk ?? 0));
     for (let i = 0; i < withChunk.length - 1; i++) {
       const a = withChunk[i].id;
@@ -135,31 +138,46 @@ function buildGraphData(kps: KnowledgePoint[], mode: GraphMode): GraphData {
     return { nodes: [...kpNodes, ...kwNodes], links };
   }
 
-  const pairsWithKeyword = new Set<string>();
-  for (let i = 0; i < kpNodes.length; i++) {
-    const ki = kpKeywords.get(kpNodes[i].id) ?? [];
-    for (let j = i + 1; j < kpNodes.length; j++) {
-      const kj = kpKeywords.get(kpNodes[j].id) ?? [];
-      const shared = ki.some((k) => kj.includes(k));
-      if (shared) pairsWithKeyword.add(linkKey(kpNodes[i].id, kpNodes[j].id));
+  // Build inverted index: keyword -> list of node ids that have it
+  const kwToNodeIds = new Map<string, string[]>();
+  for (const [nodeId, kwList] of kpKeywords) {
+    for (const kw of kwList) {
+      let arr = kwToNodeIds.get(kw);
+      if (!arr) { arr = []; kwToNodeIds.set(kw, arr); }
+      arr.push(nodeId);
     }
   }
+
+  // Collect all pairs sharing a keyword via inverted index (O(n * k) instead of O(n^2))
+  // Also store (a, b) tuples for new links
+  const pairsWithKeyword = new Set<string>();
+  const newKeywordPairs: [string, string][] = [];
+  for (const [, nodeIds] of kwToNodeIds) {
+    for (let i = 0; i < nodeIds.length; i++) {
+      for (let j = i + 1; j < nodeIds.length; j++) {
+        const key = linkKey(nodeIds[i], nodeIds[j]);
+        if (!pairsWithKeyword.has(key)) {
+          pairsWithKeyword.add(key);
+          const a = nodeIds[i] < nodeIds[j] ? nodeIds[i] : nodeIds[j];
+          const b = nodeIds[i] < nodeIds[j] ? nodeIds[j] : nodeIds[i];
+          newKeywordPairs.push([a, b]);
+        }
+      }
+    }
+  }
+
+  // Upgrade existing sequence links to keyword type if they share keywords
   for (const link of links) {
     const key = linkKey(String(link.source), String(link.target));
     if (pairsWithKeyword.has(key)) link.linkType = 'keyword';
   }
-  for (let i = 0; i < kpNodes.length; i++) {
-    const ki = kpKeywords.get(kpNodes[i].id) ?? [];
-    for (let j = i + 1; j < kpNodes.length; j++) {
-      const kj = kpKeywords.get(kpNodes[j].id) ?? [];
-      const shared = ki.some((k) => kj.includes(k));
-      if (shared) {
-        const key = linkKey(kpNodes[i].id, kpNodes[j].id);
-        if (!seenLinks.has(key)) {
-          seenLinks.add(key);
-          links.push({ source: kpNodes[i].id, target: kpNodes[j].id, linkType: 'keyword' });
-        }
-      }
+
+  // Add new keyword links for pairs not already linked
+  for (const [a, b] of newKeywordPairs) {
+    const key = linkKey(a, b);
+    if (!seenLinks.has(key)) {
+      seenLinks.add(key);
+      links.push({ source: a, target: b, linkType: 'keyword' });
     }
   }
 
@@ -288,9 +306,14 @@ const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     onRefresh();
   }, [minWeight, onRefresh]);
 
+  const colorsRef = useRef(getGraphColors(null));
+  useEffect(() => {
+    colorsRef.current = getGraphColors(rootRef.current);
+  });
+
   const drawNode = useCallback(
     (node: GraphNodeWithCoords, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      const colors = getGraphColors(rootRef.current);
+      const colors = colorsRef.current;
       const label = (node.label || node.id).slice(0, MAX_LABEL_LEN);
       const lines = labelToLines(label);
       const cx = node.x ?? 0;
@@ -350,7 +373,7 @@ const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
       link: { source: string | GraphNodeWithCoords; target: string | GraphNodeWithCoords; linkType: string },
       ctx: CanvasRenderingContext2D
     ) => {
-      const colors = getGraphColors(rootRef.current);
+      const colors = colorsRef.current;
       const src = typeof link.source === 'object' && link.source && 'x' in link.source ? (link.source as GraphNodeWithCoords) : null;
       const tgt = typeof link.target === 'object' && link.target && 'x' in link.target ? (link.target as GraphNodeWithCoords) : null;
       if (!src || !tgt) return;
@@ -447,7 +470,7 @@ const KnowledgeGraph: React.FC<KnowledgeGraphProps> = ({
     if (link?.distance) link.distance(180);
   }, [graphData]);
 
-  const bgColor = getGraphColors(rootRef.current).bg;
+  const bgColor = colorsRef.current.bg;
 
   return (
     <div ref={rootRef} className="kg-root">

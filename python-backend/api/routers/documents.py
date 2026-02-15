@@ -154,11 +154,25 @@ async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = 
 
 @router.get("/documents")
 async def list_documents():
-    """List all documents."""
+    """List all documents with knowledge point counts via SQL JOIN."""
     db = None
     try:
+        from sqlalchemy import func
         db = get_db_session()
-        documents = db.query(Document).all()
+        kp_subq = (
+            db.query(
+                KnowledgePoint.document_id,
+                func.count(KnowledgePoint.id).label('kp_count')
+            )
+            .filter(KnowledgePoint.excluded == False)
+            .group_by(KnowledgePoint.document_id)
+            .subquery()
+        )
+        rows = (
+            db.query(Document, func.coalesce(kp_subq.c.kp_count, 0))
+            .outerjoin(kp_subq, Document.id == kp_subq.c.document_id)
+            .all()
+        )
         result = [
             {
                 "id": doc.id,
@@ -167,9 +181,10 @@ async def list_documents():
                 "uploadTime": doc.upload_time.isoformat() if doc.upload_time else None,
                 "processed": doc.processed,
                 "processingStatus": doc.processing_status,
-                "processingMessage": doc.processing_message
+                "processingMessage": doc.processing_message,
+                "knowledgePointCount": kp_count
             }
-            for doc in documents
+            for doc, kp_count in rows
         ]
         db.close()
         return result

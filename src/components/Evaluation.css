@@ -7,16 +7,16 @@
 
 .evaluation-layout {
   display: flex;
-  gap: 1rem;
+  gap: 12px;
   height: 100%;
   min-height: 0;
 }
 
 .evaluation-sidebar {
-  width: 240px;
+  width: 220px;
   flex-shrink: 0;
   background: var(--vs-panel-bg);
-  border-radius: 8px;
+  border-radius: 4px;
   border: 1px solid var(--vs-border-subtle);
   display: flex;
   flex-direction: column;
@@ -27,18 +27,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--vs-border-subtle);
 }
 
 .evaluation-sidebar-actions {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 4px;
 }
 
 .evaluation-sidebar-title {
   font-weight: 600;
+  font-size: 12px;
   color: var(--vs-fg);
 }
 
@@ -46,9 +47,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.35rem;
+  padding: 4px;
   border: none;
-  border-radius: 4px;
+  border-radius: 3px;
   background: transparent;
   color: var(--vs-fg);
   cursor: pointer;
@@ -66,30 +67,30 @@
 .evaluation-template-list {
   list-style: none;
   margin: 0;
-  padding: 0.5rem 0;
+  padding: 4px 0;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
 }
 
 .evaluation-template-list-empty {
-  padding: 1rem;
+  padding: 12px;
   color: var(--vs-muted);
-  font-size: 0.9rem;
+  font-size: 12px;
 }
 
 .evaluation-sidebar-restore {
-  padding: 0.5rem 1rem;
+  padding: 6px 12px;
   border-top: 1px solid var(--vs-border-subtle);
 }
 
 .evaluation-restore-btn {
   width: 100%;
-  padding: 0.4rem 0.5rem;
-  font-size: 0.85rem;
+  padding: 4px 6px;
+  font-size: 12px;
   background: transparent;
   border: 1px solid var(--vs-border-subtle);
-  border-radius: 4px;
+  border-radius: 3px;
   color: var(--vs-muted);
   cursor: pointer;
 }
@@ -102,8 +103,8 @@
 .evaluation-template-item {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 1rem;
+  gap: 4px;
+  padding: 3px 12px;
 }
 
 .evaluation-template-item.selected {
@@ -113,13 +114,13 @@
 .evaluation-template-item-label {
   flex: 1;
   text-align: left;
-  padding: 0.4rem 0;
+  padding: 4px 0;
   border: none;
   background: none;
   color: var(--vs-fg);
   cursor: pointer;
-  font-size: 0.95rem;
-  border-radius: 4px;
+  font-size: 12px;
+  border-radius: 3px;
 }
 
 .evaluation-template-item-label:hover {
@@ -128,7 +129,7 @@
 
 .evaluation-template-item-actions {
   display: flex;
-  gap: 0.15rem;
+  gap: 2px;
   opacity: 0.8;
 }
 
@@ -142,30 +143,31 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 12px;
 }
 
 .evaluation-config {
   background: var(--vs-panel-bg);
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 12px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   border: 1px solid var(--vs-border-subtle);
 }
 
 .evaluation-editor .evaluation-editor-title {
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 8px;
+  font-size: 13px;
   color: var(--vs-fg);
 }
 
 .evaluation-input {
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding: 6px 10px;
   border: 1px solid var(--vs-border-subtle);
   border-radius: 4px;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 12px;
   background: var(--vs-bg);
   color: var(--vs-fg);
 }
@@ -178,11 +180,11 @@
 .evaluation-config textarea,
 .evaluation-textarea {
   width: 100%;
-  padding: 0.75rem;
+  padding: 8px;
   border: 1px solid var(--vs-border-subtle);
   border-radius: 4px;
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 12px;
   resize: vertical;
   background: var(--vs-bg);
   color: var(--vs-fg);
@@ -199,19 +201,19 @@
 }
 
 .evaluation-var-hint {
-  margin: 0.5rem 0 0;
-  font-size: 0.85rem;
+  margin: 6px 0 0;
+  font-size: 11px;
   color: var(--vs-muted);
 }
 
 .evaluation-var-hint.evaluation-var-required {
   color: var(--vs-warning, #d4a012);
-  margin-top: 0.5rem;
+  margin-top: 6px;
 }
 
 .evaluation-preview-vars {
-  margin-top: 0.5rem;
-  padding: 0.75rem;
+  margin-top: 6px;
+  padding: 8px;
   background: var(--vs-bg);
   border: 1px solid var(--vs-border-subtle);
   border-radius: 4px;
@@ -220,19 +222,19 @@
 }
 
 .evaluation-prompt-preview-wrap {
-  margin-bottom: 0.5rem;
+  margin-bottom: 6px;
 }
 
 .evaluation-prompt-preview-toggle {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0;
-  margin-bottom: 0.25rem;
+  gap: 4px;
+  padding: 4px 0;
+  margin-bottom: 2px;
   border: none;
   background: transparent;
   color: var(--vs-muted);
-  font-size: 0.9rem;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -241,7 +243,7 @@
 }
 
 .evaluation-prompt-preview {
-  padding: 0.75rem;
+  padding: 8px;
   background: var(--vs-bg);
   border: 1px solid var(--vs-border-subtle);
   border-radius: 4px;
@@ -253,7 +255,7 @@
   white-space: pre-wrap;
   word-break: break-word;
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 12px;
   line-height: 1.5;
   margin: 0;
   color: var(--vs-fg);
@@ -262,8 +264,8 @@
 .eval-template-var {
   background: var(--vs-warning-bg, rgba(255, 193, 7, 0.2));
   color: var(--vs-warning, #d4a012);
-  padding: 0.1em 0.35em;
-  border-radius: 4px;
+  padding: 1px 4px;
+  border-radius: 3px;
   font-weight: 600;
 }
 
@@ -288,24 +290,24 @@
 .evaluation-var-dialog {
   background: var(--vs-panel-bg);
   border: 1px solid var(--vs-border-subtle);
-  border-radius: 8px;
-  padding: 1.25rem;
+  border-radius: 4px;
+  padding: 16px;
   min-width: 320px;
   max-width: 90vw;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 .evaluation-var-dialog-title {
-  margin: 0 0 1rem;
-  font-size: 1.1rem;
+  margin: 0 0 12px;
+  font-size: 14px;
   color: var(--vs-fg);
 }
 
 .evaluation-var-dialog-varname {
   display: inline-block;
-  padding: 0.35rem 0.5rem;
+  padding: 4px 6px;
   background: var(--vs-bg);
-  border-radius: 4px;
+  border-radius: 3px;
   font-family: ui-monospace, monospace;
   color: var(--vs-warning, #d4a012);
   font-weight: 600;
@@ -313,18 +315,18 @@
 
 .evaluation-editor-actions {
   display: flex;
-  gap: 0.75rem;
-  margin-top: 1rem;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .evaluation-btn-primary {
-  padding: 0.5rem 1.25rem;
+  padding: 6px 14px;
   background: var(--vs-accent);
   color: var(--vs-accent-fg);
   border: none;
-  border-radius: 4px;
+  border-radius: 3px;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 12px;
 }
 
 .evaluation-btn-primary:hover:not(:disabled) {
@@ -337,13 +339,13 @@
 }
 
 .evaluation-btn-secondary {
-  padding: 0.5rem 1.25rem;
+  padding: 6px 14px;
   background: transparent;
   color: var(--vs-fg);
   border: 1px solid var(--vs-border-subtle);
-  border-radius: 4px;
+  border-radius: 3px;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 12px;
 }
 
 .evaluation-btn-secondary:hover {
@@ -354,7 +356,7 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.25em;
+  gap: 4px;
 }
 
 .evaluation-template-row .evaluation-template-label {
@@ -375,35 +377,37 @@
 .evaluation-results {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 12px;
 }
 
 .comparison-section {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+  gap: 12px;
 }
 
 .comparison-panel {
   background: var(--vs-panel-bg);
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 12px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   border: 1px solid var(--vs-border-subtle);
 }
 
 .comparison-panel h3 {
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 8px;
+  font-size: 13px;
   color: var(--vs-fg);
 }
 
 .content-box {
-  padding: 1rem;
+  padding: 10px;
   border-radius: 4px;
   min-height: 200px;
   line-height: 1.6;
   color: var(--vs-fg);
+  font-size: 12px;
 }
 
 .content-box:not(.evaluation-content-markdown) {
@@ -422,9 +426,9 @@
   font-weight: 600;
   line-height: 1.3;
 }
-.content-box.evaluation-content-markdown h1 { font-size: 1.35rem; }
-.content-box.evaluation-content-markdown h2 { font-size: 1.2rem; }
-.content-box.evaluation-content-markdown h3 { font-size: 1.05rem; }
+.content-box.evaluation-content-markdown h1 { font-size: 16px; }
+.content-box.evaluation-content-markdown h2 { font-size: 14px; }
+.content-box.evaluation-content-markdown h3 { font-size: 13px; }
 .content-box.evaluation-content-markdown h1:first-child,
 .content-box.evaluation-content-markdown h2:first-child,
 .content-box.evaluation-content-markdown h3:first-child { margin-top: 0; }
@@ -449,14 +453,14 @@
 .content-box.evaluation-content-markdown code {
   font-family: ui-monospace, monospace;
   font-size: 0.9em;
-  padding: 0.15em 0.35em;
+  padding: 1px 4px;
   border-radius: 3px;
   background: var(--vs-bg);
   color: var(--vs-fg);
 }
 .content-box.evaluation-content-markdown pre {
-  margin: 0.5em 0;
-  padding: 0.75rem;
+  margin: 6px 0;
+  padding: 8px;
   border-radius: 4px;
   background: var(--vs-bg);
   overflow-x: auto;
@@ -478,49 +482,50 @@
 
 .metrics-section {
   background: var(--vs-panel-bg);
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 12px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   border: 1px solid var(--vs-border-subtle);
 }
 
 .metrics-section h3 {
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 8px;
+  font-size: 13px;
   color: var(--vs-fg);
 }
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
 }
 
 .metric-card {
-  padding: 1rem;
+  padding: 10px;
   background: var(--vs-bg);
   border-radius: 4px;
   border: 1px solid var(--vs-border-subtle);
 }
 
 .metric-label {
-  font-size: 0.9rem;
+  font-size: 12px;
   color: var(--vs-muted);
-  margin-bottom: 0.5rem;
+  margin-bottom: 4px;
 }
 
 .metric-value {
-  font-size: 1.5rem;
+  font-size: 20px;
   font-weight: bold;
   color: var(--vs-accent);
-  margin-bottom: 0.5rem;
+  margin-bottom: 4px;
 }
 
 .metric-bar {
   width: 100%;
-  height: 8px;
+  height: 6px;
   background-color: var(--vs-border-subtle);
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
@@ -532,31 +537,32 @@
 
 .export-section {
   background: var(--vs-panel-bg);
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  padding: 12px;
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
   border: 1px solid var(--vs-border-subtle);
 }
 
 .export-section h3 {
   margin-top: 0;
-  margin-bottom: 1rem;
+  margin-bottom: 8px;
+  font-size: 13px;
   color: var(--vs-fg);
 }
 
 .export-buttons {
   display: flex;
-  gap: 1rem;
+  gap: 8px;
 }
 
 .export-buttons button {
-  padding: 0.75rem 1.5rem;
+  padding: 6px 14px;
   background-color: var(--vs-accent);
   color: var(--vs-accent-fg);
   border: none;
-  border-radius: 4px;
+  border-radius: 3px;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 12px;
 }
 
 .export-buttons button:hover {

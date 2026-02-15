@@ -99,9 +99,13 @@ function App() {
     }
   };
 
+  const MAX_LOGS = 500;
   const addLog = (message: string) => {
     const timestamp = new Date().toLocaleTimeString();
-    setLogs(prev => [...prev, `[${timestamp}] ${message}`]);
+    setLogs(prev => {
+      const next = [...prev, `[${timestamp}] ${message}`];
+      return next.length > MAX_LOGS ? next.slice(next.length - MAX_LOGS) : next;
+    });
   };
 
   const handleWizardComplete = () => {
@@ -129,6 +133,8 @@ function App() {
             processedCount={processedCount}
             jobsCount={jobs.length}
             activeJobsCount={activeJobsCount}
+            documents={documents}
+            jobs={jobs}
           />
         );
       }

@@ -30,6 +30,7 @@ import {
   getKnowledgePointKeywords,
 } from '../services/api';
 import { loadFileMeta, saveFileMeta, type FileMetaItem } from '../utils/fileMeta';
+import { DOCUMENTS_CHANGED_EVENT } from './layout/FileExplorer';
 import './DataCenter.css';
 
 const DC_EXCLUDED_DIRS_KEY = 'dc_excluded_dirs';
@@ -176,30 +177,51 @@ const DataCenter: React.FC = () => {
     saveExcludedDirs(excludedDirIds);
   }, [excludedDirIds]);
 
+  const documentsRef = useRef<Document[]>(documents);
+  useEffect(() => { documentsRef.current = documents; }, [documents]);
+
   useEffect(() => {
     loadData();
     const interval = setInterval(() => {
-      const processing = documents.filter(
+      const processing = documentsRef.current.filter(
         (d) => d.processingStatus === 'pending' || d.processingStatus === 'processing'
       );
       if (processing.length > 0) {
         loadDocuments();
-        if (selectedDocId) loadKnowledgePoints();
+        loadDirectories();
+        if (selectedDocIdRef.current != null) loadKnowledgePoints();
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [documents.map((d) => d.processingStatus).join(',')]);
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      loadData();
+      if (selectedDocIdRef.current != null) loadKnowledgePoints();
+    };
+    window.addEventListener(DOCUMENTS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(DOCUMENTS_CHANGED_EVENT, handler);
+  }, []);
 
   const selectedDocIdRef = useRef<number | null>(selectedDocId);
+  const kpPageRef = useRef(kpPage);
+
+  // Keep refs in sync via effects (order matters: refs update before dependent effects)
   useEffect(() => {
     selectedDocIdRef.current = selectedDocId;
   }, [selectedDocId]);
+
+  useEffect(() => {
+    kpPageRef.current = kpPage;
+  }, [kpPage]);
 
   useEffect(() => {
     if (selectedDocId == null) {
       setKnowledgePoints([]);
       setKpTotal(0);
       setKpPage(1);
+      kpPageRef.current = 1;
       setSelectedKp(null);
       setHighlightedKeywords([]);
       setSelectionToolbar(null);
@@ -208,6 +230,7 @@ const DataCenter: React.FC = () => {
     setKnowledgePoints([]);
     setKpTotal(0);
     setKpPage(1);
+    kpPageRef.current = 1;
     setSelectedKp(null);
     setHighlightedKeywords([]);
     setSelectionToolbar(null);
@@ -216,8 +239,7 @@ const DataCenter: React.FC = () => {
       .then((data) => {
         if (selectedDocIdRef.current !== docId) return;
         const raw = data.knowledge_points ?? [];
-        const forDoc = raw.filter((kp) => kp.document_id === docId);
-        setKnowledgePoints(forDoc);
+        setKnowledgePoints(raw);
         setKpTotal(data.total ?? 0);
       })
       .catch(() => {
@@ -283,14 +305,14 @@ const DataCenter: React.FC = () => {
   };
 
   const loadKnowledgePoints = async () => {
-    if (selectedDocId == null) return;
-    const docId = selectedDocId;
+    const docId = selectedDocIdRef.current;
+    if (docId == null) return;
+    const page = kpPageRef.current;
     try {
-      const data = await getKnowledgePoints(kpPage, kpPageSize, docId);
+      const data = await getKnowledgePoints(page, kpPageSize, docId);
       if (selectedDocIdRef.current !== docId) return;
       const raw = data.knowledge_points ?? [];
-      const forDoc = raw.filter((kp) => kp.document_id === docId);
-      setKnowledgePoints(forDoc);
+      setKnowledgePoints(raw);
       setKpTotal(data.total ?? 0);
     } catch (e) {
       if (selectedDocIdRef.current !== docId) return;
@@ -496,7 +518,7 @@ const DataCenter: React.FC = () => {
   const onKpDelete = (kp: KnowledgePoint, e: React.MouseEvent) => onKpSetDeleted(kp, true, e);
   const onKpRestore = (kp: KnowledgePoint, e: React.MouseEvent) => onKpSetDeleted(kp, false, e);
 
-  const getCurrentItems = (): DirectoryNode[] => {
+  const currentItems = useMemo(() => {
     if (currentDirId === null) {
       return directoryTree.filter((n) => !n.parentId && !n.directoryId);
     }
@@ -512,10 +534,9 @@ const DataCenter: React.FC = () => {
     };
     const node = findNode(directoryTree);
     return node?.children ?? [];
-  };
+  }, [directoryTree, currentDirId]);
 
   const breadcrumbs = useDataCenterBreadcrumbs(directoryTree, currentDirId);
-  const currentItems = getCurrentItems();
   const allFiles = useMemo(() => flattenFileNodes(directoryTree), [directoryTree]);
   const filteredBySearch = useMemo(() => {
     const q = (searchQuery || '').trim().toLowerCase();

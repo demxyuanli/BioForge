@@ -416,7 +416,17 @@
     "documentPreview": "文档预览",
     "resizePanel": "拖动调整大小",
     "maximizePreview": "最大化",
-    "restorePreview": "还原"
+    "restorePreview": "还原",
+    "importToDataCenter": "导入到数据中心",
+    "importing": "导入中...",
+    "importSuccess": "文件已成功导入到数据中心！",
+    "importFailed": "导入文件失败",
+    "selectTargetDirectory": "选择目标目录",
+    "rootDirectory": "根目录（无目录）",
+    "importDialogTitle": "导入到数据中心",
+    "importDialogDesc": "将此文件复制到数据中心进行知识点处理。",
+    "confirmImport": "导入",
+    "cancelImport": "取消"
   },
   "trainingLab": {
     "title": "智能标注",

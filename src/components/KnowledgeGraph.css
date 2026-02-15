@@ -182,7 +182,7 @@
 }
 
 .kg-zoom-title {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--vs-foreground, #cccccc);
 }
@@ -217,7 +217,7 @@
 .kg-error {
   padding: 12px;
   color: var(--vs-error-foreground, #f48771);
-  font-size: 13px;
+  font-size: 12px;
   margin: 0;
 }
 
@@ -225,7 +225,7 @@
   padding: 24px;
   text-align: center;
   color: var(--vs-foreground, #cccccc);
-  font-size: 14px;
+  font-size: 12px;
   margin: 0;
 }
 

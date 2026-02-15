@@ -14,16 +14,19 @@ import {
   getDocumentSummary,
   getDocumentPreview,
   selectFolder,
+  getDirectories,
+  importFileToDataCenter,
   type Document,
   type MountPoint,
   type MountPointDocumentStats,
   type MountPointFiles,
   type RecentAnnotatedFileItem,
+  type DirectoryNode,
 } from '../services/api';
-import { FolderPlus, Maximize2, Minimize2, Pencil, Trash2, X } from 'lucide-react';
+import { DatabaseZap, FolderPlus, Maximize2, Minimize2, Pencil, Trash2, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import PdfViewer from './PdfViewer';
-import { MOUNT_POINTS_CHANGED_EVENT } from './layout/FileExplorer';
+import { MOUNT_POINTS_CHANGED_EVENT, DOCUMENTS_CHANGED_EVENT } from './layout/FileExplorer';
 import './FileResourcesWorkspace.css';
 
 
@@ -68,6 +71,14 @@ const FileResourcesWorkspace: React.FC = () => {
   const [bottomHeightPercent, setBottomHeightPercent] = useState(38);
   const [previewMaximized, setPreviewMaximized] = useState(false);
   const workspaceRef = useRef<HTMLDivElement | null>(null);
+
+  // Import-to-DataCenter state
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importTargetDirId, setImportTargetDirId] = useState<number | null>(null);
+  const [dcDirectories, setDcDirectories] = useState<DirectoryNode[]>([]);
+  const [loadingDcDirs, setLoadingDcDirs] = useState(false);
+  const [importingFile, setImportingFile] = useState(false);
+  const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     getDocuments().then(setDocuments).catch(() => setDocuments([]));
@@ -430,6 +441,57 @@ const FileResourcesWorkspace: React.FC = () => {
     document.addEventListener('mouseup', onUp);
   }, []);
 
+  const flattenDirs = useCallback((nodes: DirectoryNode[], depth = 0): { id: number; name: string; depth: number }[] => {
+    const result: { id: number; name: string; depth: number }[] = [];
+    for (const node of nodes) {
+      if (node.type === 'directory') {
+        result.push({ id: node.id, name: node.name, depth });
+        if (node.children) {
+          result.push(...flattenDirs(node.children, depth + 1));
+        }
+      }
+    }
+    return result;
+  }, []);
+
+  const flatDcDirs = useMemo(() => flattenDirs(dcDirectories), [dcDirectories, flattenDirs]);
+
+  const handleOpenImportDialog = useCallback(async () => {
+    if (!selectedFile || !selectedMp) return;
+    setImportDialogOpen(true);
+    setImportTargetDirId(null);
+    setImportMessage(null);
+    setLoadingDcDirs(true);
+    try {
+      const dirs = await getDirectories();
+      setDcDirectories(dirs);
+    } catch {
+      setDcDirectories([]);
+    } finally {
+      setLoadingDcDirs(false);
+    }
+  }, [selectedFile, selectedMp]);
+
+  const handleConfirmImport = useCallback(async () => {
+    if (!selectedFile || !selectedMp) return;
+    setImportingFile(true);
+    setImportMessage(null);
+    try {
+      await importFileToDataCenter(selectedMp.path, selectedFile.relativePath, importTargetDirId);
+      window.dispatchEvent(new CustomEvent(DOCUMENTS_CHANGED_EVENT));
+      setImportMessage({ type: 'success', text: t('fileResourcesWorkspace.importSuccess') });
+      setTimeout(() => {
+        setImportDialogOpen(false);
+        setImportMessage(null);
+      }, 1500);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      setImportMessage({ type: 'error', text: `${t('fileResourcesWorkspace.importFailed')}: ${msg}` });
+    } finally {
+      setImportingFile(false);
+    }
+  }, [selectedFile, selectedMp, importTargetDirId, t]);
+
   const handleRemoveMountPoint = async (mp?: MountPoint | null) => {
     const target = mp ?? selectedMp;
     if (target == null) return;
@@ -538,7 +600,7 @@ const FileResourcesWorkspace: React.FC = () => {
                           disabled={isEditing}
                           aria-label={t('common.edit')}
                         >
-                        <Pencil size={12} aria-hidden />
+                        <Pencil size={14} aria-hidden />
                       </button>
                       </Tooltip>
                       <Tooltip title={t('fileResourcesWorkspace.removeMountPoint')}>
@@ -549,7 +611,7 @@ const FileResourcesWorkspace: React.FC = () => {
                           disabled={removing}
                           aria-label={t('fileResourcesWorkspace.removeMountPoint')}
                         >
-                        <Trash2 size={12} aria-hidden />
+                        <Trash2 size={14} aria-hidden />
                       </button>
                       </Tooltip>
                     </span>
@@ -864,6 +926,17 @@ const FileResourcesWorkspace: React.FC = () => {
                 <span className="fr-document-detail-title">{selectedFile.filename}</span>
               </Tooltip>
               <div className="fr-document-detail-actions">
+                <Tooltip title={t('fileResourcesWorkspace.importToDataCenter')}>
+                  <button
+                    type="button"
+                    className="fr-import-dc-btn"
+                    onClick={handleOpenImportDialog}
+                    disabled={importingFile}
+                    aria-label={t('fileResourcesWorkspace.importToDataCenter')}
+                  >
+                    <DatabaseZap size={14} aria-hidden />
+                  </button>
+                </Tooltip>
                 <Tooltip title={previewMaximized ? t('fileResourcesWorkspace.restorePreview') : t('fileResourcesWorkspace.maximizePreview')}>
                   <button
                     type="button"
@@ -911,6 +984,59 @@ const FileResourcesWorkspace: React.FC = () => {
         </div>
         </>
       ) : null}
+      {importDialogOpen && (
+        <div className="fr-import-dialog-overlay" onClick={() => { if (!importingFile) setImportDialogOpen(false); }}>
+          <div className="fr-import-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="fr-import-dialog-title">{t('fileResourcesWorkspace.importDialogTitle')}</div>
+            <div className="fr-import-dialog-desc">{t('fileResourcesWorkspace.importDialogDesc')}</div>
+            <div className="fr-import-dialog-file">
+              <span className="fr-import-dialog-file-label">{t('fileResourcesWorkspace.columnFileName')}:</span>
+              <span className="fr-import-dialog-file-name">{selectedFile?.filename}</span>
+            </div>
+            <label className="fr-import-dialog-label">{t('fileResourcesWorkspace.selectTargetDirectory')}</label>
+            {loadingDcDirs ? (
+              <div className="fr-import-dialog-loading">{t('sidebar.loading')}</div>
+            ) : (
+              <select
+                className="fr-import-dialog-select"
+                value={importTargetDirId ?? ''}
+                onChange={(e) => setImportTargetDirId(e.target.value ? Number(e.target.value) : null)}
+                disabled={importingFile}
+              >
+                <option value="">{t('fileResourcesWorkspace.rootDirectory')}</option>
+                {flatDcDirs.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {'\u00A0\u00A0'.repeat(d.depth)}{d.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {importMessage && (
+              <div className={`fr-import-dialog-msg fr-import-dialog-msg-${importMessage.type}`}>
+                {importMessage.text}
+              </div>
+            )}
+            <div className="fr-import-dialog-actions">
+              <button
+                type="button"
+                className="fr-btn fr-btn-neutral"
+                onClick={() => setImportDialogOpen(false)}
+                disabled={importingFile}
+              >
+                {t('fileResourcesWorkspace.cancelImport')}
+              </button>
+              <button
+                type="button"
+                className="fr-btn fr-btn-primary"
+                onClick={handleConfirmImport}
+                disabled={importingFile || loadingDcDirs}
+              >
+                {importingFile ? t('fileResourcesWorkspace.importing') : t('fileResourcesWorkspace.confirmImport')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

@@ -173,7 +173,8 @@ const KnowledgeBaseWorkspace: React.FC = () => {
         id: d.id,
         name: d.filename,
         type: 'file' as const,
-        processed: d.processed
+        processed: d.processed,
+        knowledgePointCount: d.knowledgePointCount
       }));
     }
     return [];
@@ -194,27 +195,25 @@ const KnowledgeBaseWorkspace: React.FC = () => {
   }, [selectedDocId]);
 
   const selectedDocIdRef = useRef<number | null>(selectedDocId);
-  const fetchPageRef = useRef(1);
+  const kpPageRef = useRef(kpPage);
+
   useEffect(() => {
     selectedDocIdRef.current = selectedDocId;
   }, [selectedDocId]);
-  useEffect(() => {
-    fetchPageRef.current = kpPage;
-  }, [kpPage]);
-  useEffect(() => {
-    if (selectedDocId != null) fetchPageRef.current = 1;
-  }, [selectedDocId]);
 
-  const refetchKnowledgePoints = useCallback(() => {
-    if (selectedDocId == null) return;
-    const docId = selectedDocId;
-    const page = fetchPageRef.current;
+  useEffect(() => {
+    kpPageRef.current = kpPage;
+  }, [kpPage]);
+
+  const loadKnowledgePoints = useCallback(() => {
+    const docId = selectedDocIdRef.current;
+    if (docId == null) return;
+    const page = kpPageRef.current;
     getKnowledgePoints(page, KP_PAGE_SIZE, docId)
       .then((res) => {
         if (selectedDocIdRef.current !== docId) return;
         const raw = res.knowledge_points ?? [];
-        const forDoc = raw.filter((kp) => kp.document_id === docId);
-        setKnowledgePoints(forDoc);
+        setKnowledgePoints(raw);
         setKpTotal(res.total ?? 0);
       })
       .catch(() => {
@@ -222,11 +221,17 @@ const KnowledgeBaseWorkspace: React.FC = () => {
         setKnowledgePoints([]);
         setKpTotal(0);
       });
-  }, [selectedDocId, kpPage]);
+  }, []);
 
   useEffect(() => {
-    refetchKnowledgePoints();
-  }, [refetchKnowledgePoints]);
+    if (selectedDocId == null) return;
+    kpPageRef.current = 1;
+    loadKnowledgePoints();
+  }, [selectedDocId, loadKnowledgePoints]);
+
+  useEffect(() => {
+    loadKnowledgePoints();
+  }, [kpPage, loadKnowledgePoints]);
 
   const kpTotalPages = Math.max(1, Math.ceil(kpTotal / KP_PAGE_SIZE));
 
@@ -344,7 +349,8 @@ const KnowledgeBaseWorkspace: React.FC = () => {
         id: d.id,
         name: d.filename,
         type: 'file' as const,
-        processed: d.processed
+        processed: d.processed,
+        knowledgePointCount: d.knowledgePointCount
       }));
     }
     return fileListInDir;
@@ -644,6 +650,9 @@ const KnowledgeBaseWorkspace: React.FC = () => {
                           <Tooltip title={item.name}>
                             <span className={`kb-cli-col-filename kb-file-weight-${weight}`}>
                               <span className="kb-file-name">{item.name}</span>
+                              {typeof item.knowledgePointCount === 'number' && item.knowledgePointCount > 0 && (
+                                <span className="kb-file-kp-count">{item.knowledgePointCount}</span>
+                              )}
                             </span>
                           </Tooltip>
                           <span

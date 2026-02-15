@@ -75,4 +75,4 @@ const BottomPanel: React.FC<BottomPanelProps> = ({
   );
 };
 
-export default BottomPanel;
+export default React.memo(BottomPanel);

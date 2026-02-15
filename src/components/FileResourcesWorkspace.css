@@ -38,7 +38,7 @@
 
 .fr-workspace-resize-handle {
   flex-shrink: 0;
-  height: 6px;
+  height: 4px;
   cursor: row-resize;
   background: var(--vs-border-subtle);
   border-top: 1px solid var(--vs-border-subtle);
@@ -254,8 +254,8 @@
 
 .fr-search-input {
   width: 100%;
-  padding: 8px 12px;
-  font-size: 13px;
+  padding: 6px 10px;
+  font-size: 12px;
   color: var(--vs-fg);
   background: var(--vs-input-bg);
   border: 1px solid var(--vs-border);
@@ -396,7 +396,7 @@
 
 .fr-attachment-header .fr-section-title {
   border-bottom: none;
-  padding: 6px 0;
+  padding: 6px 10px;
 }
 
 .fr-workspace .fr-add-mount-btn {
@@ -667,7 +667,7 @@
 
 .fr-cli-file-table-header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 84px 56px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 56px 56px;
   gap: 8px;
   padding: 4px 0 6px;
   font-size: 11px;
@@ -687,7 +687,7 @@
 
 .fr-cli-file-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 84px 56px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) 56px 56px;
   gap: 8px;
   padding: 4px 0;
   align-items: center;
@@ -752,7 +752,7 @@
 .fr-cli-col-weight {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
+  gap: 0;
   cursor: default;
 }
 
@@ -766,7 +766,7 @@
 }
 
 .fr-star {
-  font-size: 14px;
+  font-size: 10px;
   line-height: 1;
   color: var(--fr-cli-muted, #505050);
   cursor: pointer;
@@ -797,7 +797,7 @@
   color: var(--fr-cli-muted, #858585);
   background: transparent !important;
   border: none;
-  border-radius: 0;
+  border-radius: 2px;
   cursor: pointer;
   box-shadow: none;
 }
@@ -974,7 +974,7 @@
 
 .fr-loading {
   padding: 12px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--vs-description-foreground);
 }
 
@@ -989,8 +989,8 @@
 .fr-annotation-content {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 16px;
-  font-size: 13px;
+  padding: 8px 12px;
+  font-size: 12px;
   line-height: 1.5;
   color: var(--vs-fg);
 }
@@ -1040,7 +1040,7 @@
   color: var(--vs-description-foreground);
 }
 .fr-doc-stats-total {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--vs-fg);
   margin-bottom: 8px;
 }
@@ -1154,5 +1154,154 @@
   color: var(--vs-description-foreground);
   font-style: italic;
   padding: 12px 0;
+}
+
+/* Import to Data Center button */
+.fr-import-dc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--vs-foreground);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.85;
+  transition: opacity 0.15s, background 0.15s;
+}
+.fr-import-dc-btn:hover:not(:disabled) {
+  opacity: 1;
+  background: var(--vs-list-hover, rgba(255,255,255,0.06));
+}
+.fr-import-dc-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Import dialog overlay */
+.fr-import-dialog-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* Import dialog */
+.fr-import-dialog {
+  background: var(--vs-editor-background, #1e1e1e);
+  border: 1px solid var(--vs-panel-border, #444);
+  border-radius: 8px;
+  padding: 20px 24px;
+  min-width: 360px;
+  max-width: 480px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.fr-import-dialog-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--vs-foreground);
+  margin-bottom: 6px;
+}
+
+.fr-import-dialog-desc {
+  font-size: 12px;
+  color: var(--vs-description-foreground, #999);
+  margin-bottom: 12px;
+}
+
+.fr-import-dialog-file {
+  font-size: 12px;
+  color: var(--vs-foreground);
+  margin-bottom: 12px;
+  padding: 6px 8px;
+  background: var(--vs-input-background, #3c3c3c);
+  border-radius: 4px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.fr-import-dialog-file-label {
+  color: var(--vs-description-foreground, #999);
+  white-space: nowrap;
+}
+
+.fr-import-dialog-file-name {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fr-import-dialog-label {
+  display: block;
+  font-size: 12px;
+  color: var(--vs-foreground);
+  margin-bottom: 4px;
+}
+
+.fr-import-dialog-loading {
+  font-size: 12px;
+  color: var(--vs-description-foreground);
+  padding: 4px 0;
+}
+
+.fr-import-dialog-select {
+  width: 100%;
+  padding: 5px 8px;
+  font-size: 12px;
+  background: var(--vs-input-background, #3c3c3c);
+  color: var(--vs-input-foreground, #ccc);
+  border: 1px solid var(--vs-input-border, #555);
+  border-radius: 4px;
+  outline: none;
+}
+.fr-import-dialog-select:focus {
+  border-color: var(--vs-focusBorder, #007fd4);
+}
+
+.fr-import-dialog-msg {
+  font-size: 12px;
+  margin-top: 8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+}
+.fr-import-dialog-msg-success {
+  color: #89d185;
+  background: rgba(137, 209, 133, 0.1);
+}
+.fr-import-dialog-msg-error {
+  color: var(--vs-errorForeground, #f14c4c);
+  background: rgba(241, 76, 76, 0.1);
+}
+
+.fr-import-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.fr-btn-primary {
+  background: var(--vs-button-background, #0e639c);
+  color: var(--vs-button-foreground, #fff);
+  border: none;
+  border-radius: 4px;
+  padding: 5px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.fr-btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+.fr-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 

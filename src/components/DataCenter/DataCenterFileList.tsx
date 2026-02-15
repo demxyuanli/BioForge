@@ -111,6 +111,9 @@ const DataCenterFileList: React.FC<DataCenterFileListProps> = ({
                   <Tooltip title={item.name}>
                     <span className={`dc-cli-col-filename dc-file-weight-${isFile ? weight : 0}`}>
                       <span className="dc-file-name">{item.name}</span>
+                      {isFile && typeof item.knowledgePointCount === 'number' && item.knowledgePointCount > 0 && (
+                        <span className="dc-file-kp-count">{item.knowledgePointCount}</span>
+                      )}
                     </span>
                   </Tooltip>
                   {isFile ? (
@@ -276,4 +279,4 @@ const DataCenterFileList: React.FC<DataCenterFileListProps> = ({
   );
 };
 
-export default DataCenterFileList;
+export default React.memo(DataCenterFileList);

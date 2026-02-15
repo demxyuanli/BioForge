@@ -71,7 +71,7 @@
 
 .fe-remove-mount:hover {
   background: var(--vs-hover-bg);
-  color: #fff;
+  color: var(--vs-fg);
 }
 
 .fe-loading,

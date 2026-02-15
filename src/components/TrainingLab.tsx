@@ -61,6 +61,7 @@ const buildPromptFromTemplate = (template: string, kp: KnowledgePoint, defaultTe
 const TrainingLab: React.FC = () => {
   const { t } = useTranslation();
   const defaultPromptTemplate = t('trainingLab.defaultPromptTemplate');
+  const aiConfig = useMemo(() => getAIConfig(), []);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [availableLocalModels, setAvailableLocalModels] = useState<string[]>([]);
@@ -92,11 +93,10 @@ const TrainingLab: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const cfg = getAIConfig();
-    if (cfg.useLocalModel) {
+    if (aiConfig.useLocalModel) {
       fetchLocalModels();
     }
-  }, []);
+  }, [aiConfig.useLocalModel]);
 
   useEffect(() => {
     setPromptTemplate((prev) => (prev.trim() ? prev : defaultPromptTemplate));
@@ -130,10 +130,9 @@ const TrainingLab: React.FC = () => {
   }, [isSplitResizing]);
 
   const fetchLocalModels = async () => {
-    const cfg = getAIConfig();
     setIsFetchingModels(true);
     try {
-      const models = await getLocalModels(cfg.localBaseUrl);
+      const models = await getLocalModels(aiConfig.localBaseUrl);
       setAvailableLocalModels(models);
     } catch (error) {
       console.error('Failed to fetch local models:', error);
@@ -249,7 +248,7 @@ const TrainingLab: React.FC = () => {
   };
 
   const handleGenerateAnnotations = async () => {
-    const cfg = getAIConfig();
+    const cfg = aiConfig;
     if (!cfg.useLocalModel && !cfg.defaultPlatform) {
       alert(t('trainingLab.configureInSettings'));
       return;
@@ -488,14 +487,14 @@ const TrainingLab: React.FC = () => {
                       aria-label={activeTrainingItemId === item.id ? t('trainingLab.active') : t('trainingLab.activate')}
                       title={activeTrainingItemId === item.id ? t('trainingLab.active') : t('trainingLab.activate')}
                     >
-                      <Check size={16} strokeWidth={2} />
+                      <Check size={14} strokeWidth={1.5} />
                     </button>
                     <button
                       onClick={() => handleDeleteTrainingItem(item.id)}
                       aria-label={t('trainingLab.remove')}
                       title={t('trainingLab.remove')}
                     >
-                      <Trash2 size={16} strokeWidth={2} />
+                      <Trash2 size={14} strokeWidth={1.5} />
                     </button>
                   </div>
                 </div>
@@ -605,7 +604,7 @@ const TrainingLab: React.FC = () => {
       <div className="training-lab-divider" onMouseDown={handleSplitResizeStart} />
 
       <div className="training-lab-pane training-lab-right-pane">
-        {getAIConfig().useLocalModel && (
+        {aiConfig.useLocalModel && (
           <div className="config-section">
             <div className="form-group">
               <label>{t('trainingLab.localModelName')}:</label>
@@ -613,7 +612,7 @@ const TrainingLab: React.FC = () => {
                 <input
                   list="local-models-list"
                   type="text"
-                  value={getAIConfig().localModelName}
+                  value={aiConfig.localModelName}
                   readOnly
                   style={{ flex: 1, backgroundColor: 'var(--vs-input-bg)', color: 'var(--vs-muted)' }}
                 />
@@ -660,7 +659,7 @@ const TrainingLab: React.FC = () => {
               <span>{t('trainingLab.candidatesPerKnowledgePoint')}</span>
               <Tooltip title={t('trainingLab.candidatesPerKnowledgePointDesc')}>
                 <span className="training-inline-tip-icon" aria-label={t('trainingLab.candidatesPerKnowledgePointDesc')}>
-                  <CircleHelp size={14} strokeWidth={1.8} />
+                  <CircleHelp size={14} strokeWidth={1.5} />
                 </span>
               </Tooltip>
             </label>
@@ -728,7 +727,7 @@ const TrainingLab: React.FC = () => {
                             onClick={() => handleScoreChange(index, starValue)}
                             aria-label={`${t('trainingLab.score')} ${starValue}`}
                           >
-                            <Star size={16} strokeWidth={1.8} fill={isActive ? 'currentColor' : 'none'} />
+                            <Star size={14} strokeWidth={1.5} fill={isActive ? 'currentColor' : 'none'} />
                           </button>
                         );
                       })}

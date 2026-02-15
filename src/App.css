@@ -58,8 +58,8 @@ body {
     --settings-fg: #1a1a1a;
     --settings-section-bg: #fff;
     --settings-section-border: #ddd;
-    --settings-muted: #555555;
-    --vs-muted: #555555;
+    --settings-muted: #424242;
+    --vs-muted: #424242;
     --vs-list-hover: #d8d8d8;
     --vs-divider: #d0d0d0;
     --vs-scrollbar-thumb: #b0b0b0;
@@ -86,6 +86,13 @@ body {
     --vs-drag-bg: rgba(0, 122, 204, 0.3);
     --vs-drag-border: #007acc;
     --vs-modal-overlay: rgba(0, 0, 0, 0.6);
+    --vs-description-foreground: #424242;
+    --vs-input-bg: #ffffff;
+    --vs-focus-border: #007acc;
+    --vs-editor-background: #ffffff;
+    --vs-highlight-fg: #005a9e;
+    --kb-cli-fg: #1a1a1a;
+    --kb-cli-muted: #505050;
   }
 }
 
@@ -116,8 +123,8 @@ body {
   --settings-fg: #1a1a1a;
   --settings-section-bg: #fff;
   --settings-section-border: #ddd;
-  --settings-muted: #555555;
-  --vs-muted: #555555;
+  --settings-muted: #424242;
+  --vs-muted: #424242;
   --vs-list-hover: #d8d8d8;
   --vs-divider: #d0d0d0;
   --vs-scrollbar-thumb: #b0b0b0;
@@ -144,6 +151,13 @@ body {
   --vs-drag-bg: rgba(0, 122, 204, 0.3);
   --vs-drag-border: #007acc;
   --vs-modal-overlay: rgba(0, 0, 0, 0.6);
+  --vs-description-foreground: #424242;
+  --vs-input-bg: #ffffff;
+  --vs-focus-border: #007acc;
+  --vs-editor-background: #ffffff;
+  --vs-highlight-fg: #005a9e;
+  --kb-cli-fg: #1a1a1a;
+  --kb-cli-muted: #505050;
 }
 
 :root[data-theme="dark"] {
@@ -198,6 +212,13 @@ body {
   --vs-drag-bg: rgba(0, 122, 204, 0.3);
   --vs-drag-border: #007acc;
   --vs-modal-overlay: rgba(0, 0, 0, 0.6);
+  --vs-description-foreground: #858585;
+  --vs-input-bg: #3c3c3c;
+  --vs-focus-border: #007acc;
+  --vs-editor-background: #1e1e1e;
+  --vs-highlight-fg: #4fc1ff;
+  --kb-cli-fg: #d4d4d4;
+  --kb-cli-muted: #858585;
 }
 
 * {

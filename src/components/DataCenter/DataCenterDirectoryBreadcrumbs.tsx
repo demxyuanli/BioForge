@@ -38,4 +38,4 @@ const DataCenterDirectoryBreadcrumbs: React.FC<DataCenterDirectoryBreadcrumbsPro
   );
 };
 
-export default DataCenterDirectoryBreadcrumbs;
+export default React.memo(DataCenterDirectoryBreadcrumbs);

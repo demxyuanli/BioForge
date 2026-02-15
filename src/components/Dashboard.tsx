@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { getFinetuningJobs, getDocuments, FinetuningJob, Document } from '../services/api';
+import { FinetuningJob, Document } from '../services/api';
 import './Dashboard.css';
 
 interface DashboardProps {
@@ -9,6 +9,8 @@ interface DashboardProps {
   processedCount?: number;
   jobsCount?: number;
   activeJobsCount?: number;
+  documents?: Document[];
+  jobs?: FinetuningJob[];
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -16,58 +18,23 @@ const Dashboard: React.FC<DashboardProps> = ({
   documentsCount,
   processedCount,
   jobsCount,
-  activeJobsCount
+  activeJobsCount,
+  documents = [],
+  jobs = []
 }) => {
   const { t } = useTranslation();
-  const [jobs, setJobs] = useState<FinetuningJob[]>([]);
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [stats, setStats] = useState({
-    totalDocuments: 0,
-    totalJobs: 0,
-    activeJobs: 0,
-    completedJobs: 0,
-    totalCost: 0
-  });
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadData = async () => {
-    try {
-      const [jobsData, docsData] = await Promise.all([
-        getFinetuningJobs(),
-        getDocuments()
-      ]);
-      
-      setJobs(jobsData);
-      setDocuments(docsData);
-      
-      const activeJobs = jobsData.filter(j => j.status === 'running' || j.status === 'submitted');
-      const completedJobs = jobsData.filter(j => j.status === 'completed');
-      const totalCost = jobsData.reduce((sum, job) => sum + (job.costUsd || 0), 0);
-      
-      setStats({
-        totalDocuments: docsData.length,
-        totalJobs: jobsData.length,
-        activeJobs: activeJobs.length,
-        completedJobs: completedJobs.length,
-        totalCost
-      });
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    }
-  };
-
-  const displayStats = {
-    totalDocuments: documentsCount ?? stats.totalDocuments,
-    totalJobs: jobsCount ?? stats.totalJobs,
-    activeJobs: activeJobsCount ?? stats.activeJobs,
-    completedJobs: stats.completedJobs,
-    totalCost: stats.totalCost
-  };
+  const displayStats = useMemo(() => {
+    const completedJobs = jobs.filter(j => j.status === 'completed');
+    const totalCost = jobs.reduce((sum, job) => sum + (job.costUsd || 0), 0);
+    return {
+      totalDocuments: documentsCount ?? documents.length,
+      totalJobs: jobsCount ?? jobs.length,
+      activeJobs: activeJobsCount ?? jobs.filter(j => j.status === 'running' || j.status === 'submitted').length,
+      completedJobs: completedJobs.length,
+      totalCost
+    };
+  }, [documents, jobs, documentsCount, jobsCount, activeJobsCount]);
 
   return (
     <div className="dashboard">
@@ -96,11 +63,11 @@ const Dashboard: React.FC<DashboardProps> = ({
         </div>
         <div className="stat-card">
           <div className="stat-label">{t('dashboard.completedJobs')}</div>
-          <div className="stat-value">{stats.completedJobs}</div>
+          <div className="stat-value">{displayStats.completedJobs}</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">{t('dashboard.totalCost')}</div>
-          <div className="stat-value">${stats.totalCost.toFixed(2)}</div>
+          <div className="stat-value">${displayStats.totalCost.toFixed(2)}</div>
         </div>
       </div>
 

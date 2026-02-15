@@ -1,8 +1,9 @@
 """Directory and document-move routes."""
 from fastapi import APIRouter, HTTPException, Body, Depends
 from typing import Dict, Any
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from database.models import Directory, Document
+from database.models import Directory, Document, KnowledgePoint
 from api.db import get_db
 
 router = APIRouter()
@@ -10,10 +11,23 @@ router = APIRouter()
 
 @router.get("/directories")
 async def list_directories(db: Session = Depends(get_db)):
-    """List all directories and files in tree structure."""
+    """List all directories and files in tree structure with KP counts via SQL JOIN."""
     try:
         directories = db.query(Directory).all()
-        documents = db.query(Document).all()
+        kp_subq = (
+            db.query(
+                KnowledgePoint.document_id,
+                func.count(KnowledgePoint.id).label('kp_count')
+            )
+            .filter(KnowledgePoint.excluded == False)
+            .group_by(KnowledgePoint.document_id)
+            .subquery()
+        )
+        doc_rows = (
+            db.query(Document, func.coalesce(kp_subq.c.kp_count, 0))
+            .outerjoin(kp_subq, Document.id == kp_subq.c.document_id)
+            .all()
+        )
         dir_map = {}
         root_dirs = []
         for d in directories:
@@ -25,7 +39,7 @@ async def list_directories(db: Session = Depends(get_db)):
                 "parentId": d.parent_id
             }
         root_files = []
-        for doc in documents:
+        for doc, kp_count in doc_rows:
             file_node = {
                 "id": doc.id,
                 "name": doc.filename,
@@ -33,7 +47,8 @@ async def list_directories(db: Session = Depends(get_db)):
                 "fileType": doc.file_type,
                 "processed": doc.processed,
                 "uploadTime": doc.upload_time.isoformat() if doc.upload_time else None,
-                "directoryId": doc.directory_id
+                "directoryId": doc.directory_id,
+                "knowledgePointCount": kp_count
             }
             if doc.directory_id and doc.directory_id in dir_map:
                 dir_map[doc.directory_id]["children"].append(file_node)

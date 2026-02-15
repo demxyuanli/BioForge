@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { readChatHistory, writeChatHistory } from '../services/api';
 
 export interface Message {
@@ -201,7 +201,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     [setConversationsAndPersist]
   );
 
-  const value: ChatContextValue = {
+  const value = useMemo<ChatContextValue>(() => ({
     conversations,
     currentId,
     historyLoaded,
@@ -213,7 +213,18 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     deleteConversation,
     updateConversation,
     appendUserMessage
-  };
+  }), [
+    conversations,
+    currentId,
+    historyLoaded,
+    currentConversation,
+    messages,
+    newChat,
+    selectConversation,
+    deleteConversation,
+    updateConversation,
+    appendUserMessage
+  ]);
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }

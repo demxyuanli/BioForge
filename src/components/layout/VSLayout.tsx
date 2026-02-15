@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import ActivityBar from './ActivityBar';
@@ -135,11 +135,16 @@ const VSLayout: React.FC<VSLayoutProps> = ({
     await handleMaximize();
   };
 
-  const handleSidebarResize = (e: React.MouseEvent) => {
+  const sidebarWidthRef = useRef(sidebarWidth);
+  useEffect(() => { sidebarWidthRef.current = sidebarWidth; }, [sidebarWidth]);
+  const bottomPanelHeightRef = useRef(bottomPanelHeight);
+  useEffect(() => { bottomPanelHeightRef.current = bottomPanelHeight; }, [bottomPanelHeight]);
+
+  const handleSidebarResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     if (sidebarFloating) return;
     const startX = e.clientX;
-    const startWidth = sidebarWidth;
+    const startWidth = sidebarWidthRef.current;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const newWidth = startWidth + (moveEvent.clientX - startX);
@@ -155,12 +160,12 @@ const VSLayout: React.FC<VSLayoutProps> = ({
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
-  };
+  }, [sidebarFloating]);
 
-  const handleBottomPanelResize = (e: React.MouseEvent) => {
+  const handleBottomPanelResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     const startY = e.clientY;
-    const startHeight = bottomPanelHeight;
+    const startHeight = bottomPanelHeightRef.current;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const newHeight = startHeight - (moveEvent.clientY - startY);
@@ -176,7 +181,7 @@ const VSLayout: React.FC<VSLayoutProps> = ({
 
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);
-  };
+  }, []);
 
   return (
     <div className="vs-layout">

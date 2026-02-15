@@ -750,7 +750,6 @@
 /* Scrollbar uses global theme vars from App.css */
 
 /* Content Area Overrides for existing components */
-.vs-editor-content .dashboard,
 .vs-editor-content .data-center,
 .vs-editor-content .kb-workspace,
 .vs-editor-content .training-lab,
@@ -758,6 +757,11 @@
 .vs-editor-content .privacy-center {
   max-width: 100%;
   margin: -16px;
+  background: transparent;
+}
+
+.vs-editor-content .dashboard {
+  max-width: 100%;
   background: transparent;
 }
 
@@ -837,9 +841,9 @@
   background-color: var(--vs-accent);
   color: var(--vs-accent-fg);
   border: none;
-  border-radius: 2px;
+  border-radius: 3px;
   cursor: pointer;
-  font-size: var(--font-size-13, 1rem);
+  font-size: var(--font-size-12, 12px);
   font-family: inherit;
   transition: background-color 0.15s;
 }
@@ -964,16 +968,22 @@
 .vs-editor-content .training-lab-right-pane {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
   height: 100%;
 }
 
+.vs-editor-content .training-lab .config-section,
+.vs-editor-content .training-lab .info-section {
+  padding: 8px;
+  margin-bottom: 0;
+}
+
 .vs-editor-content .training-lab-left-pane {
-  padding-right: 10px;
+  padding-right: 5px;
 }
 
 .vs-editor-content .training-lab-right-pane {
-  padding-left: 10px;
+  padding-left: 5px;
 }
 
 .vs-editor-content .training-lab-divider {
@@ -1002,7 +1012,7 @@
 .vs-editor-content .training-filters-grid {
   display: grid;
   grid-template-columns: 1fr;
-  row-gap: 10px;
+  row-gap: 5px;
   max-width: 100%;
 }
 
@@ -1010,7 +1020,7 @@
   display: grid;
   grid-template-columns: 130px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 6px;
   margin-bottom: 0;
 }
 
@@ -1031,8 +1041,8 @@
 
 .vs-editor-content .training-filter-actions {
   margin-left: 142px;
-  margin-top: 14px;
-  gap: 12px;
+  margin-top: 7px;
+  gap: 6px;
 }
 
 .vs-editor-content .training-filter-actions button {
@@ -1043,7 +1053,7 @@
   display: grid;
   grid-template-columns: 130px minmax(0, 1fr);
   align-items: center;
-  gap: 12px;
+  gap: 6px;
 }
 
 .vs-editor-content .training-name-inline label {
@@ -1068,7 +1078,7 @@
 .vs-editor-content .training-actions-inline-field {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   margin-left: auto;
 }
 
@@ -1085,7 +1095,7 @@
 .vs-editor-content .training-summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 16px;
+  gap: 4px 8px;
 }
 
 .vs-editor-content .training-summary-grid p {
@@ -1109,7 +1119,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 5px;
   border: 1px solid var(--vs-border-subtle);
   border-radius: 4px;
   padding: 8px 10px;
@@ -1124,7 +1134,7 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  gap: 8px;
+  gap: 4px;
 }
 
 .vs-editor-content .training-item-main strong {
@@ -1136,7 +1146,7 @@
 .vs-editor-content .training-item-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 3px;
   margin-left: auto;
   flex-shrink: 0;
 }
@@ -1177,7 +1187,7 @@
 }
 
 .vs-editor-content .training-kp-item {
-  padding: 10px;
+  padding: 5px;
   border-bottom: 1px solid var(--vs-border-subtle);
 }
 
@@ -1192,8 +1202,8 @@
 .vs-editor-content .training-kp-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  gap: 4px;
+  margin-bottom: 3px;
   cursor: pointer;
 }
 
@@ -1205,7 +1215,7 @@
 }
 
 .vs-editor-content .training-kp-keywords {
-  margin-top: 6px;
+  margin-top: 3px;
   color: var(--vs-muted);
   font-size: var(--font-size-12, 0.923rem);
 }
@@ -1213,7 +1223,7 @@
 .vs-editor-content .training-star-rating {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
 }
 
 .vs-editor-content .training-star-button {
@@ -1240,7 +1250,7 @@
 }
 
 .vs-editor-content .training-star-value {
-  margin-left: 6px;
+  margin-left: 3px;
   color: var(--vs-muted);
   font-size: var(--font-size-12, 0.923rem);
 }
@@ -1362,7 +1372,7 @@
   cursor: pointer;
   border-radius: 4px;
   padding: 2px 4px;
-  margin: -2px -4px 8px -4px;
+  margin: -2px -4px 4px -4px;
   border: 1px dashed transparent;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
@@ -1374,23 +1384,28 @@
   outline: none;
 }
 
+.vs-editor-content .training-lab-usage {
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
 .vs-editor-content .training-lab-usage h4 {
   color: var(--vs-fg);
   font-size: var(--font-size-13, 1rem);
   font-weight: 500;
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
 }
 
 .vs-editor-content .training-lab-usage-steps {
   margin: 0;
-  padding-left: 20px;
+  padding-left: 16px;
   color: var(--vs-fg);
   font-size: var(--font-size-13, 1rem);
-  line-height: 1.6;
+  line-height: 1.4;
 }
 
 .vs-editor-content .training-lab-usage-steps li {
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .vs-editor-content .annotation-item strong {

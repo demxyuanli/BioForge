@@ -53,4 +53,4 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ activeTab, onTabChang
   );
 };
 
-export default SettingsSidebar;
+export default React.memo(SettingsSidebar);

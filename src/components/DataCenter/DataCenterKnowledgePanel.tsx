@@ -100,7 +100,7 @@ const DataCenterKnowledgePanel: React.FC<DataCenterKnowledgePanelProps> = ({
                 className={kpViewMode === 'list' ? 'dc-kp-view-tab active' : 'dc-kp-view-tab'}
                 onClick={() => setKpViewMode('list')}
               >
-                <List size={15} aria-hidden />
+                <List size={14} aria-hidden />
               </button>
             </Tooltip>
             <Tooltip title={t('knowledgeGraph.graphView')}>
@@ -112,7 +112,7 @@ const DataCenterKnowledgePanel: React.FC<DataCenterKnowledgePanelProps> = ({
                 className={kpViewMode === 'graph' ? 'dc-kp-view-tab active' : 'dc-kp-view-tab'}
                 onClick={() => setKpViewMode('graph')}
               >
-                <Network size={15} aria-hidden />
+                <Network size={14} aria-hidden />
               </button>
             </Tooltip>
           </div>
@@ -372,4 +372,4 @@ const DataCenterKnowledgePanel: React.FC<DataCenterKnowledgePanelProps> = ({
   );
 };
 
-export default DataCenterKnowledgePanel;
+export default React.memo(DataCenterKnowledgePanel);

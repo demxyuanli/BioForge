@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { chatQuery } from '../services/api';
 import { getAIConfig } from '../utils/aiConfig';
@@ -15,6 +15,7 @@ const ChatAssistant: React.FC = () => {
   const { messages, updateConversation, appendUserMessage } = useChat();
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const aiConfig = useMemo(() => getAIConfig(), []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -124,9 +125,9 @@ const ChatAssistant: React.FC = () => {
         {!isEmpty && (
           <header className="chat-header">
             <span className="chat-header-model">
-              {getAIConfig().useLocalModel
-                ? `${t('trainingLab.useLocalModel')}: ${getAIConfig().localModelName}`
-                : `${getAIConfig().defaultPlatform} / ${getAIConfig().defaultCloudModel}`}
+              {aiConfig.useLocalModel
+                ? `${t('trainingLab.useLocalModel')}: ${aiConfig.localModelName}`
+                : `${aiConfig.defaultPlatform} / ${aiConfig.defaultCloudModel}`}
             </span>
           </header>
         )}
@@ -138,9 +139,9 @@ const ChatAssistant: React.FC = () => {
                   {t('chat.welcome') || 'How can I help you today?'}
                 </p>
                 <p className="chat-welcome-hint">
-                  {getAIConfig().useLocalModel
-                    ? `Using Local: ${getAIConfig().localModelName}`
-                    : `Using Cloud: ${getAIConfig().defaultPlatform} / ${getAIConfig().defaultCloudModel}`}
+                  {aiConfig.useLocalModel
+                    ? `Using Local: ${aiConfig.localModelName}`
+                    : `Using Cloud: ${aiConfig.defaultPlatform} / ${aiConfig.defaultCloudModel}`}
                 </p>
               </div>
             )}
