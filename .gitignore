@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.db
+*.sqlite
+chroma_db/
+.encryption_key
+audit.log
+
+# Node
+node_modules/
+dist/
+.DS_Store
+
+# Rust
+target/
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+python-backend/documents/20260130_211444_2023大模型落地应用案例集.pdf
+python-backend/documents/20260130_220259_网格划分原理与实例绪论.pdf

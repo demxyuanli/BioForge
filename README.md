@@ -73,7 +73,7 @@ npm run tauri dev
 │   ├── database/         # Database models
 │   ├── api/              # FastAPI routes
 │   └── main.py           # Backend entry point
-└── requirments.md         # Project requirements
+└── requirments.md         # Project requirements (task book)
 ```
 
 ## Building

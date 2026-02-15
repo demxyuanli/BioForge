@@ -8,7 +8,10 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 use std::fs;
+use reqwest::Method;
 use tauri::Manager;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 
 use backend_url::{
     get_backend_base_url, get_config_path_from_app, get_backend_port_from_env,
@@ -36,105 +39,83 @@ use commands::training::{
     save_training_set, get_training_set, get_training_items, save_training_item, delete_training_item,
 };
 
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+fn backend_host_command() -> Command {
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new("python");
+        cmd.creation_flags(CREATE_NO_WINDOW);
+        cmd
+    }
+    #[cfg(not(windows))]
+    {
+        Command::new("python")
+    }
+}
+
+fn json_result(success: bool, data: serde_json::Value, error: Option<String>) -> Result<String, String> {
+    serde_json::to_string(&serde_json::json!({
+        "success": success,
+        "data": data,
+        "error": error
+    }))
+    .map_err(|e| e.to_string())
+}
+
+async fn backend_request_json(
+    app: &tauri::AppHandle,
+    method: Method,
+    path: &str,
+    query: Option<Vec<(String, String)>>,
+    body: Option<serde_json::Value>,
+) -> Result<String, String> {
+    let base_url = get_backend_base_url(app);
+    let url = format!("{}{}", base_url, path);
+    let client = reqwest::Client::new();
+    let mut req = client.request(method, &url);
+    if let Some(q) = query {
+        req = req.query(&q);
+    }
+    if let Some(b) = body {
+        req = req.json(&b);
+    }
+
+    let resp = req.send().await.map_err(|e| format!("Backend request failed: {}", e))?;
+    let status_ok = resp.status().as_u16() == 200;
+    let bytes = resp.bytes().await.map_err(|e| format!("Failed to read response: {}", e))?;
+
+    if status_ok {
+        let data = serde_json::from_slice::<serde_json::Value>(&bytes).unwrap_or(serde_json::Value::Null);
+        json_result(true, data, None)
+    } else {
+        let error = String::from_utf8_lossy(&bytes).to_string();
+        json_result(false, serde_json::Value::Null, Some(error))
+    }
+}
+
 #[tauri::command]
 async fn save_api_key(app: tauri::AppHandle, platform: String, api_key: String) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
     let payload = serde_json::json!({"platform": platform, "api_key": api_key});
-    let payload_str = payload.to_string();
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    payload = json.loads(sys.argv[1])
-    r = requests.post(base_url + '/api-keys', json=payload)
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).arg(&payload_str).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    backend_request_json(&app, Method::POST, "/api-keys", None, Some(payload)).await
 }
 
 #[tauri::command]
 async fn get_api_keys(app: tauri::AppHandle) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.get(base_url + '/api-keys')
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    backend_request_json(&app, Method::GET, "/api-keys", None, None).await
 }
 
 #[tauri::command]
 async fn get_audit_log(app: tauri::AppHandle, limit: i32) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.get(base_url + '/audit-log', params={{"limit": {}}})
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        limit
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let query = vec![("limit".to_string(), limit.to_string())];
+    backend_request_json(&app, Method::GET, "/audit-log", Some(query), None).await
 }
 
 #[tauri::command]
 async fn get_desensitization_log(app: tauri::AppHandle, limit: i32) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.get(base_url + '/desensitization-log', params={{"limit": {}}})
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        limit
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let query = vec![("limit".to_string(), limit.to_string())];
+    backend_request_json(&app, Method::GET, "/desensitization-log", Some(query), None).await
 }
 
 #[tauri::command]
@@ -167,8 +148,6 @@ async fn evaluation_generate(
     api_key: Option<String>,
     platform: Option<String>,
 ) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
     let mut payload = serde_json::json!({
         "prompt": prompt,
         "template": template,
@@ -177,26 +156,7 @@ async fn evaluation_generate(
     if let Some(p) = platform {
         payload["platform"] = serde_json::json!(p);
     }
-    let payload_str = payload.to_string();
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    payload = json.loads(sys.argv[1])
-    r = requests.post(base_url + '/evaluation/generate', json=payload)
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).arg(&payload_str).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    backend_request_json(&app, Method::POST, "/evaluation/generate", None, Some(payload)).await
 }
 
 #[tauri::command]
@@ -208,8 +168,6 @@ async fn chat_query(
     base_url: Option<String>,
     platform: Option<String>,
 ) -> Result<String, String> {
-    let backend_base = get_backend_base_url(&app);
-    let base_escaped = backend_base.replace('\\', "\\\\").replace('"', "\\\"");
     let mut payload = serde_json::json!({
         "query": query,
         "api_key": api_key.unwrap_or_default(),
@@ -219,26 +177,7 @@ async fn chat_query(
     if let Some(p) = platform {
         payload["platform"] = serde_json::json!(p);
     }
-    let payload_str = payload.to_string();
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-backend_base = "{}"
-try:
-    payload = json.loads(sys.argv[1])
-    r = requests.post(backend_base + '/chat/query', json=payload)
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).arg(&payload_str).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    backend_request_json(&app, Method::POST, "/chat/query", None, Some(payload)).await
 }
 
 
@@ -295,496 +234,180 @@ async fn get_file_icon(file_path: String) -> Result<Option<String>, String> {
 
 #[tauri::command]
 async fn get_directories(app: tauri::AppHandle) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-
-base_url = "{}"
-try:
-    response = requests.get(base_url + '/directories')
-    result = {{
-        "success": response.status_code == 200,
-        "data": response.json() if response.status_code == 200 else None,
-        "error": None if response.status_code == 200 else response.text
-    }}
-    print(json.dumps(result))
-except Exception as e:
-    result = {{
-        "success": False,
-        "data": None,
-        "error": str(e)
-    }}
-    print(json.dumps(result))
-"#,
-        base_escaped
-    );
-
-    let output = Command::new("python")
-        .arg("-c")
-        .arg(&python_script)
-        .output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-
-    let output_str = String::from_utf8_lossy(&output.stdout);
-    Ok(output_str.to_string())
+    backend_request_json(&app, Method::GET, "/directories", None, None).await
 }
 
 #[tauri::command]
 async fn create_directory(app: tauri::AppHandle, name: String, parent_id: Option<i32>) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
     let payload = serde_json::json!({
         "name": name,
         "parent_id": parent_id
     });
-    let payload_str = payload.to_string();
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    payload = json.loads(sys.argv[1])
-    r = requests.post(base_url + '/directories', json=payload)
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).arg(&payload_str).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    backend_request_json(&app, Method::POST, "/directories", None, Some(payload)).await
 }
 
 #[tauri::command]
 async fn move_document(app: tauri::AppHandle, document_id: i32, directory_id: Option<i32>) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
     let payload = serde_json::json!({
         "directory_id": directory_id
     });
-    let payload_str = payload.to_string();
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    payload = json.loads(sys.argv[1])
-    r = requests.put(base_url + '/documents/{}/move', json=payload)
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        document_id
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).arg(&payload_str).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let path = format!("/documents/{}/move", document_id);
+    backend_request_json(&app, Method::PUT, &path, None, Some(payload)).await
 }
 
 #[tauri::command]
 async fn move_directory(app: tauri::AppHandle, directory_id: i32, parent_id: Option<i32>) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
     let payload = serde_json::json!({
         "parent_id": parent_id
     });
-    let payload_str = payload.to_string();
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    payload = json.loads(sys.argv[1])
-    r = requests.put(base_url + '/directories/{}/move', json=payload)
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        directory_id
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).arg(&payload_str).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let path = format!("/directories/{}/move", directory_id);
+    backend_request_json(&app, Method::PUT, &path, None, Some(payload)).await
 }
 
 #[tauri::command]
 async fn delete_all_mount_points(app: tauri::AppHandle) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.delete(base_url + '/mount-points')
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    backend_request_json(&app, Method::DELETE, "/mount-points", None, None).await
 }
 
 #[tauri::command]
 async fn get_mount_points(app: tauri::AppHandle) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.get(base_url + '/mount-points')
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    backend_request_json(&app, Method::GET, "/mount-points", None, None).await
 }
 
 #[tauri::command]
 async fn create_mount_point(app: tauri::AppHandle, path: String, name: Option<String>, description: Option<String>) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
     let payload = serde_json::json!({
         "path": path,
         "name": name.unwrap_or_default(),
         "description": description.unwrap_or_default()
     });
-    let payload_str = payload.to_string();
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    payload = json.loads(sys.argv[1])
-    r = requests.post(base_url + '/mount-points', json=payload)
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).arg(&payload_str).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    backend_request_json(&app, Method::POST, "/mount-points", None, Some(payload)).await
 }
 
 #[tauri::command]
 async fn update_mount_point(app: tauri::AppHandle, mp_id: i32, path: Option<String>, name: Option<String>, description: Option<String>) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
     let mut payload = serde_json::Map::new();
     if let Some(p) = path { payload.insert("path".to_string(), serde_json::json!(p)); }
     if let Some(n) = name { payload.insert("name".to_string(), serde_json::json!(n)); }
     if let Some(d) = description { payload.insert("description".to_string(), serde_json::json!(d)); }
-    let payload_str = serde_json::Value::Object(payload).to_string();
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    payload = json.loads(sys.argv[1])
-    r = requests.patch(base_url + '/mount-points/{}', json=payload)
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        mp_id
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).arg(&payload_str).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let path = format!("/mount-points/{}", mp_id);
+    backend_request_json(&app, Method::PATCH, &path, None, Some(serde_json::Value::Object(payload))).await
 }
 
 #[tauri::command]
 async fn get_mount_point_document_stats(app: tauri::AppHandle, mp_id: i32) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.get(base_url + '/mount-points/{}/document-stats')
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        mp_id
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let path = format!("/mount-points/{}/document-stats", mp_id);
+    backend_request_json(&app, Method::GET, &path, None, None).await
 }
 
 #[tauri::command]
 async fn get_recent_annotated_files(app: tauri::AppHandle) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.get(base_url + '/mount-points/recent-annotated-files')
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    backend_request_json(&app, Method::GET, "/mount-points/recent-annotated-files", None, None).await
 }
 
 #[tauri::command]
 async fn get_mount_point_files(app: tauri::AppHandle, mp_id: i32) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.get(base_url + '/mount-points/{}/files')
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        mp_id
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let path = format!("/mount-points/{}/files", mp_id);
+    backend_request_json(&app, Method::GET, &path, None, None).await
 }
 
 #[tauri::command]
 async fn update_mount_point_file_meta(app: tauri::AppHandle, mp_id: i32, relative_path: String, weight: Option<f64>, note: Option<String>) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
     let mut payload = serde_json::Map::new();
     payload.insert("relative_path".to_string(), serde_json::json!(relative_path));
     if let Some(w) = weight { payload.insert("weight".to_string(), serde_json::json!(w)); }
     if let Some(n) = note { payload.insert("note".to_string(), serde_json::json!(n)); }
-    let payload_str = serde_json::Value::Object(payload).to_string();
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    payload = json.loads(sys.argv[1])
-    r = requests.patch(base_url + '/mount-points/{}/files/meta', json=payload)
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        mp_id
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).arg(&payload_str).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let path = format!("/mount-points/{}/files/meta", mp_id);
+    backend_request_json(&app, Method::PATCH, &path, None, Some(serde_json::Value::Object(payload))).await
 }
 
 #[tauri::command]
 async fn get_document_summary(app: tauri::AppHandle, mp_id: i32, relative_path: String) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let rel_escaped = relative_path.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.get(base_url + '/mount-points/document-summary', params={{"mp_id": {}, "relative_path": "{}"}})
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        mp_id,
-        rel_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let query = vec![
+        ("mp_id".to_string(), mp_id.to_string()),
+        ("relative_path".to_string(), relative_path),
+    ];
+    backend_request_json(&app, Method::GET, "/mount-points/document-summary", Some(query), None).await
 }
 
 #[tauri::command]
 async fn get_document_preview(app: tauri::AppHandle, mp_id: i32, relative_path: String) -> Result<String, String> {
     let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let rel_escaped = relative_path.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-import base64
-base_url = "{}"
-try:
-    r = requests.get(base_url + '/mount-points/document-preview', params={{"mp_id": {}, "relative_path": "{}"}})
-    if r.status_code != 200:
-        out = {{"success": False, "data": None, "version": "", "error": r.text}}
-    else:
-        ver = r.headers.get("X-Preview-Version") or r.headers.get("x-preview-version") or ""
-        out = {{"success": True, "data": base64.b64encode(r.content).decode(), "version": ver if isinstance(ver, str) else "", "error": None}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        mp_id,
-        rel_escaped
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let url = format!("{}{}", base_url, "/mount-points/document-preview");
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(&url)
+        .query(&[
+            ("mp_id".to_string(), mp_id.to_string()),
+            ("relative_path".to_string(), relative_path),
+        ])
+        .send()
+        .await
+        .map_err(|e| format!("Backend request failed: {}", e))?;
+    let status_ok = resp.status().as_u16() == 200;
+    if !status_ok {
+        let error = resp
+            .text()
+            .await
+            .unwrap_or_else(|e| format!("Failed to read error body: {}", e));
+        return json_result(false, serde_json::Value::Null, Some(error));
+    }
+    let version = resp
+        .headers()
+        .get("X-Preview-Version")
+        .or_else(|| resp.headers().get("x-preview-version"))
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_string();
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read response bytes: {}", e))?;
+    use base64::Engine;
+    let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
+    serde_json::to_string(&serde_json::json!({
+        "success": true,
+        "data": encoded,
+        "version": version,
+        "error": null
+    }))
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 async fn delete_mount_point(app: tauri::AppHandle, mp_id: i32) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.delete(base_url + '/mount-points/{}')
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        mp_id
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let path = format!("/mount-points/{}", mp_id);
+    backend_request_json(&app, Method::DELETE, &path, None, None).await
 }
 
 #[tauri::command]
 async fn delete_directory(app: tauri::AppHandle, directory_id: i32) -> Result<String, String> {
-    let base_url = get_backend_base_url(&app);
-    let base_escaped = base_url.replace('\\', "\\\\").replace('"', "\\\"");
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-base_url = "{}"
-try:
-    r = requests.delete(base_url + '/directories/{}')
-    out = {{"success": r.status_code == 200, "data": r.json() if r.status_code == 200 else None, "error": None if r.status_code == 200 else r.text}}
-    print(json.dumps(out))
-except Exception as e:
-    print(json.dumps({{"success": False, "data": None, "error": str(e)}}))
-"#,
-        base_escaped,
-        directory_id
-    );
-    let output = Command::new("python").arg("-c").arg(&python_script).output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    let path = format!("/directories/{}", directory_id);
+    backend_request_json(&app, Method::DELETE, &path, None, None).await
 }
 
 #[tauri::command]
 async fn get_local_models(base_url: Option<String>) -> Result<String, String> {
-    let base_url_val = base_url.unwrap_or("http://localhost:11434".to_string());
-    // Escape base_url to prevent injection/errors in python script
-    let base_url_escaped = base_url_val.replace('\\', "\\\\").replace('"', "\\\"");
-    
-    let python_script = format!(
-        r#"
-import sys
-import requests
-import json
-try:
-    response = requests.get('http://127.0.0.1:8778/models/local', params={{"base_url": "{}"}})
-    result = {{
-        "success": response.status_code == 200,
-        "data": response.json() if response.status_code == 200 else None,
-        "error": None if response.status_code == 200 else response.text
-    }}
-    print(json.dumps(result))
-except Exception as e:
-    result = {{
-        "success": False,
-        "data": None,
-        "error": str(e)
-    }}
-    print(json.dumps(result))
-"#,
-        base_url_escaped
-    );
-
-    let output = Command::new("python")
-        .arg("-c")
-        .arg(&python_script)
-        .output()
-        .map_err(|e| format!("Failed to execute Python: {}", e))?;
-
-    let output_str = String::from_utf8_lossy(&output.stdout);
-    Ok(output_str.to_string())
+    let target_base = base_url.unwrap_or("http://localhost:11434".to_string());
+    let client = reqwest::Client::new();
+    let resp = client
+        .get("http://127.0.0.1:8778/models/local")
+        .query(&[("base_url".to_string(), target_base)])
+        .send()
+        .await
+        .map_err(|e| format!("Backend request failed: {}", e))?;
+    let status_ok = resp.status().as_u16() == 200;
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| format!("Failed to read response: {}", e))?;
+    if status_ok {
+        let data = serde_json::from_slice::<serde_json::Value>(&bytes).unwrap_or(serde_json::Value::Null);
+        json_result(true, data, None)
+    } else {
+        let error = String::from_utf8_lossy(&bytes).to_string();
+        json_result(false, serde_json::Value::Null, Some(error))
+    }
 }
 
 #[tauri::command]
@@ -895,12 +518,43 @@ fn kill_process_on_port(port: u16) {
     }
 }
 
+async fn wait_backend_healthy(client: &reqwest::Client, health_url: &str) -> bool {
+    for _ in 0..25 {
+        if let Ok(resp) = client.get(health_url).send().await {
+            if resp.status().is_success() {
+                return true;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    false
+}
+
 async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<Option<BackendProcess>, String> {
-    let python_path = backend_url::find_main_py_path()
-        .ok_or("Python backend main.py not found. Please ensure python-backend/main.py exists.")?;
-    let backend_dir = python_path.parent()
-        .ok_or("Invalid path")?
-        .to_path_buf();
+    let backend_exe_path = backend_url::find_backend_executable_path();
+    let (backend_dir, backend_entry_path, use_executable) = if let Some(exe_path) = backend_exe_path {
+        (
+            exe_path
+                .parent()
+                .ok_or("Invalid backend executable path")?
+                .to_path_buf(),
+            exe_path,
+            true,
+        )
+    } else {
+        let main_py_path = backend_url::find_main_py_path()
+            .ok_or("Python backend main.py not found. Please ensure python-backend/main.py exists.")?;
+        let backend_dir = main_py_path.parent()
+            .ok_or("Invalid path")?
+            .to_path_buf();
+        let gui_host_path = backend_dir.join("backend_gui_host.py");
+        let backend_entry_path = if gui_host_path.exists() {
+            gui_host_path
+        } else {
+            main_py_path
+        };
+        (backend_dir, backend_entry_path, false)
+    };
     let backend_port = backend_url::resolve_backend_port(config_path.as_ref());
     backend_url::configure_python_env(&backend_dir, backend_port);
     let health_url = format!("http://127.0.0.1:{}/health", backend_port);
@@ -930,6 +584,46 @@ async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<O
         use windows::Win32::Foundation::CloseHandle;
         use windows::core::PCWSTR;
 
+        let mut cmd = if use_executable {
+            Command::new(backend_entry_path.to_str().ok_or("Invalid backend executable path")?)
+        } else {
+            let mut py_cmd = backend_host_command();
+            py_cmd.arg(backend_entry_path.to_str().ok_or("Invalid path")?);
+            py_cmd
+        };
+        cmd.current_dir(&backend_dir);
+        cmd.env("PORT", backend_port.to_string());
+        cmd.env("BIOFORGER_BACKEND_PORT", backend_port.to_string());
+        if let Some(ref cfg_path) = config_path {
+            cmd.env("BIOFORGER_CONFIG_PATH", cfg_path.to_string_lossy().to_string());
+            if cfg_path.exists() {
+                if let Ok(contents) = fs::read_to_string(cfg_path) {
+                    if let Ok(config) = serde_json::from_str::<serde_json::Value>(&contents) {
+                        if let Some(db) = config.get("dbPath").and_then(|v| v.as_str()) {
+                            if !db.is_empty() {
+                                cmd.env("BIOFORGER_DB_PATH", db);
+                            }
+                        }
+                        if let Some(doc) = config.get("documentsDir").and_then(|v| v.as_str()) {
+                            if !doc.is_empty() {
+                                cmd.env("BIOFORGER_DOCUMENTS_DIR", doc);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let mut child = cmd.spawn()
+            .map_err(|e| format!("Failed to start Python backend: {}", e))?;
+        let healthy = wait_backend_healthy(&client, &health_url).await;
+        if !healthy {
+            let _ = child.kill();
+            return Err(format!(
+                "Python backend failed to become healthy. Entry: {}",
+                backend_entry_path.to_string_lossy()
+            ));
+        }
+
         let job_handle = unsafe {
             CreateJobObjectW(None, PCWSTR::null())
         }.map_err(|e| format!("CreateJobObject failed: {}", e))?;
@@ -944,41 +638,16 @@ async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<O
                 std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
             )
         }.is_err() {
+            let _ = child.kill();
             let _ = unsafe { CloseHandle(job_handle) };
             return Err("SetInformationJobObject failed".to_string());
         }
-
-        let mut cmd = Command::new("python");
-        cmd.arg(python_path.to_str().ok_or("Invalid path")?);
-        cmd.current_dir(&backend_dir);
-        cmd.env("PORT", backend_port.to_string());
-        cmd.env("BIOFORGER_BACKEND_PORT", backend_port.to_string());
-        if let Some(ref cfg_path) = config_path {
-            cmd.env("BIOFORGER_CONFIG_PATH", cfg_path.to_string_lossy().to_string());
-            if cfg_path.exists() {
-                if let Ok(contents) = fs::read_to_string(cfg_path) {
-                    if let Ok(config) = serde_json::from_str::<serde_json::Value>(&contents) {
-                        if let Some(db) = config.get("dbPath").and_then(|v| v.as_str()) {
-                            if !db.is_empty() {
-                                cmd.env("BIOFORGER_DB_PATH", db);
-                            }
-                        }
-                        if let Some(doc) = config.get("documentsDir").and_then(|v| v.as_str()) {
-                            if !doc.is_empty() {
-                                cmd.env("BIOFORGER_DOCUMENTS_DIR", doc);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        let child = cmd.spawn()
-            .map_err(|e| format!("Failed to start Python backend: {}", e))?;
 
         let child_handle = child.as_raw_handle();
         if unsafe {
             AssignProcessToJobObject(job_handle, windows::Win32::Foundation::HANDLE(child_handle as _))
         }.is_err() {
+            let _ = child.kill();
             let _ = unsafe { CloseHandle(job_handle) };
             return Err("AssignProcessToJobObject failed".to_string());
         }
@@ -991,8 +660,13 @@ async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<O
 
     #[cfg(not(windows))]
     {
-        let mut cmd = Command::new("python");
-        cmd.arg(python_path.to_str().ok_or("Invalid path")?);
+        let mut cmd = if use_executable {
+            Command::new(backend_entry_path.to_str().ok_or("Invalid backend executable path")?)
+        } else {
+            let mut py_cmd = backend_host_command();
+            py_cmd.arg(backend_entry_path.to_str().ok_or("Invalid path")?);
+            py_cmd
+        };
         cmd.current_dir(&backend_dir);
         cmd.env("PORT", backend_port.to_string());
         cmd.env("BIOFORGER_BACKEND_PORT", backend_port.to_string());
@@ -1015,8 +689,16 @@ async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<O
                 }
             }
         }
-        let child = cmd.spawn()
+        let mut child = cmd.spawn()
             .map_err(|e| format!("Failed to start Python backend: {}", e))?;
+        let healthy = wait_backend_healthy(&client, &health_url).await;
+        if !healthy {
+            let _ = child.kill();
+            return Err(format!(
+                "Python backend failed to become healthy. Entry: {}",
+                backend_entry_path.to_string_lossy()
+            ));
+        }
         Ok(Some(BackendProcess { child }))
     }
 }
@@ -1101,18 +783,38 @@ pub fn run() {
             let state = BackendState {
                 process: Mutex::new(None),
             };
-            let config_path = get_config_path_from_app(&app.handle());
-            if let Ok(Some(proc_)) = tauri::async_runtime::block_on(ensure_python_backend_running(config_path)) {
-                if let Ok(mut guard) = state.process.lock() {
-                    *guard = Some(proc_);
-                }
-            }
             app.manage(state);
 
             let ollama_state = OllamaState {
                 process: Mutex::new(None),
             };
             app.manage(ollama_state);
+
+            let app_handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                let config_path = get_config_path_from_app(&app_handle);
+                match ensure_python_backend_running(config_path).await {
+                    Ok(Some(proc_)) => {
+                        if let Some(backend) = app_handle.try_state::<BackendState>() {
+                            if let Ok(mut guard) = backend.process.lock() {
+                                *guard = Some(proc_);
+                            }
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(e) => {
+                        eprintln!("Failed to auto-start backend: {}", e);
+                    }
+                }
+
+                if let Some(splash) = app_handle.get_webview_window("splashscreen") {
+                    let _ = splash.close();
+                }
+                if let Some(main) = app_handle.get_webview_window("main") {
+                    let _ = main.show();
+                    let _ = main.set_focus();
+                }
+            });
 
             #[cfg(desktop)]
             {
@@ -1209,6 +911,9 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if window.label() == "splashscreen" {
+                    return;
+                }
                 api.prevent_close();
                 let _ = window.hide();
             }

@@ -6,13 +6,15 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "npm run build && npm run build:backend",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "PrivateTune Pro",
+        "visible": false,
         "width": 1400,
         "height": 900,
         "center": true,
@@ -21,6 +23,19 @@
         "resizable": true,
         "minWidth": 1000,
         "minHeight": 600
+      },
+      {
+        "label": "splashscreen",
+        "title": "Starting PrivateTune Pro",
+        "url": "splash.html",
+        "width": 520,
+        "height": 300,
+        "center": true,
+        "decorations": false,
+        "transparent": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true
       }
     ],
     "security": {
@@ -35,6 +50,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "resources": [
+      "../python-backend/dist/bioforger-backend.exe"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

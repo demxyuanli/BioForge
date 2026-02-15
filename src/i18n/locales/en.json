@@ -722,6 +722,7 @@
       "defaultCloudModel": "Default cloud model",
       "apiKeySaved": "API Key saved successfully",
       "apiKeySaveFailed": "Failed to save API key",
+      "apiKeySaveFailedWithReason": "Failed to save API key: {{error}}",
       "ollamaConnectFailed": "Failed to connect to Ollama. Please check if it is running.",
       "ollamaTitle": "Local LLM (Ollama)",
       "ollamaDesc": "Configure your local Ollama instance for privacy-preserving inference.",

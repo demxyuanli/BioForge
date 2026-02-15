@@ -919,4 +919,3 @@ export async function readChatHistory(): Promise<string> {
 export async function writeChatHistory(contents: string): Promise<void> {
   await invoke('write_chat_history', { contents });
 }
-

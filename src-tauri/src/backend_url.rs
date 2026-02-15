@@ -107,28 +107,72 @@ pub fn configure_python_env(backend_dir: &Path, backend_port: u16) {
     }
 }
 
-pub fn find_main_py_path() -> Option<PathBuf> {
+pub fn find_backend_executable_path() -> Option<PathBuf> {
+    let exe_name = if cfg!(windows) {
+        "bioforger-backend.exe"
+    } else {
+        "bioforger-backend"
+    };
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
     if let Ok(current_dir) = std::env::current_dir() {
-        let dev_path = current_dir.join("python-backend").join("main.py");
-        if dev_path.exists() {
-            return Some(dev_path);
-        }
+        candidates.push(current_dir.join("python-backend").join("dist").join(exe_name));
         if let Some(parent_dir) = current_dir.parent() {
-            let parent_path = parent_dir.join("python-backend").join("main.py");
-            if parent_path.exists() {
-                return Some(parent_path);
-            }
+            candidates.push(parent_dir.join("python-backend").join("dist").join(exe_name));
         }
     }
+
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            let prod_path = exe_dir.join("python-backend").join("main.py");
-            if prod_path.exists() {
-                return Some(prod_path);
-            }
+            candidates.push(exe_dir.join(exe_name));
+            candidates.push(exe_dir.join("_up_").join(exe_name));
+            candidates.push(exe_dir.join("resources").join(exe_name));
+            candidates.push(exe_dir.join("resources").join("_up_").join(exe_name));
+            candidates.push(exe_dir.join("..").join("Resources").join(exe_name));
+            candidates.push(exe_dir.join("..").join("Resources").join("_up_").join(exe_name));
         }
     }
-    None
+
+    candidates.into_iter().find(|p| p.exists())
+}
+
+pub fn find_main_py_path() -> Option<PathBuf> {
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    if let Ok(current_dir) = std::env::current_dir() {
+        candidates.push(current_dir.join("python-backend").join("main.py"));
+        if let Some(parent_dir) = current_dir.parent() {
+            candidates.push(parent_dir.join("python-backend").join("main.py"));
+        }
+    }
+
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            // Common runtime layouts.
+            candidates.push(exe_dir.join("python-backend").join("main.py"));
+            candidates.push(exe_dir.join("_up_").join("python-backend").join("main.py"));
+            candidates.push(exe_dir.join("resources").join("python-backend").join("main.py"));
+            candidates.push(exe_dir.join("resources").join("_up_").join("python-backend").join("main.py"));
+            // macOS app bundle resources path.
+            candidates.push(
+                exe_dir
+                    .join("..")
+                    .join("Resources")
+                    .join("python-backend")
+                    .join("main.py"),
+            );
+            candidates.push(
+                exe_dir
+                    .join("..")
+                    .join("Resources")
+                    .join("_up_")
+                    .join("python-backend")
+                    .join("main.py"),
+            );
+        }
+    }
+
+    candidates.into_iter().find(|p| p.exists())
 }
 
 pub fn migrate_config_from_legacy(app_config_path: &PathBuf) {

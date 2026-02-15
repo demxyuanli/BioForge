@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:backend": "python -m PyInstaller --noconfirm --clean --onefile --noconsole --name bioforger-backend --distpath python-backend/dist --workpath python-backend/build --specpath python-backend python-backend/backend_gui_host.py",
     "preview": "vite preview",
     "tauri": "tauri"
   },
