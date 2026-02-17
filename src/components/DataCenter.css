@@ -812,14 +812,14 @@
 
 .data-center-layout .dc-kp-star:hover,
 .data-center-layout .dc-kp-star.filled {
-  color: #dcdcaa;
+  color: var(--vs-weight-star);
 }
 
-.data-center-layout .dc-kp-weight-1 { color: #808080; }
-.data-center-layout .dc-kp-weight-2 { color: #9cdcfe; }
-.data-center-layout .dc-kp-weight-3 { color: #4ec9b0; }
-.data-center-layout .dc-kp-weight-4 { color: #dcdcaa; }
-.data-center-layout .dc-kp-weight-5 { color: #d4d4d4; font-weight: 600; }
+.data-center-layout .dc-kp-weight-1 { color: var(--vs-weight-1); }
+.data-center-layout .dc-kp-weight-2 { color: var(--vs-weight-2); }
+.data-center-layout .dc-kp-weight-3 { color: var(--vs-weight-3); }
+.data-center-layout .dc-kp-weight-4 { color: var(--vs-weight-4); }
+.data-center-layout .dc-kp-weight-5 { color: var(--vs-weight-5); font-weight: 600; }
 
 .data-center-layout .dc-kp-action-btn {
   display: inline-flex;
@@ -1205,23 +1205,23 @@
 }
 
 .data-center-layout .dc-file-weight-1 {
-  color: #808080;
+  color: var(--vs-weight-1);
 }
 
 .data-center-layout .dc-file-weight-2 {
-  color: #9cdcfe;
+  color: var(--vs-weight-2);
 }
 
 .data-center-layout .dc-file-weight-3 {
-  color: #4ec9b0;
+  color: var(--vs-weight-3);
 }
 
 .data-center-layout .dc-file-weight-4 {
-  color: #dcdcaa;
+  color: var(--vs-weight-4);
 }
 
 .data-center-layout .dc-file-weight-5 {
-  color: #d4d4d4;
+  color: var(--vs-weight-5);
   font-weight: 600;
 }
 
@@ -1243,7 +1243,7 @@
 
 .data-center-layout .dc-cli-col-weight .dc-star:hover,
 .data-center-layout .dc-cli-col-weight .dc-star.filled {
-  color: #dcdcaa;
+  color: var(--vs-weight-star);
 }
 
 .data-center-layout .dc-weight-slider {

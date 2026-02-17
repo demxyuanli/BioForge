@@ -729,23 +729,23 @@
 }
 
 .fr-file-weight-1 {
-  color: #808080;
+  color: var(--vs-weight-1);
 }
 
 .fr-file-weight-2 {
-  color: #9cdcfe;
+  color: var(--vs-weight-2);
 }
 
 .fr-file-weight-3 {
-  color: #4ec9b0;
+  color: var(--vs-weight-3);
 }
 
 .fr-file-weight-4 {
-  color: #dcdcaa;
+  color: var(--vs-weight-4);
 }
 
 .fr-file-weight-5 {
-  color: #d4d4d4;
+  color: var(--vs-weight-5);
   font-weight: 600;
 }
 
@@ -1304,4 +1304,3 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
-

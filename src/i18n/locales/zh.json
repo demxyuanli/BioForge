@@ -224,6 +224,9 @@
     "pageOf": "第 {{page}} 页 / 共 {{total}} 页",
     "selectAndUpload": "选择并上传文档",
     "uploadFile": "上传文件",
+    "batchImport": "批量导入文档",
+    "uploadingCount": "正在上传 {{current}} / {{total}}...",
+    "batchImportDone": "批量完成：已上传 {{done}}/{{total}}，失败 {{failed}} 个。",
     "processing": "处理中...",
     "documentProcessed": "文档处理成功！",
     "documents": "文档",
@@ -755,7 +758,12 @@
       "ragDesc": "配置检索增强生成参数。",
       "chunkSize": "分块大小",
       "contextWindow": "上下文窗口 (Top K)",
-      "hint": "这些设置将应用于新查询。"
+      "useHybrid": "混合检索 (向量 + BM25)",
+      "embeddingModel": "Embedding 模型",
+      "embeddingBaseUrl": "Embedding API 地址",
+      "embeddingPlatform": "API 密钥 (平台)",
+      "hint": "这些设置将应用于新查询。留空 embedding 模型则使用 Chroma 默认。",
+      "saveRag": "保存 RAG 设置"
     }
   },
   "helpDocs": {

@@ -16,8 +16,10 @@ from api.routers import knowledge_points as knowledge_points_router
 from api.routers import annotations as annotations_router
 from api.routers import finetuning as finetuning_router
 from api.routers import training as training_router
+from api.routers import config as config_router
 
 router = APIRouter()
+router.include_router(config_router.router)
 router.include_router(logs_router.router)
 router.include_router(api_keys_router.router)
 router.include_router(directories_router.router)

@@ -11,6 +11,7 @@ import { useDataCenterBreadcrumbs } from '../hooks/useDataCenterBreadcrumbs';
 import { useDataCenterLayout } from '../hooks/useDataCenterLayout';
 import {
   selectFile,
+  selectFiles,
   uploadDocument,
   getDocuments,
   getKnowledgePoints,
@@ -581,6 +582,35 @@ const DataCenter: React.FC = () => {
     }
   };
 
+  const handleBatchFileSelect = async () => {
+    const filePaths = await selectFiles();
+    if (filePaths.length === 0) return;
+    setIsUploading(true);
+    const total = filePaths.length;
+    let done = 0;
+    let failed = 0;
+    try {
+      for (const filePath of filePaths) {
+        setUploadProgress(t('dataCenter.uploadingCount', { current: done + 1, total }));
+        try {
+          const result = await uploadDocument(filePath);
+          if (currentDirId && result?.document_id) {
+            await moveDocument(result.document_id, currentDirId);
+          }
+          done += 1;
+        } catch (e) {
+          console.error('Batch upload error:', e);
+          failed += 1;
+        }
+      }
+      setUploadProgress(t('dataCenter.batchImportDone', { done, total, failed }));
+      await loadData();
+      setTimeout(() => setUploadProgress(''), 4000);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleKpContentMouseUp = (_e: React.MouseEvent) => {
     const sel = window.getSelection();
     const text = sel?.toString?.()?.trim();
@@ -718,6 +748,7 @@ const DataCenter: React.FC = () => {
               uploadProgress={uploadProgress}
               isUploading={isUploading}
               onUploadClick={handleFileSelect}
+              onBatchUploadClick={handleBatchFileSelect}
               isCreatingDir={isCreatingDir}
               newDirName={newDirName}
               onNewDirNameChange={setNewDirName}

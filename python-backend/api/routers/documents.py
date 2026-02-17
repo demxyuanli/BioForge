@@ -69,12 +69,19 @@ def process_document_background(document_id: int, file_path: str, file_type: str
         doc.processing_message = "Generating knowledge points..."
         db.commit()
 
+        from api.routers.config import get_rag_config_for_service
+        from api.helpers import resolve_api_key as resolve_rag_api_key
+        from api.shared import get_chroma_db_path
         from services.rag_service import RAGService
-        rag = RAGService()
+        rag_cfg = get_rag_config_for_service()
+        emb_platform = (rag_cfg.get("embeddingPlatform") or "deepseek").strip().lower()
+        rag_cfg["embeddingApiKey"] = resolve_rag_api_key(emb_platform)
+        rag = RAGService(chroma_db_path=get_chroma_db_path(), rag_config=rag_cfg)
         knowledge_points = rag.structure_document(cleaned_text, str(doc.id))
 
         if knowledge_points and len(knowledge_points) > 0:
             rag.add_to_vector_store(knowledge_points, f"doc_{doc.id}")
+            rag.add_to_vector_store(knowledge_points, "global_knowledge_base")
 
         for kp in knowledge_points:
             kp_db = KnowledgePoint(
@@ -298,8 +305,14 @@ async def delete_document(document_id: int):
             db.delete(ann)
 
         try:
+            from api.routers.config import get_rag_config_for_service
+            from api.helpers import resolve_api_key as resolve_rag_api_key
+            from api.shared import get_chroma_db_path
             from services.rag_service import RAGService
-            rag = RAGService()
+            rag_cfg = get_rag_config_for_service()
+            emb_platform = (rag_cfg.get("embeddingPlatform") or "deepseek").strip().lower()
+            rag_cfg["embeddingApiKey"] = resolve_rag_api_key(emb_platform)
+            rag = RAGService(chroma_db_path=get_chroma_db_path(), rag_config=rag_cfg)
             if rag.client:
                 collection_name = f"doc_{document_id}"
                 try:

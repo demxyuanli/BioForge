@@ -20,7 +20,6 @@ interface ActivityItem {
 const activities: ActivityItem[] = [
   { id: 'fileResources', icon: <FolderOpen size={18} strokeWidth={1.5} />, titleKey: 'nav.fileResources' },
   { id: 'knowledgeBase', icon: <BookOpen size={18} strokeWidth={1.5} />, titleKey: 'nav.knowledgeBase' },
-  { id: 'dashboard', icon: <LayoutDashboard size={18} strokeWidth={1.5} />, titleKey: 'nav.dashboard' },
   { id: 'datacenter', icon: <Database size={18} strokeWidth={1.5} />, titleKey: 'nav.dataCenter' },
   { id: 'training', icon: <GraduationCap size={18} strokeWidth={1.5} />, titleKey: 'nav.trainingLab' },
   { id: 'production', icon: <Settings2 size={18} strokeWidth={1.5} />, titleKey: 'nav.productionTuning' },
@@ -70,13 +69,21 @@ const ActivityBar: React.FC<ActivityBarProps> = ({
             <span className="vs-activity-icon" style={{ fontSize: '12px' }}>{sidebarVisible ? '\u2190' : '\u2192'}</span>
           </button>
         </Tooltip>
+        <Tooltip title={t('nav.dashboard')}>
+          <button
+            className={`vs-activity-item ${activeActivity === 'dashboard' ? 'active' : ''}`}
+            onClick={() => handleActivityClick('dashboard')}
+          >
+            <span className="vs-activity-icon"><LayoutDashboard size={18} strokeWidth={1.5} /></span>
+          </button>
+        </Tooltip>
         <Tooltip title={t('panel.settings')}>
           <button
             className={`vs-activity-item ${activeActivity === 'settings' ? 'active' : ''}`}
             onClick={() => handleActivityClick('settings')}
           >
-          <span className="vs-activity-icon"><Settings size={18} strokeWidth={1.5} /></span>
-        </button>
+            <span className="vs-activity-icon"><Settings size={18} strokeWidth={1.5} /></span>
+          </button>
         </Tooltip>
       </div>
     </div>

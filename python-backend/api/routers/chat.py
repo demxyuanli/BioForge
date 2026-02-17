@@ -23,9 +23,16 @@ async def chat_query(body: Dict[str, Any] = Body(...)):
         raise HTTPException(status_code=400, detail="Query is required")
 
     try:
+        from api.routers.config import get_rag_config_for_service
+        from api.helpers import resolve_api_key as resolve_rag_api_key
+        from api.shared import get_chroma_db_path
         from services.rag_service import RAGService
-        rag = RAGService()
-        search_results = rag.search_similar(query, n_results=5)
+        rag_cfg = get_rag_config_for_service()
+        emb_platform = (rag_cfg.get("embeddingPlatform") or "deepseek").strip().lower()
+        rag_cfg["embeddingApiKey"] = resolve_rag_api_key(emb_platform)
+        n_context = int(rag_cfg.get("contextWindow") or 5)
+        rag = RAGService(chroma_db_path=get_chroma_db_path(), rag_config=rag_cfg)
+        search_results = rag.search_similar(query, n_results=n_context)
         context = ""
         if search_results:
             context = "\n\n".join([f"Document chunk {i+1}:\n{r['content']}" for i, r in enumerate(search_results)])

@@ -1,12 +1,13 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { Upload, FolderPlus } from 'lucide-react';
+import { Upload, FolderPlus, FileStack } from 'lucide-react';
 import Tooltip from '../Tooltip';
 
 interface DataCenterToolbarProps {
   uploadProgress: string;
   isUploading: boolean;
   onUploadClick: () => void;
+  onBatchUploadClick: () => void;
   isCreatingDir: boolean;
   newDirName: string;
   onNewDirNameChange: (value: string) => void;
@@ -19,6 +20,7 @@ const DataCenterToolbar: React.FC<DataCenterToolbarProps> = ({
   uploadProgress,
   isUploading,
   onUploadClick,
+  onBatchUploadClick,
   isCreatingDir,
   newDirName,
   onNewDirNameChange,
@@ -44,6 +46,17 @@ const DataCenterToolbar: React.FC<DataCenterToolbarProps> = ({
                 aria-label={t('dataCenter.uploadFile')}
               >
                 <Upload size={14} />
+              </button>
+            </Tooltip>
+            <Tooltip title={t('dataCenter.batchImport')}>
+              <button
+                type="button"
+                onClick={onBatchUploadClick}
+                disabled={isUploading}
+                className="dc-icon-btn"
+                aria-label={t('dataCenter.batchImport')}
+              >
+                <FileStack size={14} />
               </button>
             </Tooltip>
             <Tooltip title={t('dataCenter.newFolder')}>

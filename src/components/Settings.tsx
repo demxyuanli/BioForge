@@ -6,7 +6,10 @@ import {
   getApiKeys, 
   getAuditLog, 
   getDesensitizationLog,
-  getLocalModels
+  getLocalModels,
+  getRagConfig,
+  saveRagConfig,
+  type RagConfig
 } from '../services/api';
 import { 
   getStoredTheme, 
@@ -57,10 +60,19 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [apiKeyValue, setApiKeyValue] = useState('');
 
+  // RAG / Context State
+  const [ragChunkSize, setRagChunkSize] = useState<number>(500);
+  const [ragContextWindow, setRagContextWindow] = useState<number>(5);
+  const [ragUseHybrid, setRagUseHybrid] = useState<boolean>(true);
+  const [ragEmbeddingModel, setRagEmbeddingModel] = useState<string>('');
+  const [ragEmbeddingBaseUrl, setRagEmbeddingBaseUrl] = useState<string>('');
+  const [ragEmbeddingPlatform, setRagEmbeddingPlatform] = useState<string>('deepseek');
+  const [ragSaving, setRagSaving] = useState<boolean>(false);
+
   // Privacy Settings State
   const [auditLogEntries, setAuditLogEntries] = useState<any[]>([]);
   const [desensitizationEntries, setDesensitizationEntries] = useState<any[]>([]);
-  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [loadingLogs, setLoadingLogs] = useState<boolean>(false);
 
   useEffect(() => {
     const init = async () => {
@@ -68,7 +80,15 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
         const config = await getStorageConfig();
         setDocumentsDir(config?.documentsDir ?? null);
         setDbPath(config?.dbPath ?? null);
-        
+
+        const rag = await getRagConfig();
+        setRagChunkSize(typeof rag.chunkSize === 'number' ? rag.chunkSize : 500);
+        setRagContextWindow(typeof rag.contextWindow === 'number' ? rag.contextWindow : 5);
+        setRagUseHybrid(rag.useHybrid !== false);
+        setRagEmbeddingModel(rag.embeddingModel ?? '');
+        setRagEmbeddingBaseUrl(rag.embeddingBaseUrl ?? '');
+        setRagEmbeddingPlatform(rag.embeddingPlatform ?? 'deepseek');
+
         await loadAPIKeys();
       } catch (error) {
         console.error('Settings initialization error:', error);
@@ -403,13 +423,97 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
             <div className="settings-field-group">
               <div className="settings-field">
                 <label>{t('settings.context.chunkSize')}</label>
-                <input className="settings-input" type="number" defaultValue={500} />
+                <input
+                  className="settings-input"
+                  type="number"
+                  min={100}
+                  max={2000}
+                  value={ragChunkSize}
+                  onChange={(e) => setRagChunkSize(Number(e.target.value) || 500)}
+                />
               </div>
               <div className="settings-field">
                 <label>{t('settings.context.contextWindow')}</label>
-                <input className="settings-input" type="number" defaultValue={5} />
+                <input
+                  className="settings-input"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={ragContextWindow}
+                  onChange={(e) => setRagContextWindow(Number(e.target.value) || 5)}
+                />
+              </div>
+              <div className="settings-field">
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={ragUseHybrid}
+                    onChange={(e) => setRagUseHybrid(e.target.checked)}
+                  />
+                  {' '}{t('settings.context.useHybrid')}
+                </label>
+              </div>
+              <div className="settings-field">
+                <label>{t('settings.context.embeddingModel')}</label>
+                <input
+                  className="settings-input"
+                  type="text"
+                  placeholder="e.g. text-embedding-3-small or nomic-embed-text"
+                  value={ragEmbeddingModel}
+                  onChange={(e) => setRagEmbeddingModel(e.target.value)}
+                />
+              </div>
+              <div className="settings-field">
+                <label>{t('settings.context.embeddingBaseUrl')}</label>
+                <input
+                  className="settings-input"
+                  type="text"
+                  placeholder="e.g. https://api.openai.com/v1 or http://localhost:11434/v1"
+                  value={ragEmbeddingBaseUrl}
+                  onChange={(e) => setRagEmbeddingBaseUrl(e.target.value)}
+                />
+              </div>
+              <div className="settings-field">
+                <label>{t('settings.context.embeddingPlatform')}</label>
+                <select
+                  className="settings-input"
+                  value={ragEmbeddingPlatform}
+                  onChange={(e) => setRagEmbeddingPlatform(e.target.value)}
+                >
+                  {apiKeys.map((k) => (
+                    <option key={k.platform} value={k.platform}>{k.platform}</option>
+                  ))}
+                  {apiKeys.length === 0 && <option value="deepseek">deepseek</option>}
+                  {apiKeys.length > 0 && !apiKeys.some((k) => k.platform === ragEmbeddingPlatform) && (
+                    <option value={ragEmbeddingPlatform}>{ragEmbeddingPlatform}</option>
+                  )}
+                </select>
               </div>
               <p className="settings-hint">{t('settings.context.hint')}</p>
+              <div className="settings-field settings-field-inline">
+                <button
+                  type="button"
+                  className="settings-btn primary"
+                  disabled={ragSaving}
+                  onClick={async () => {
+                    setRagSaving(true);
+                    try {
+                      await saveRagConfig({
+                        chunkSize: ragChunkSize,
+                        contextWindow: ragContextWindow,
+                        useHybrid: ragUseHybrid,
+                        embeddingModel: ragEmbeddingModel.trim(),
+                        embeddingBaseUrl: ragEmbeddingBaseUrl.trim(),
+                        embeddingPlatform: ragEmbeddingPlatform,
+                      });
+                    } finally {
+                      setRagSaving(false);
+                    }
+                  }}
+                >
+                  {ragSaving ? '...' : t('settings.context.saveRag')}
+                </button>
+              </div>
             </div>
           </section>
         )}

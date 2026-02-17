@@ -94,6 +94,14 @@
   color: var(--vs-fg);
 }
 
+.settings-field-inline {
+  align-self: flex-start;
+}
+
+.settings-field-inline .settings-btn {
+  width: auto;
+}
+
 .settings-input,
 .settings-select {
   padding: 8px;

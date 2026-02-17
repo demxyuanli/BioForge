@@ -183,6 +183,32 @@ export async function getDefaultStoragePaths(): Promise<{ documentsDir: string; 
   return result;
 }
 
+export interface RagConfig {
+  chunkSize?: number;
+  contextWindow?: number;
+  useHybrid?: boolean;
+  embeddingModel?: string;
+  embeddingBaseUrl?: string;
+  embeddingPlatform?: string;
+}
+
+export async function getRagConfig(): Promise<RagConfig> {
+  try {
+    const response = await invoke<string>('get_rag_config');
+    const data = await parsePythonResponse(response);
+    return (data && typeof data === 'object') ? data as RagConfig : {};
+  } catch (error) {
+    console.error('Get RAG config error:', error);
+    return {};
+  }
+}
+
+export async function saveRagConfig(config: RagConfig): Promise<RagConfig> {
+  const response = await invoke<string>('save_rag_config', { config });
+  const data = await parsePythonResponse(response);
+  return (data && typeof data === 'object') ? data as RagConfig : {};
+}
+
 export interface MountPoint {
   id: number;
   path: string;
@@ -425,23 +451,35 @@ export async function selectFolder(): Promise<string | null> {
   }
 }
 
+const DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'md', 'txt', 'jpg', 'jpeg', 'png', 'ppt', 'pptx', 'wps', 'rtf'];
+const DOCUMENT_FILTER = { name: 'Documents', extensions: DOCUMENT_EXTENSIONS };
+
 export async function selectFile(): Promise<string | null> {
   try {
     const selected = await open({
       multiple: false,
-      filters: [{
-        name: 'Documents',
-        extensions: ['pdf', 'doc', 'docx', 'md', 'txt', 'jpg', 'jpeg', 'png', 'ppt', 'pptx', 'wps', 'rtf']
-      }]
+      filters: [DOCUMENT_FILTER]
     });
-    
-    if (selected && typeof selected === 'string') {
-      return selected;
-    }
+    if (selected && typeof selected === 'string') return selected;
     return null;
   } catch (error) {
     console.error('File selection error:', error);
     return null;
+  }
+}
+
+export async function selectFiles(): Promise<string[]> {
+  try {
+    const selected = await open({
+      multiple: true,
+      filters: [DOCUMENT_FILTER]
+    });
+    if (selected == null) return [];
+    if (typeof selected === 'string') return [selected];
+    return Array.isArray(selected) ? selected : [];
+  } catch (error) {
+    console.error('File selection error:', error);
+    return [];
   }
 }
 

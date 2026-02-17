@@ -223,6 +223,9 @@
     "pageOf": "Page {{page}} of {{total}}",
     "selectAndUpload": "Select and Upload Document",
     "uploadFile": "Upload File",
+    "batchImport": "Batch import documents",
+    "uploadingCount": "Uploading {{current}} / {{total}}...",
+    "batchImportDone": "Batch done: {{done}}/{{total}} uploaded, {{failed}} failed.",
     "processing": "Processing...",
     "documentProcessed": "Document processed successfully!",
     "documents": "Documents",
@@ -754,7 +757,12 @@
       "ragDesc": "Configure retrieval augmented generation parameters.",
       "chunkSize": "Chunk Size",
       "contextWindow": "Context Window (Top K)",
-      "hint": "These settings will be applied to new queries."
+      "useHybrid": "Hybrid search (vector + BM25)",
+      "embeddingModel": "Embedding model",
+      "embeddingBaseUrl": "Embedding API base URL",
+      "embeddingPlatform": "API key (platform)",
+      "hint": "These settings will be applied to new queries. Leave embedding model empty to use Chroma default.",
+      "saveRag": "Save RAG settings"
     }
   },
   "helpDocs": {

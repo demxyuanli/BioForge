@@ -402,44 +402,44 @@
 }
 
 .kb-file-weight-1 {
-  color: #808080;
+  color: var(--vs-weight-1);
 }
 
 .kb-file-weight-2 {
-  color: #9cdcfe;
+  color: var(--vs-weight-2);
 }
 
 .kb-file-weight-3 {
-  color: #4ec9b0;
+  color: var(--vs-weight-3);
 }
 
 .kb-file-weight-4 {
-  color: #dcdcaa;
+  color: var(--vs-weight-4);
 }
 
 .kb-file-weight-5 {
-  color: #d4d4d4;
+  color: var(--vs-weight-5);
   font-weight: 600;
 }
 
 .kb-kp-weight-1 {
-  color: #808080;
+  color: var(--vs-weight-1);
 }
 
 .kb-kp-weight-2 {
-  color: #9cdcfe;
+  color: var(--vs-weight-2);
 }
 
 .kb-kp-weight-3 {
-  color: #4ec9b0;
+  color: var(--vs-weight-3);
 }
 
 .kb-kp-weight-4 {
-  color: #dcdcaa;
+  color: var(--vs-weight-4);
 }
 
 .kb-kp-weight-5 {
-  color: #d4d4d4;
+  color: var(--vs-weight-5);
   font-weight: 600;
 }
 
@@ -461,7 +461,7 @@
 
 .kb-cli-col-weight .kb-star:hover,
 .kb-cli-col-weight .kb-star.filled {
-  color: #dcdcaa;
+  color: var(--vs-weight-star);
 }
 
 .kb-cli-col-notes {
@@ -866,7 +866,7 @@
 
 .kb-kp-star:hover,
 .kb-kp-star.filled {
-  color: #dcdcaa;
+  color: var(--vs-weight-star);
 }
 
 .kb-kp-action-btn {

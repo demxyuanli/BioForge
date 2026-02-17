@@ -15,6 +15,15 @@ PREVIEW_CACHE_DIR = os.getenv("BIOFORGER_PREVIEW_CACHE_DIR") or os.path.join(
 TRAINING_SET_PATH = os.path.join(BACKEND_DIR, "training_set.json")
 AUDIT_LOG_PATH = os.path.join(BACKEND_DIR, "audit.log")
 DESENSITIZATION_LOG_PATH = os.path.join(BACKEND_DIR, "desensitization.log")
+RAG_CONFIG_PATH = os.path.join(BACKEND_DIR, "rag_config.json")
+
+
+def get_chroma_db_path() -> str:
+    """Chroma DB path: same directory as main DB if configured, else backend dir."""
+    db_path = os.environ.get("BIOFORGER_DB_PATH", "")
+    if db_path and os.path.isdir(os.path.dirname(db_path)):
+        return os.path.join(os.path.dirname(db_path), "chroma_db")
+    return os.path.join(BACKEND_DIR, "chroma_db")
 
 DOC_EXTENSIONS = frozenset([
     "pdf", "doc", "docx", "md", "txt", "jpg", "jpeg", "png",

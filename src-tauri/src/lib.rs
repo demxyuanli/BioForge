@@ -119,6 +119,16 @@ async fn get_desensitization_log(app: tauri::AppHandle, limit: i32) -> Result<St
 }
 
 #[tauri::command]
+async fn get_rag_config(app: tauri::AppHandle) -> Result<String, String> {
+    backend_request_json(&app, Method::GET, "/config/rag", None, None).await
+}
+
+#[tauri::command]
+async fn save_rag_config(app: tauri::AppHandle, config: serde_json::Value) -> Result<String, String> {
+    backend_request_json(&app, Method::POST, "/config/rag", None, Some(config)).await
+}
+
+#[tauri::command]
 fn write_export_file(file_path: String, contents_base64: String) -> Result<(), String> {
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD
@@ -946,6 +956,8 @@ pub fn run() {
             delete_training_item,
             get_audit_log,
             get_desensitization_log,
+            get_rag_config,
+            save_rag_config,
             read_template_file,
             write_export_file,
             evaluation_generate,
