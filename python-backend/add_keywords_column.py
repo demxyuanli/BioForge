@@ -7,7 +7,7 @@ import sys
 from sqlalchemy import create_engine, text, inspect
 
 BACKEND_DIR = os.path.dirname(__file__)
-db_path = os.getenv("BIOFORGER_DB_PATH") or os.path.join(BACKEND_DIR, "privatetune.db")
+db_path = os.getenv("BIOFORGER_DB_PATH") or os.path.join(BACKEND_DIR, "aiforger.db")
 
 if not os.path.exists(db_path):
     print(f"Database file not found: {db_path}")

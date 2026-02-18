@@ -8,7 +8,7 @@ Backup your database before running this script.
 import os
 from database.models import init_database, Base
 
-db_path = os.path.join(os.path.dirname(__file__), "privatetune.db")
+    db_path = os.path.join(os.path.dirname(__file__), "aiforger.db")
 
 # Initialize database to get engine
 engine = init_database(db_path)

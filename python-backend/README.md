@@ -1,6 +1,6 @@
-# PrivateTune Pro Python Backend
+# AiForger Pro Python Backend
 
-Python backend service for PrivateTune Pro application.
+Python backend service for AiForger Pro application.
 
 ## Quick Start
 

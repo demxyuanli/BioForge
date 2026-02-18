@@ -1,5 +1,5 @@
 """
-PrivateTune Pro Python Backend Service
+AiForger Pro Python Backend Service
 Main entry point for the Python backend service
 """
 import asyncio
@@ -37,7 +37,7 @@ logging.basicConfig(
 from fastapi.middleware.cors import CORSMiddleware
 from api.routes import router
 
-app = FastAPI(title="PrivateTune Pro Backend")
+app = FastAPI(title="AiForger Pro Backend")
 
 app.add_middleware(
     CORSMiddleware,

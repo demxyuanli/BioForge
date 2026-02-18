@@ -27,8 +27,8 @@ install_dependencies.bat
 If pip installation continues to fail, consider using conda:
 
 ```bash
-conda create -n privatetune python=3.11
-conda activate privatetune
+conda create -n aiforger python=3.11
+conda activate aiforger
 conda install pandas numpy
 pip install -r requirements.txt
 ```

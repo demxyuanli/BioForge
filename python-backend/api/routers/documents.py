@@ -5,6 +5,7 @@ import os
 import logging
 import shutil
 import tempfile
+import threading
 from datetime import datetime
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
@@ -18,9 +19,18 @@ from services.libreoffice_parser import is_office_extension, convert_to_pdf
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+# Limit concurrent document processing to avoid exhausting DB connection pool
+_process_semaphore = threading.Semaphore(6)
+
 
 def process_document_background(document_id: int, file_path: str, file_type: str):
     """Background task to process document. Non-PDF Office docs are converted to PDF first."""
+    with _process_semaphore:
+        _process_document_impl(document_id, file_path, file_type)
+
+
+def _process_document_impl(document_id: int, file_path: str, file_type: str):
+    """Actual document processing; called while holding _process_semaphore."""
     db = get_db_session()
     try:
         doc = db.query(Document).filter(Document.id == document_id).first()

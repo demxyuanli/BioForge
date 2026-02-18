@@ -22,16 +22,16 @@ def _get_system_config_path():
     sys_name = platform.system()
     if sys_name == "Windows":
         base = os.environ.get("APPDATA", os.path.expanduser("~"))
-        return os.path.join(base, "com.privatetune.pro", "bioforger-config.json")
+        return os.path.join(base, "com.aiforger.pro", "bioforger-config.json")
     if sys_name == "Darwin":
         base = os.path.expanduser("~/Library/Application Support")
-        return os.path.join(base, "com.privatetune.pro", "bioforger-config.json")
+        return os.path.join(base, "com.aiforger.pro", "bioforger-config.json")
     base = os.environ.get("XDG_CONFIG_HOME", os.path.expanduser("~/.config"))
-    return os.path.join(base, "com.privatetune.pro", "bioforger-config.json")
+    return os.path.join(base, "com.aiforger.pro", "bioforger-config.json")
 
 
 def get_paths():
-    db_path = os.path.join(BACKEND_DIR, "privatetune.db")
+    db_path = os.path.join(BACKEND_DIR, "aiforger.db")
     documents_dir = os.path.join(BACKEND_DIR, "documents")
     config_path = _get_system_config_path()
     if os.path.exists(config_path):

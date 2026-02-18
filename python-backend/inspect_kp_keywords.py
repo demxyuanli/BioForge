@@ -19,7 +19,7 @@ if not db_path and os.path.exists(_CONFIG_PATH):
     except Exception:
         pass
 if not db_path:
-    db_path = os.path.join(BACKEND_DIR, "privatetune.db")
+    db_path = os.path.join(BACKEND_DIR, "aiforger.db")
 
 from database.models import init_database, KnowledgePoint
 from sqlalchemy.orm import sessionmaker

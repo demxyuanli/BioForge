@@ -1,1 +1,3 @@
-{"dbPath":"D:\\source\\data/privatetune.db","documentsDir":"D:\\source\\data"}
+{
+  "backendPort": 8778
+}

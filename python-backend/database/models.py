@@ -168,13 +168,19 @@ class TrainingAnnotationFinetuningLink(Base):
     used_at = Column(DateTime, default=datetime.utcnow)
 
 
-def init_database(db_path: str = "privatetune.db"):
+def init_database(db_path: str = "aiforger.db"):
     """Initialize database and create tables"""
     db_dir = os.path.dirname(db_path)
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
     norm_path = db_path.replace("\\", "/")
-    engine = create_engine(f"sqlite:///{norm_path}")
+    engine = create_engine(
+        f"sqlite:///{norm_path}",
+        connect_args={"check_same_thread": False},
+        pool_size=20,
+        max_overflow=30,
+        pool_pre_ping=True,
+    )
     Base.metadata.create_all(engine)
     # Add missing columns to knowledge_points if missing (migration)
     from sqlalchemy import text, inspect
