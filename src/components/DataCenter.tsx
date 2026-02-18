@@ -20,7 +20,6 @@ import {
   getDocumentSummaryByDocumentId,
   getDocumentPreviewByDocumentId,
   searchFulltext,
-  rebuildFulltextIndex,
   type FulltextSearchHit,
   Document,
   getDirectories,
@@ -110,11 +109,9 @@ const DataCenter: React.FC = () => {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewBlobUrlRef = useRef<string | null>(null);
-  const [contentSearchQuery, setContentSearchQuery] = useState('');
   const [contentSearchResults, setContentSearchResults] = useState<FulltextSearchHit[]>([]);
   const [contentSearching, setContentSearching] = useState(false);
   const [contentSearchError, setContentSearchError] = useState<string | null>(null);
-  const [rebuildIndexing, setRebuildIndexing] = useState(false);
 
   const {
     lowerVisible,
@@ -620,7 +617,7 @@ const DataCenter: React.FC = () => {
   };
 
   const handleContentSearch = async () => {
-    const q = contentSearchQuery.trim();
+    const q = searchQuery.trim();
     if (!q) return;
     setContentSearching(true);
     setContentSearchResults([]);
@@ -641,22 +638,6 @@ const DataCenter: React.FC = () => {
     setSelectedDocId(hit.document_id);
     setContentSearchResults([]);
     setContentSearchError(null);
-  };
-
-  const handleRebuildFulltextIndex = async () => {
-    setRebuildIndexing(true);
-    setContentSearchError(null);
-    try {
-      const { indexed } = await rebuildFulltextIndex();
-      setContentSearchError(null);
-      setUploadProgress(t('dataCenter.fulltextRebuildDone', { count: indexed }));
-      setTimeout(() => setUploadProgress(''), 3000);
-    } catch (e) {
-      console.error('Rebuild fulltext index error:', e);
-      setContentSearchError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setRebuildIndexing(false);
-    }
   };
 
   const handleKpContentMouseUp = (_e: React.MouseEvent) => {
@@ -782,42 +763,23 @@ const DataCenter: React.FC = () => {
             className="dc-upper-left-filelist dc-cli-panel"
             style={{ width: leftPanelWidth, minWidth: LEFT_PANEL_MIN }}
           >
-            <div className="dc-filelist-search">
-              <input
-                type="text"
-                className="dc-search-input"
-                placeholder={t('dataCenter.searchDocuments')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label={t('dataCenter.searchDocuments')}
-              />
-            </div>
             <div className="dc-content-search">
               <input
                 type="text"
                 className="dc-search-input"
-                placeholder={t('dataCenter.contentSearchPlaceholder')}
-                value={contentSearchQuery}
-                onChange={(e) => setContentSearchQuery(e.target.value)}
+                placeholder={t('dataCenter.searchPlaceholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleContentSearch()}
-                aria-label={t('dataCenter.searchInContent')}
+                aria-label={t('dataCenter.searchPlaceholder')}
               />
               <button
                 type="button"
                 className="dc-btn dc-btn-small"
                 onClick={handleContentSearch}
-                disabled={contentSearching || !contentSearchQuery.trim()}
+                disabled={contentSearching || !searchQuery.trim()}
               >
                 {contentSearching ? '...' : t('dataCenter.searchInContent')}
-              </button>
-              <button
-                type="button"
-                className="dc-btn dc-btn-small"
-                onClick={handleRebuildFulltextIndex}
-                disabled={rebuildIndexing}
-                title={t('dataCenter.fulltextRebuildHint')}
-              >
-                {rebuildIndexing ? '...' : t('dataCenter.fulltextRebuild')}
               </button>
             </div>
             {contentSearchError && (

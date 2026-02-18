@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { FileText, X, Maximize2, Minimize2 } from 'lucide-react';
 import Tooltip from './Tooltip';
 import PdfViewer from './PdfViewer';
-import { getDocuments, getDirectories, getKnowledgePoints, updateKnowledgePointWeight, updateKnowledgePointExcluded, getDocumentSummaryByDocumentId, getDocumentPreviewByDocumentId, getKnowledgePointKeywords, addKnowledgePointKeyword, removeKnowledgePointKeyword, type Document, type DirectoryNode, type KnowledgePoint } from '../services/api';
+import { getDocuments, getDirectories, getKnowledgePoints, updateKnowledgePointWeight, updateKnowledgePointExcluded, getDocumentSummaryByDocumentId, getDocumentPreviewByDocumentId, getKnowledgePointKeywords, addKnowledgePointKeyword, removeKnowledgePointKeyword, searchFulltext, type Document, type DirectoryNode, type KnowledgePoint, type FulltextSearchHit } from '../services/api';
 import { loadFileMeta, saveFileMeta, type FileMetaItem } from '../utils/fileMeta';
 import './KnowledgeBaseWorkspace.css';
 
@@ -66,6 +66,9 @@ const KnowledgeBaseWorkspace: React.FC = () => {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewBlobUrlRef = useRef<string | null>(null);
+  const [contentSearchResults, setContentSearchResults] = useState<FulltextSearchHit[]>([]);
+  const [contentSearching, setContentSearching] = useState(false);
+  const [contentSearchError, setContentSearchError] = useState<string | null>(null);
 
   useEffect(() => {
     saveFileMeta(fileMeta);
@@ -336,6 +339,30 @@ const KnowledgeBaseWorkspace: React.FC = () => {
     }
   };
 
+  const handleContentSearch = async () => {
+    const q = searchQuery.trim();
+    if (!q) return;
+    setContentSearching(true);
+    setContentSearchResults([]);
+    setContentSearchError(null);
+    try {
+      const { results } = await searchFulltext(q);
+      setContentSearchResults(results);
+    } catch (e) {
+      console.error('Content search error:', e);
+      const msg = e instanceof Error ? e.message : String(e);
+      setContentSearchError(msg.includes('Not Found') || msg.includes('404') ? t('dataCenter.contentSearchUnavailable') : msg);
+    } finally {
+      setContentSearching(false);
+    }
+  };
+
+  const handleContentSearchResultClick = (hit: FulltextSearchHit) => {
+    setSelectedDocId(hit.document_id);
+    setContentSearchResults([]);
+    setContentSearchError(null);
+  };
+
   const searchResults = useMemo(() => {
     const q = (searchQuery || '').trim().toLowerCase();
     if (!q) return [];
@@ -594,16 +621,54 @@ const KnowledgeBaseWorkspace: React.FC = () => {
             className="kb-upper-left-filelist kb-cli-panel"
             style={{ width: leftPanelWidth, minWidth: LEFT_PANEL_MIN }}
           >
-            <div className="kb-filelist-search">
+            <div className="kb-filelist-search kb-content-search-row">
               <input
                 type="text"
                 className="kb-search-input"
-                placeholder={t('knowledgeBaseWorkspace.searchFiles')}
+                placeholder={t('dataCenter.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                aria-label={t('knowledgeBaseWorkspace.searchFiles')}
+                onKeyDown={(e) => e.key === 'Enter' && handleContentSearch()}
+                aria-label={t('dataCenter.searchPlaceholder')}
               />
+              <button
+                type="button"
+                className="kb-btn kb-btn-small"
+                onClick={handleContentSearch}
+                disabled={contentSearching || !searchQuery.trim()}
+              >
+                {contentSearching ? '...' : t('dataCenter.searchInContent')}
+              </button>
             </div>
+            {contentSearchError && (
+              <div className="kb-content-search-error">
+                {contentSearchError}
+              </div>
+            )}
+            {contentSearchResults.length > 0 && (
+              <div className="kb-content-search-results">
+                <div className="kb-content-search-results-header">
+                  {t('dataCenter.contentSearchResults', { count: contentSearchResults.length })}
+                </div>
+                <ul className="kb-content-search-results-list">
+                  {contentSearchResults.map((hit, idx) => (
+                    <li key={`${hit.document_id}-${hit.knowledge_point_id}-${idx}`}>
+                      <button
+                        type="button"
+                        className="kb-content-search-result-item"
+                        onClick={() => handleContentSearchResultClick(hit)}
+                      >
+                        <span className="kb-content-search-filename">{hit.filename || ''}</span>
+                        <span
+                          className="kb-content-search-snippet"
+                          dangerouslySetInnerHTML={{ __html: hit.snippet || '' }}
+                        />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div className="kb-cli-file-table-wrap" role="listbox" aria-label={t('knowledgeBaseWorkspace.documentList')}>
               {displayFileList.length === 0 ? (
                 <div className="kb-cli-line kb-cli-empty">

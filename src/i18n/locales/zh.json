@@ -212,6 +212,7 @@
   "dataCenter": {
     "title": "知识存储",
     "searchDocuments": "搜索文档...",
+    "searchPlaceholder": "搜索文档或全文内容...",
     "addAndProcessDocuments": "新增与处理文档",
     "selectDocumentForKp": "选择文档以查看知识点",
     "selectDocumentFirst": "请先选择文档",
@@ -770,7 +771,10 @@
       "embeddingBaseUrl": "Embedding API 地址",
       "embeddingPlatform": "API 密钥 (平台)",
       "hint": "这些设置将应用于新查询。留空 embedding 模型则使用 Chroma 默认。",
-      "saveRag": "保存 RAG 设置"
+      "saveRag": "保存 RAG 设置",
+      "fulltextRebuild": "重建全文索引",
+      "fulltextRebuildHint": "从全部知识点重建全文索引（搜索无结果时可在设置中执行）",
+      "fulltextRebuildDone": "全文索引已重建：共 {{count}} 条。"
     }
   },
   "helpDocs": {

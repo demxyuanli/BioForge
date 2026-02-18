@@ -211,6 +211,7 @@
   "dataCenter": {
     "title": "Knowledge Repository",
     "searchDocuments": "Search documents...",
+    "searchPlaceholder": "Search documents or full-text content...",
     "addAndProcessDocuments": "Add and process documents",
     "selectDocumentForKp": "Select a document to view knowledge points",
     "selectDocumentFirst": "Select a document first",
@@ -769,7 +770,10 @@
       "embeddingBaseUrl": "Embedding API base URL",
       "embeddingPlatform": "API key (platform)",
       "hint": "These settings will be applied to new queries. Leave embedding model empty to use Chroma default.",
-      "saveRag": "Save RAG settings"
+      "saveRag": "Save RAG settings",
+      "fulltextRebuild": "Rebuild full-text index",
+      "fulltextRebuildHint": "Rebuild full-text index from all knowledge points (use if search returns no results)",
+      "fulltextRebuildDone": "Full-text index rebuilt: {{count}} entries."
     }
   },
   "helpDocs": {

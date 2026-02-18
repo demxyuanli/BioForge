@@ -9,7 +9,7 @@ import {
   getLocalModels,
   getRagConfig,
   saveRagConfig,
-  type RagConfig
+  rebuildFulltextIndex
 } from '../services/api';
 import { 
   getStoredTheme, 
@@ -68,6 +68,8 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
   const [ragEmbeddingBaseUrl, setRagEmbeddingBaseUrl] = useState<string>('');
   const [ragEmbeddingPlatform, setRagEmbeddingPlatform] = useState<string>('deepseek');
   const [ragSaving, setRagSaving] = useState<boolean>(false);
+  const [rebuildIndexing, setRebuildIndexing] = useState<boolean>(false);
+  const [rebuildIndexMessage, setRebuildIndexMessage] = useState<string | null>(null);
 
   // Privacy Settings State
   const [auditLogEntries, setAuditLogEntries] = useState<any[]>([]);
@@ -513,6 +515,34 @@ const Settings: React.FC<SettingsProps> = ({ activeTab: propActiveTab }) => {
                 >
                   {ragSaving ? '...' : t('settings.context.saveRag')}
                 </button>
+              </div>
+            </div>
+            <h2>{t('settings.context.fulltextRebuild')}</h2>
+            <p className="settings-section-desc">{t('settings.context.fulltextRebuildHint')}</p>
+            <div className="settings-field-group">
+              <div className="settings-field settings-field-inline">
+                <button
+                  type="button"
+                  className="settings-btn"
+                  disabled={rebuildIndexing}
+                  onClick={async () => {
+                    setRebuildIndexing(true);
+                    setRebuildIndexMessage(null);
+                    try {
+                      const { indexed } = await rebuildFulltextIndex();
+                      setRebuildIndexMessage(t('settings.context.fulltextRebuildDone', { count: indexed }));
+                    } catch (e) {
+                      setRebuildIndexMessage(e instanceof Error ? e.message : String(e));
+                    } finally {
+                      setRebuildIndexing(false);
+                    }
+                  }}
+                >
+                  {rebuildIndexing ? '...' : t('settings.context.fulltextRebuild')}
+                </button>
+                {rebuildIndexMessage != null && (
+                  <span className="settings-hint" style={{ marginLeft: '8px' }}>{rebuildIndexMessage}</span>
+                )}
               </div>
             </div>
           </section>

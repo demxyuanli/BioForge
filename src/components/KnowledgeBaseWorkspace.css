@@ -210,6 +210,114 @@
   color: var(--vs-description-foreground);
 }
 
+.kb-filelist-search.kb-content-search-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.kb-filelist-search.kb-content-search-row .kb-search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.kb-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--vs-fg);
+  background: var(--vs-button-secondaryBackground, var(--vs-input-bg));
+  border: 1px solid var(--vs-border-subtle);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.kb-btn:hover:not(:disabled) {
+  background: var(--vs-button-secondaryHoverBackground);
+}
+
+.kb-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.kb-btn-small {
+  padding: 4px 8px;
+  font-size: 11px;
+}
+
+.kb-content-search-error {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--vs-error-foreground, #f14c4c);
+  background: var(--vs-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
+  border: 1px solid var(--vs-inputValidation-errorBorder, #f14c4c);
+  border-radius: 4px;
+}
+
+.kb-content-search-results {
+  flex-shrink: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--vs-border-subtle);
+  border-radius: 4px;
+  margin-bottom: 6px;
+  background: var(--vs-editor-background);
+}
+
+.kb-content-search-results-header {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--vs-muted);
+  border-bottom: 1px solid var(--vs-border-subtle);
+}
+
+.kb-content-search-results-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.kb-content-search-result-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--vs-border-subtle);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.kb-content-search-result-item:last-child {
+  border-bottom: none;
+}
+
+.kb-content-search-result-item:hover {
+  background: var(--vs-list-hover);
+}
+
+.kb-content-search-filename {
+  font-weight: 500;
+  color: var(--vs-fg);
+  margin-bottom: 4px;
+}
+
+.kb-content-search-snippet {
+  color: var(--vs-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.kb-content-search-snippet b {
+  color: var(--vs-accent);
+  font-weight: 600;
+}
+
 .kb-upper-left-filelist.kb-cli-panel .kb-cli-line.kb-cli-empty {
   color: var(--kb-cli-muted, #858585);
   font-style: italic;
