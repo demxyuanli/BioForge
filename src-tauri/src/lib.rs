@@ -129,6 +129,17 @@ async fn save_rag_config(app: tauri::AppHandle, config: serde_json::Value) -> Re
 }
 
 #[tauri::command]
+async fn search_fulltext(app: tauri::AppHandle, query: String) -> Result<String, String> {
+    let query_params = vec![("q".to_string(), query)];
+    backend_request_json(&app, Method::GET, "/fulltext-search", Some(query_params), None).await
+}
+
+#[tauri::command]
+async fn rebuild_fulltext_index(app: tauri::AppHandle) -> Result<String, String> {
+    backend_request_json(&app, Method::POST, "/fulltext-search/rebuild", None, None).await
+}
+
+#[tauri::command]
 fn write_export_file(file_path: String, contents_base64: String) -> Result<(), String> {
     use base64::Engine;
     let bytes = base64::engine::general_purpose::STANDARD
@@ -541,8 +552,21 @@ async fn wait_backend_healthy(client: &reqwest::Client, health_url: &str) -> boo
 }
 
 async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<Option<BackendProcess>, String> {
+    // Prefer Python source (main.py) when present so dev runs use latest code; fall back to packaged exe.
+    let main_py_path = backend_url::find_main_py_path();
     let backend_exe_path = backend_url::find_backend_executable_path();
-    let (backend_dir, backend_entry_path, use_executable) = if let Some(exe_path) = backend_exe_path {
+    let (backend_dir, backend_entry_path, use_executable) = if let Some(main_py) = main_py_path {
+        let backend_dir = main_py.parent()
+            .ok_or("Invalid path")?
+            .to_path_buf();
+        let gui_host_path = backend_dir.join("backend_gui_host.py");
+        let backend_entry_path = if gui_host_path.exists() {
+            gui_host_path
+        } else {
+            main_py
+        };
+        (backend_dir, backend_entry_path, false)
+    } else if let Some(exe_path) = backend_exe_path {
         (
             exe_path
                 .parent()
@@ -552,18 +576,7 @@ async fn ensure_python_backend_running(config_path: Option<PathBuf>) -> Result<O
             true,
         )
     } else {
-        let main_py_path = backend_url::find_main_py_path()
-            .ok_or("Python backend main.py not found. Please ensure python-backend/main.py exists.")?;
-        let backend_dir = main_py_path.parent()
-            .ok_or("Invalid path")?
-            .to_path_buf();
-        let gui_host_path = backend_dir.join("backend_gui_host.py");
-        let backend_entry_path = if gui_host_path.exists() {
-            gui_host_path
-        } else {
-            main_py_path
-        };
-        (backend_dir, backend_entry_path, false)
+        return Err("Python backend main.py not found. Please ensure python-backend/main.py exists or build the backend exe.".to_string());
     };
     let backend_port = backend_url::resolve_backend_port(config_path.as_ref());
     backend_url::configure_python_env(&backend_dir, backend_port);
@@ -958,6 +971,8 @@ pub fn run() {
             get_desensitization_log,
             get_rag_config,
             save_rag_config,
+            search_fulltext,
+            rebuild_fulltext_index,
             read_template_file,
             write_export_file,
             evaluation_generate,

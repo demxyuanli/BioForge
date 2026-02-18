@@ -116,6 +116,92 @@
   color: var(--vs-description-foreground);
 }
 
+.data-center-layout .dc-content-search {
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  padding-bottom: 6px;
+  align-items: center;
+}
+
+.data-center-layout .dc-content-search .dc-search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.data-center-layout .dc-content-search-error {
+  flex-shrink: 0;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--vs-error-foreground, #f14c4c);
+  background: var(--vs-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
+  border: 1px solid var(--vs-inputValidation-errorBorder, #f14c4c);
+  border-radius: 4px;
+}
+
+.data-center-layout .dc-content-search-results {
+  flex-shrink: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--vs-border-subtle);
+  border-radius: 4px;
+  margin-bottom: 6px;
+  background: var(--vs-editor-background);
+}
+
+.data-center-layout .dc-content-search-results-header {
+  padding: 6px 10px;
+  font-size: 11px;
+  color: var(--vs-muted);
+  border-bottom: 1px solid var(--vs-border-subtle);
+}
+
+.data-center-layout .dc-content-search-results-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.data-center-layout .dc-content-search-result-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  text-align: left;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--vs-border-subtle);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.data-center-layout .dc-content-search-result-item:last-child {
+  border-bottom: none;
+}
+
+.data-center-layout .dc-content-search-result-item:hover {
+  background: var(--vs-list-hover);
+}
+
+.data-center-layout .dc-content-search-filename {
+  font-weight: 500;
+  color: var(--vs-fg);
+  margin-bottom: 4px;
+}
+
+.data-center-layout .dc-content-search-snippet {
+  color: var(--vs-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.data-center-layout .dc-content-search-snippet b {
+  color: var(--vs-accent);
+  font-weight: 600;
+}
+
 .data-center-layout .dc-upper {
   display: flex;
   flex-direction: column;

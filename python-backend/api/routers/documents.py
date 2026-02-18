@@ -83,6 +83,7 @@ def process_document_background(document_id: int, file_path: str, file_type: str
             rag.add_to_vector_store(knowledge_points, f"doc_{doc.id}")
             rag.add_to_vector_store(knowledge_points, "global_knowledge_base")
 
+        kp_db_list = []
         for kp in knowledge_points:
             kp_db = KnowledgePoint(
                 document_id=doc.id,
@@ -91,11 +92,20 @@ def process_document_background(document_id: int, file_path: str, file_type: str
                 tags="[]"
             )
             db.add(kp_db)
+            kp_db_list.append(kp_db)
 
         doc.processed = True
         doc.processing_status = "completed"
         doc.processing_message = f"Processed successfully. {len(knowledge_points)} knowledge points generated."
         db.commit()
+
+        try:
+            from api.db import engine
+            from services.fulltext_service import add_to_fts
+            for kp_db in kp_db_list:
+                add_to_fts(engine, doc.id, kp_db.id, kp_db.content)
+        except Exception as fts_err:
+            logger.warning("Failed to update full-text index for doc %s: %s", document_id, fts_err)
 
     except Exception as e:
         logger.error("Background processing failed for doc %s: %s", document_id, e)
@@ -325,6 +335,13 @@ async def delete_document(document_id: int):
                     logger.warning("Failed to delete document from global vector store: %s", e)
         except Exception as e:
             logger.warning("Failed to delete vector store data: %s", e)
+
+        try:
+            from api.db import engine
+            from services.fulltext_service import remove_document_from_fts
+            remove_document_from_fts(engine, document_id)
+        except Exception as e:
+            logger.warning("Failed to remove document from full-text index: %s", e)
 
         db.delete(doc)
         db.commit()

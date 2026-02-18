@@ -260,7 +260,14 @@
     "processing": "处理中...",
     "failed": "失败",
     "processed": "已处理",
-    "pending": "待处理"
+    "pending": "待处理",
+    "searchInContent": "内容搜索",
+    "contentSearchPlaceholder": "在解析内容中全文搜索...",
+    "contentSearchResults": "共 {{count}} 条结果",
+    "contentSearchUnavailable": "全文搜索不可用。请从项目目录运行应用（以使用 python-backend 源码），或重新构建后端（npm run build:backend）。",
+    "fulltextRebuild": "重建索引",
+    "fulltextRebuildHint": "从全部知识点重建全文索引（搜索无结果时可点此）",
+    "fulltextRebuildDone": "全文索引已重建：共 {{count}} 条。"
   },
   "knowledgeBaseWorkspace": {
     "searchFiles": "搜索文件...",

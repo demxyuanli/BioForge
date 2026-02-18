@@ -19,6 +19,9 @@ import {
   updateKnowledgePointExcluded,
   getDocumentSummaryByDocumentId,
   getDocumentPreviewByDocumentId,
+  searchFulltext,
+  rebuildFulltextIndex,
+  type FulltextSearchHit,
   Document,
   getDirectories,
   createDirectory,
@@ -107,6 +110,11 @@ const DataCenter: React.FC = () => {
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const previewBlobUrlRef = useRef<string | null>(null);
+  const [contentSearchQuery, setContentSearchQuery] = useState('');
+  const [contentSearchResults, setContentSearchResults] = useState<FulltextSearchHit[]>([]);
+  const [contentSearching, setContentSearching] = useState(false);
+  const [contentSearchError, setContentSearchError] = useState<string | null>(null);
+  const [rebuildIndexing, setRebuildIndexing] = useState(false);
 
   const {
     lowerVisible,
@@ -611,6 +619,46 @@ const DataCenter: React.FC = () => {
     }
   };
 
+  const handleContentSearch = async () => {
+    const q = contentSearchQuery.trim();
+    if (!q) return;
+    setContentSearching(true);
+    setContentSearchResults([]);
+    setContentSearchError(null);
+    try {
+      const { results } = await searchFulltext(q);
+      setContentSearchResults(results);
+    } catch (e) {
+      console.error('Content search error:', e);
+      const msg = e instanceof Error ? e.message : String(e);
+      setContentSearchError(msg.includes('Not Found') || msg.includes('404') ? t('dataCenter.contentSearchUnavailable') : msg);
+    } finally {
+      setContentSearching(false);
+    }
+  };
+
+  const handleContentSearchResultClick = (hit: FulltextSearchHit) => {
+    setSelectedDocId(hit.document_id);
+    setContentSearchResults([]);
+    setContentSearchError(null);
+  };
+
+  const handleRebuildFulltextIndex = async () => {
+    setRebuildIndexing(true);
+    setContentSearchError(null);
+    try {
+      const { indexed } = await rebuildFulltextIndex();
+      setContentSearchError(null);
+      setUploadProgress(t('dataCenter.fulltextRebuildDone', { count: indexed }));
+      setTimeout(() => setUploadProgress(''), 3000);
+    } catch (e) {
+      console.error('Rebuild fulltext index error:', e);
+      setContentSearchError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRebuildIndexing(false);
+    }
+  };
+
   const handleKpContentMouseUp = (_e: React.MouseEvent) => {
     const sel = window.getSelection();
     const text = sel?.toString?.()?.trim();
@@ -744,6 +792,63 @@ const DataCenter: React.FC = () => {
                 aria-label={t('dataCenter.searchDocuments')}
               />
             </div>
+            <div className="dc-content-search">
+              <input
+                type="text"
+                className="dc-search-input"
+                placeholder={t('dataCenter.contentSearchPlaceholder')}
+                value={contentSearchQuery}
+                onChange={(e) => setContentSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleContentSearch()}
+                aria-label={t('dataCenter.searchInContent')}
+              />
+              <button
+                type="button"
+                className="dc-btn dc-btn-small"
+                onClick={handleContentSearch}
+                disabled={contentSearching || !contentSearchQuery.trim()}
+              >
+                {contentSearching ? '...' : t('dataCenter.searchInContent')}
+              </button>
+              <button
+                type="button"
+                className="dc-btn dc-btn-small"
+                onClick={handleRebuildFulltextIndex}
+                disabled={rebuildIndexing}
+                title={t('dataCenter.fulltextRebuildHint')}
+              >
+                {rebuildIndexing ? '...' : t('dataCenter.fulltextRebuild')}
+              </button>
+            </div>
+            {contentSearchError && (
+              <div className="dc-content-search-error">
+                {contentSearchError}
+              </div>
+            )}
+            {contentSearchResults.length > 0 && (
+              <div className="dc-content-search-results">
+                <div className="dc-content-search-results-header">
+                  {t('dataCenter.contentSearchResults', { count: contentSearchResults.length })}
+                </div>
+                <ul className="dc-content-search-results-list">
+                  {contentSearchResults.map((hit, idx) => (
+                    <li key={`${hit.document_id}-${hit.knowledge_point_id}-${idx}`}>
+                      <button
+                        type="button"
+                        className="dc-content-search-result-item"
+                        onClick={() => handleContentSearchResultClick(hit)}
+                      >
+                        <span className="dc-content-search-filename">{hit.filename || ''}</span>
+                        <span
+                          className="dc-content-search-snippet"
+                          dangerouslySetInnerHTML={{ __html: hit.snippet || '' }}
+                        />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <DataCenterToolbar
               uploadProgress={uploadProgress}
               isUploading={isUploading}

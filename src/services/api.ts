@@ -209,6 +209,28 @@ export async function saveRagConfig(config: RagConfig): Promise<RagConfig> {
   return (data && typeof data === 'object') ? data as RagConfig : {};
 }
 
+export interface FulltextSearchHit {
+  document_id: number;
+  knowledge_point_id: number;
+  snippet: string;
+  filename?: string;
+}
+
+export async function searchFulltext(query: string): Promise<{ query: string; results: FulltextSearchHit[] }> {
+  const response = await invoke<string>('search_fulltext', { query: query.trim() });
+  const data = await parsePythonResponse(response);
+  if (!data || typeof data !== 'object') return { query: query.trim(), results: [] };
+  const results = Array.isArray((data as any).results) ? (data as any).results : [];
+  return { query: (data as any).query || query.trim(), results };
+}
+
+export async function rebuildFulltextIndex(): Promise<{ indexed: number }> {
+  const response = await invoke<string>('rebuild_fulltext_index');
+  const data = await parsePythonResponse(response);
+  const indexed = typeof (data as any)?.indexed === 'number' ? (data as any).indexed : 0;
+  return { indexed };
+}
+
 export interface MountPoint {
   id: number;
   path: string;

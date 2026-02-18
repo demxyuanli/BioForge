@@ -201,4 +201,14 @@ def init_database(db_path: str = "privatetune.db"):
             with engine.connect() as conn:
                 conn.execute(text("ALTER TABLE knowledge_points ADD COLUMN keywords TEXT"))
                 conn.commit()
+    # Full-text search (FTS5) virtual table for parsed content
+    try:
+        with engine.connect() as conn:
+            conn.execute(text(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS fts_content USING fts5("
+                "content, document_id UNINDEXED, knowledge_point_id UNINDEXED)"
+            ))
+            conn.commit()
+    except Exception:
+        pass
     return engine

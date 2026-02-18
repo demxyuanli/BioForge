@@ -259,7 +259,14 @@
     "processing": "Processing...",
     "failed": "Failed",
     "processed": "Processed",
-    "pending": "Pending"
+    "pending": "Pending",
+    "searchInContent": "Search in content",
+    "contentSearchPlaceholder": "Full-text search in parsed content...",
+    "contentSearchResults": "{{count}} result(s)",
+    "contentSearchUnavailable": "Full-text search unavailable. Run the app from the project directory (so python-backend/main.py is used), or rebuild the backend (npm run build:backend).",
+    "fulltextRebuild": "Rebuild index",
+    "fulltextRebuildHint": "Rebuild full-text index from all knowledge points (use if search returns no results)",
+    "fulltextRebuildDone": "Full-text index rebuilt: {{count}} entries."
   },
   "knowledgeBaseWorkspace": {
     "searchFiles": "Search files...",
