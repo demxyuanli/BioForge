@@ -1,8 +1,8 @@
 # BioForger
 
-BioForger（应用名称：PrivateTune Pro）是一款将 **RAG（检索增强生成）** 与 **专业微调** 结合在一起的桌面工具。其核心用途是：管理本地专业知识与文档，并基于这些知识对大语言模型进行微调，最终通过 **模板** 生成符合领域规范的专业文本内容。无需自备本地 GPU，数据与 API 密钥均可由用户自行掌控。
+BioForger（应用名称：AiForger Pro）是一款将 **RAG（检索增强生成）** 与 **专业微调** 结合在一起的桌面工具。其核心用途是：管理本地专业知识与文档，并基于这些知识对大语言模型进行微调，最终通过 **模板** 生成符合领域规范的专业文本内容。无需自备本地 GPU，数据与 API 密钥均可由用户自行掌控。
 
-**English:** BioForger (app name: PrivateTune Pro) is a desktop tool that combines **RAG (Retrieval-Augmented Generation)** and **professional fine-tuning**. It manages local professional knowledge and documents, fine-tunes LLMs with that knowledge, and generates domain-standard professional text via **templates**. No local GPU required; data and API keys stay under your control.
+**English:** BioForger (app name: AiForger Pro) is a desktop tool that combines **RAG (Retrieval-Augmented Generation)** and **professional fine-tuning**. It manages local professional knowledge and documents, fine-tunes LLMs with that knowledge, and generates domain-standard professional text via **templates**. No local GPU required; data and API keys stay under your control.
 
 与仅做检索或仅做微调的工具不同，BioForger 将“知识入库 → 检索增强 → 微调训练 → 模板化输出”串联为一条流水线，适合需要**私有化、领域化**写作能力的团队：知识资产留在本地或自选云端，模型可基于自有数据微调，生成内容的口径与格式由模板统一约束，便于合规与品控。
 
@@ -281,11 +281,15 @@ cd ..\..
 cd python-backend/database && python init_db.py && cd ../..
 ```
 
-执行成功后，会在 `python-backend` 下生成 **`privatetune.db`**（或你在配置中指定的路径）。若该文件已存在，`init_database` 会按现有模型创建缺失表，一般不会清空已有数据；若需从头重建，请先备份或删除旧库文件后再执行。
+执行成功后，会在 `python-backend` 下生成 **`aiforger.db`**（或你在配置中指定的路径）。若该文件已存在，`init_database` 会按现有模型创建缺失表，一般不会清空已有数据；若需从头重建，请先备份或删除旧库文件后再执行。
 
-**English:** This creates **`privatetune.db`** under `python-backend` (or your configured path). If the file exists, missing tables are created without wiping data; to rebuild from scratch, backup or remove the old DB first.
+**English:** This creates **`aiforger.db`** under `python-backend` (or your configured path). If the file exists, missing tables are created without wiping data; to rebuild from scratch, backup or remove the old DB first.
 
 ### 4. 构建应用
+
+打包前若需清理本机测试数据（会备份后删除仓库内 `aiforger.db`/`privatetune.db` 并将 `bioforger-config.json` 重置为仅含 `backendPort`），可先执行：`npm run clean:test-data`，再按下列步骤构建。
+
+**English:** Before packaging, to clean local test data (backup then remove in-repo `aiforger.db`/`privatetune.db` and reset `bioforger-config.json` to default), run: `npm run clean:test-data`, then build as below.
 
 分两种方式：
 
@@ -302,9 +306,9 @@ npm run tauri build
 ```
 
 - **完整构建（前端 + Tauri + 后端 exe）**  
-  先使用 PyInstaller 将 Python 后端打成单文件 exe（生成在 `python-backend/dist/bioforger-backend.exe`），再由 Tauri 将该 exe 打包进桌面应用，实现“双击即用”。可分步执行：
+  先使用 PyInstaller 将 Python 后端打成单文件 exe（生成在 `python-backend/dist/aiforger-backend.exe`），再由 Tauri 将该 exe 打包进桌面应用，实现“双击即用”。可分步执行：
 
-  **English:** Full build: PyInstaller produces `python-backend/dist/bioforger-backend.exe`, then Tauri bundles it for a single “double-click” app.
+  **English:** Full build: PyInstaller produces `python-backend/dist/aiforger-backend.exe`, then Tauri bundles it for a single “double-click” app.
 
 ```bash
 npm run build
@@ -316,9 +320,9 @@ npm run tauri build
 
 **English:** Or run `npm run tauri build` alone (beforeBuildCommand runs the above). If PyInstaller is missing or fails, build the first two steps and run the backend separately.
 
-**构建产物**：位于 `src-tauri/target/release/` 下（Windows 下例如 **`privatetune-pro.exe`**）。若为完整构建，后端 exe 等资源会出现在该目录或已安装应用的 resources 中；首次运行时会根据配置或端口占用情况启动后端进程。
+**构建产物**：位于 `src-tauri/target/release/` 下（Windows 下例如 **`aiforger-pro.exe`**）。若为完整构建，后端 exe 等资源会出现在该目录或已安装应用的 resources 中；首次运行时会根据配置或端口占用情况启动后端进程。
 
-**English:** Output is under `src-tauri/target/release/` (e.g. **`privatetune-pro.exe`** on Windows). With full build, the backend exe is in that directory or in the app’s resources; backend is started on first run based on config or port availability.
+**English:** Output is under `src-tauri/target/release/` (e.g. **`aiforger-pro.exe`** on Windows). With full build, the backend exe is in that directory or in the app’s resources; backend is started on first run based on config or port availability.
 
 **常见问题**：若 Tauri 构建报错与 Rust/Node 相关，可检查 Rust 与 Node 版本是否符合要求；若后端打包失败，可查看 `python-backend/build` 下日志，或先在本机直接运行 `python main.py` 确认后端无报错后再打包。
 
@@ -369,14 +373,14 @@ npm run tauri dev
 **English: Production (built app)**
 
 - **已打包后端**  
-  直接运行构建出的 Tauri 可执行文件即可；应用会自动启动同捆的 `bioforger-backend.exe`（通常从同目录或 resources 中查找），无需单独开后端进程。若杀毒软件拦截，需放行该 exe 或整个应用目录。
+  直接运行构建出的 Tauri 可执行文件即可；应用会自动启动同捆的 `aiforger-backend.exe`（通常从同目录或 resources 中查找），无需单独开后端进程。若杀毒软件拦截，需放行该 exe 或整个应用目录。
 
-  **English:** Run the Tauri executable; it will start the bundled `bioforger-backend.exe`. If antivirus blocks it, allow the exe or app directory.
+  **English:** Run the Tauri executable; it will start the bundled `aiforger-backend.exe`. If antivirus blocks it, allow the exe or app directory.
 
 - **未打包后端**  
-  需先在本机启动后端（同上，在 `python-backend` 下执行 `python main.py`），再运行桌面可执行文件（例如 Windows 下 `src-tauri\target\release\privatetune-pro.exe`）。此时后端与桌面端需使用同一端口（默认 8778，或与 `bioforger-config.json` 中 `backendPort` 一致）。
+  需先在本机启动后端（同上，在 `python-backend` 下执行 `python main.py`），再运行桌面可执行文件（例如 Windows 下 `src-tauri\target\release\aiforger-pro.exe`）。此时后端与桌面端需使用同一端口（默认 8778，或与 `bioforger-config.json` 中 `backendPort` 一致）。
 
-  **English:** Start the backend first (`python main.py` in `python-backend`), then run the desktop exe (e.g. `src-tauri\target\release\privatetune-pro.exe` on Windows). Backend and desktop must use the same port (default 8778 or `backendPort` in config).
+  **English:** Start the backend first (`python main.py` in `python-backend`), then run the desktop exe (e.g. `src-tauri\target\release\aiforger-pro.exe` on Windows). Backend and desktop must use the same port (default 8778 or `backendPort` in config).
 
 ---
 
@@ -388,16 +392,16 @@ npm run tauri dev
   **English:** Default port **8778**. Override with **`BIOFORGER_BACKEND_PORT`** or **`backendPort`** in **`bioforger-config.json`**. Desktop and backend must use the same port; auto port (see below) is synced via config.
 
 - **配置文件 bioforger-config.json**  
-  可配置项包括：**`backendPort`**（后端 HTTP 端口）、**`dbPath`**（SQLite 数据库文件完整路径，如 `privatetune.db`）、**`documentsDir`**（默认文档根目录，用于上传与挂载的默认路径）。  
-  桌面端从 **应用配置目录** 读取该文件（例如 Windows 下为 `%APPDATA%\com.privatetune.pro\`）；后端则从环境变量 **`BIOFORGER_CONFIG_PATH`** 指定路径读取，若未设置则使用 **`python-backend/bioforger-config.json`**。  
+  可配置项包括：**`backendPort`**（后端 HTTP 端口）、**`dbPath`**（SQLite 数据库文件完整路径，如 `aiforger.db`）、**`documentsDir`**（默认文档根目录，用于上传与挂载的默认路径）。  
+  桌面端从 **应用配置目录** 读取该文件（例如 Windows 下为 `%APPDATA%\com.aiforger.pro\`）；后端则从环境变量 **`BIOFORGER_CONFIG_PATH`** 指定路径读取，若未设置则使用 **`python-backend/bioforger-config.json`**。  
   若首次运行由桌面端创建配置（例如自动选择端口），可能只在应用配置目录下生成；后端若需共用，需将 `dbPath`、`documentsDir` 等同步到后端可读路径，或设置 `BIOFORGER_CONFIG_PATH` 指向同一文件。
 
-  **English:** Keys: **`backendPort`**, **`dbPath`** (full path to SQLite file), **`documentsDir`** (default doc root). Desktop reads from app config dir (e.g. Windows `%APPDATA%\com.privatetune.pro\`); backend reads from **`BIOFORGER_CONFIG_PATH`** or **`python-backend/bioforger-config.json`**. If the desktop creates the config first (e.g. auto port), the backend may need the same file via `BIOFORGER_CONFIG_PATH` or a copy with matching `dbPath`/`documentsDir`.
+  **English:** Keys: **`backendPort`**, **`dbPath`** (full path to SQLite file), **`documentsDir`** (default doc root). Desktop reads from app config dir (e.g. Windows `%APPDATA%\com.aiforger.pro\`); backend reads from **`BIOFORGER_CONFIG_PATH`** or **`python-backend/bioforger-config.json`**. If the desktop creates the config first (e.g. auto port), the backend may need the same file via `BIOFORGER_CONFIG_PATH` or a copy with matching `dbPath`/`documentsDir`.
 
 - **数据库路径**  
-  后端使用环境变量 **`BIOFORGER_DB_PATH`** 作为数据库路径；若未设置，则使用配置文件中的 **`dbPath`**，或默认 **`python-backend/privatetune.db`**。请确保运行用户对该路径具备读写权限；若将数据库放在网络盘或同步目录，需注意并发与锁，建议单进程使用。
+  后端使用环境变量 **`BIOFORGER_DB_PATH`** 作为数据库路径；若未设置，则使用配置文件中的 **`dbPath`**，或默认 **`python-backend/aiforger.db`**（兼容旧的 `python-backend/privatetune.db`）。请确保运行用户对该路径具备读写权限；若将数据库放在网络盘或同步目录，需注意并发与锁，建议单进程使用。
 
-  **English:** Backend uses **`BIOFORGER_DB_PATH`** or config **`dbPath`** or default **`python-backend/privatetune.db`**. Ensure write access; avoid network or sync folders for the DB if possible; single process recommended.
+  **English:** Backend uses **`BIOFORGER_DB_PATH`** or config **`dbPath`** or default **`python-backend/aiforger.db`** (compatible with legacy `python-backend/privatetune.db`). Ensure write access; avoid network or sync folders for the DB if possible; single process recommended.
 
 - **单实例**  
   应用通过单实例插件限制同一用户仅能打开一个主窗口；重复启动时会激活已有窗口而非再开新进程，避免多进程同时写同一数据库或配置造成冲突。
@@ -432,12 +436,12 @@ npm run tauri dev
 │   ├── database/              # 模型定义、init_database、init_db.py
 │   ├── services/              # 文档解析、RAG、标注、微调等业务逻辑
 │   ├── requirements.txt
-│   ├── dist/                 # PyInstaller 输出（如 bioforger-backend.exe）
-│   └── privatetune.db        # SQLite 库（由 init_db 创建）
+│   ├── dist/                 # PyInstaller 输出（如 aiforger-backend.exe）
+│   └── aiforger.db           # SQLite 库（由 init_db 创建；兼容旧的 privatetune.db）
 └── package.json              # npm 脚本（dev、build、tauri、build:backend）
 ```
 
-**English:** `src/`: React frontend (components, i18n, App). `src-tauri/`: Tauri shell (lib.rs, backend_url.rs, commands, tauri.conf.json). `python-backend/`: FastAPI app (main.py, backend_gui_host.py), api, database, services, requirements.txt, dist (exe), privatetune.db. Root: package.json.
+**English:** `src/`: React frontend (components, i18n, App). `src-tauri/`: Tauri shell (lib.rs, backend_url.rs, commands, tauri.conf.json). `python-backend/`: FastAPI app (main.py, backend_gui_host.py), api, database, services, requirements.txt, dist (exe), aiforger.db (legacy privatetune.db). Root: package.json.
 
 **扩展与二次开发**：前端可修改 `src` 下组件与路由；后端可扩展 `api` 下路由与 `services` 下业务；数据库模型在 `python-backend/database/models.py`，新增表或字段后需在迁移或初始化逻辑中体现。Tauri 侧新增命令需在 `lib.rs` 与对应 `commands` 模块中注册并实现 HTTP 转发。
 
@@ -462,6 +466,6 @@ npm run tauri dev
 ## 许可与命名
 
 - 本仓库名称：**BioForger**
-- 应用产品名称：**PrivateTune Pro**，在 **`src-tauri/tauri.conf.json`**（如 `productName`、窗口标题）与 **`package.json`** 中均有体现。安装包或关于界面中的名称以 Tauri 配置为准；对外宣传或文档中可同时使用 BioForger 与 PrivateTune Pro 以区分仓库与产品名。
+- 应用产品名称：**AiForger Pro**，在 **`src-tauri/tauri.conf.json`**（如 `productName`、窗口标题）与 **`package.json`** 中均有体现。安装包或关于界面中的名称以 Tauri 配置为准；对外宣传或文档中可同时使用 BioForger 与 AiForger Pro 以区分仓库与产品名。
 
-**English:** Repository name: **BioForger**. App product name: **PrivateTune Pro** (see `src-tauri/tauri.conf.json` and `package.json`). Use both names as needed to distinguish repo vs. product in docs and marketing.
+**English:** Repository name: **BioForger**. App product name: **AiForger Pro** (see `src-tauri/tauri.conf.json` and `package.json`). Use both names as needed to distinguish repo vs. product in docs and marketing.

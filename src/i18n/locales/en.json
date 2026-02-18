@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "PrivateTune Pro",
+    "title": "AiForger Pro",
     "startingBackend": "Starting backend..."
   },
   "tray": {
@@ -657,8 +657,8 @@
       "documentsDir": "Document library path",
       "documentsDirPlaceholder": "Select directory for uploaded documents",
       "dbPath": "Database file path",
-      "dbPathPlaceholder": "Select directory for database (privatetune.db)",
-      "dbPathHint": "privatetune.db will be stored in the selected directory",
+      "dbPathPlaceholder": "Select directory for database (aiforger.db)",
+      "dbPathHint": "aiforger.db will be stored in the selected directory",
       "browse": "Browse",
       "save": "Save and continue",
       "saving": "Saving...",
@@ -666,9 +666,9 @@
       "dbPathRequired": "Please select database directory"
     },
     "welcome": {
-      "title": "Welcome to PrivateTune Pro",
+      "title": "Welcome to AiForger Pro",
       "description": "This wizard will guide you through setting up your first fine-tuning project.",
-      "intro": "PrivateTune Pro helps you transform your professional documents into a fine-tuned language model.",
+      "intro": "AiForger Pro helps you transform your professional documents into a fine-tuned language model.",
       "steps": "Follow these simple steps to get started:",
       "step1": "Upload your documents",
       "step2": "Generate training data",
@@ -832,8 +832,8 @@
   },
   "aboutDialog": {
     "title": "About",
-    "product": "PrivateTune Pro",
-    "description": "PrivateTune Pro is a desktop workflow for building and tuning domain-focused language models from private documents.",
+    "product": "AiForger Pro",
+    "description": "AiForger Pro is a desktop workflow for building and tuning domain-focused language models from private documents.",
     "capabilitiesTitle": "Core Capabilities",
     "capability1": "Document ingestion and knowledge extraction",
     "capability2": "Annotation generation and dataset curation",

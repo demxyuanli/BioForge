@@ -109,9 +109,9 @@ pub fn configure_python_env(backend_dir: &Path, backend_port: u16) {
 
 pub fn find_backend_executable_path() -> Option<PathBuf> {
     let exe_name = if cfg!(windows) {
-        "bioforger-backend.exe"
+        "aiforger-backend.exe"
     } else {
-        "bioforger-backend"
+        "aiforger-backend"
     };
     let mut candidates: Vec<PathBuf> = Vec::new();
 

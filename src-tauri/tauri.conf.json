@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "PrivateTune Pro",
-  "version": "0.1.0",
-  "identifier": "com.privatetune.pro",
+  "productName": "AiForger Pro",
+  "version": "1.0.0",
+  "identifier": "com.aiforger.pro",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "PrivateTune Pro",
+        "title": "AiForger Pro",
         "visible": false,
         "width": 1400,
         "height": 900,
@@ -26,7 +26,7 @@
       },
       {
         "label": "splashscreen",
-        "title": "Starting PrivateTune Pro",
+        "title": "Starting AiForger Pro",
         "url": "splash.html",
         "width": 520,
         "height": 300,
@@ -51,7 +51,7 @@
     "active": true,
     "targets": "all",
     "resources": [
-      "../python-backend/dist/bioforger-backend.exe"
+      "../python-backend/dist/aiforger-backend.exe"
     ],
     "icon": [
       "icons/32x32.png",

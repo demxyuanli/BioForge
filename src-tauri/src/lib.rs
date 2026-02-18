@@ -449,7 +449,7 @@ fn get_default_storage_paths() -> Result<serde_json::Value, String> {
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
         .ok_or("Backend dir not found")?;
     let docs = backend_dir.join("documents");
-    let db = backend_dir.join("privatetune.db");
+    let db = backend_dir.join("aiforger.db");
     Ok(serde_json::json!({
         "documentsDir": docs.to_string_lossy(),
         "dbPath": db.to_string_lossy()

@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "PrivateTune Pro",
+    "title": "AiForger Pro",
     "startingBackend": "正在启动后端..."
   },
   "tray": {
@@ -658,8 +658,8 @@
       "documentsDir": "文档库路径",
       "documentsDirPlaceholder": "选择上传文档的存储目录",
       "dbPath": "数据库文件路径",
-      "dbPathPlaceholder": "选择数据库存储目录（privatetune.db）",
-      "dbPathHint": "privatetune.db 将保存在所选目录中",
+      "dbPathPlaceholder": "选择数据库存储目录（aiforger.db）",
+      "dbPathHint": "aiforger.db 将保存在所选目录中",
       "browse": "浏览",
       "save": "保存并继续",
       "saving": "保存中...",
@@ -667,9 +667,9 @@
       "dbPathRequired": "请选择数据库目录"
     },
     "welcome": {
-      "title": "欢迎使用 PrivateTune Pro",
+      "title": "欢迎使用 AiForger Pro",
       "description": "此向导将引导您完成第一个微调项目的设置。",
-      "intro": "PrivateTune Pro 帮助您将专业文档转换为微调语言模型。",
+      "intro": "AiForger Pro 帮助您将专业文档转换为微调语言模型。",
       "steps": "按照以下简单步骤开始：",
       "step1": "上传您的文档",
       "step2": "生成训练数据",
@@ -833,8 +833,8 @@
   },
   "aboutDialog": {
     "title": "关于",
-    "product": "PrivateTune Pro",
-    "description": "PrivateTune Pro 是一套基于桌面的私有文档模型构建与微调工作流。",
+    "product": "AiForger Pro",
+    "description": "AiForger Pro 是一套基于桌面的私有文档模型构建与微调工作流。",
     "capabilitiesTitle": "核心能力",
     "capability1": "文档导入与知识提取",
     "capability2": "标注生成与数据集整理",

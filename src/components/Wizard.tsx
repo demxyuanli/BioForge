@@ -40,7 +40,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete, onStorageComplete }) => {
       setNeedsStorageStep(needStorage);
       if (config?.documentsDir) setDocumentsDir(config.documentsDir);
       if (config?.dbPath) {
-        const dir = config.dbPath.replace(/[/\\]privatetune\.db$/i, '');
+        const dir = config.dbPath.replace(/[/\\](aiforger|privatetune)\.db$/i, '');
         if (dir) setDbDir(dir);
       }
       setLoading(false);
@@ -184,9 +184,9 @@ const Wizard: React.FC<WizardProps> = ({ onComplete, onStorageComplete }) => {
     }
     setStorageSaving(true);
     try {
-      const dbPath = dbPathDir.endsWith('privatetune.db')
+      const dbPath = dbPathDir.endsWith('aiforger.db') || dbPathDir.endsWith('privatetune.db')
         ? dbPathDir
-        : `${dbPathDir.replace(/[/\\]+$/, '')}/privatetune.db`;
+        : `${dbPathDir.replace(/[/\\]+$/, '')}/aiforger.db`;
       await saveStorageConfig(docsDir, dbPath);
       await startPythonBackend();
       onStorageComplete?.();

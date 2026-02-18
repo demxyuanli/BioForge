@@ -1,12 +1,13 @@
 {
-  "name": "privatetune-pro",
+  "name": "aiforger-pro",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:backend": "python -m PyInstaller --noconfirm --clean --onefile --noconsole --name bioforger-backend --distpath python-backend/dist --workpath python-backend/build --specpath python-backend python-backend/backend_gui_host.py",
+    "clean:test-data": "python scripts/clean_test_data.py",
+    "build:backend": "python -m PyInstaller --noconfirm --clean --onefile --noconsole --name aiforger-backend --distpath python-backend/dist --workpath python-backend/build --specpath python-backend python-backend/backend_gui_host.py",
     "preview": "vite preview",
     "tauri": "tauri"
   },

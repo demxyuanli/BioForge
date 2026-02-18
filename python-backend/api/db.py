@@ -7,7 +7,23 @@ from sqlalchemy.orm import Session
 from database.models import init_database
 
 BACKEND_DIR = os.path.join(os.path.dirname(__file__), "..")
-_db_path = os.getenv("BIOFORGER_DB_PATH") or os.path.join(BACKEND_DIR, "privatetune.db")
+
+def _resolve_db_path() -> str:
+    env = os.getenv("BIOFORGER_DB_PATH")
+    if env:
+        return env
+
+    preferred = os.path.join(BACKEND_DIR, "aiforger.db")
+    legacy = os.path.join(BACKEND_DIR, "privatetune.db")
+
+    if os.path.exists(preferred):
+        return preferred
+    if os.path.exists(legacy):
+        return legacy
+    return preferred
+
+
+_db_path = _resolve_db_path()
 engine = init_database(_db_path)
 
 
