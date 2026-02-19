@@ -474,23 +474,12 @@
   font-size: var(--font-size-13, 1rem);
 }
 
-.vs-tab-close {
-  background: transparent;
-  border: none;
-  color: transparent;
-  cursor: pointer;
-  padding: 2px 4px;
-  font-size: var(--font-size-10, 0.769rem);
-  border-radius: 3px;
-}
-
-.vs-tab:hover .vs-tab-close {
+.vs-tab-tooltip-icon {
+  display: inline-flex;
+  align-items: center;
   color: var(--vs-muted);
-}
-
-.vs-tab-close:hover {
-  background-color: var(--vs-hover-bg);
-  color: var(--vs-fg) !important;
+  margin-left: 4px;
+  flex-shrink: 0;
 }
 
 .vs-editor-content {

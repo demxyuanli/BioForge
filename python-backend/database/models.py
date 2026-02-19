@@ -4,6 +4,7 @@ SQLAlchemy models for SQLite database
 """
 import os
 from sqlalchemy import create_engine, Column, Integer, String, Text, Float, DateTime, Boolean, ForeignKey, UniqueConstraint
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
@@ -181,7 +182,11 @@ def init_database(db_path: str = "aiforger.db"):
         max_overflow=30,
         pool_pre_ping=True,
     )
-    Base.metadata.create_all(engine)
+    try:
+        Base.metadata.create_all(engine, checkfirst=True)
+    except OperationalError as e:
+        if "already exists" not in str(e).lower():
+            raise
     # Add missing columns to knowledge_points if missing (migration)
     from sqlalchemy import text, inspect
     insp = inspect(engine)

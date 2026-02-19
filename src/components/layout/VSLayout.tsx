@@ -1,12 +1,27 @@
 import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { FolderOpen, BookOpen, Database, GraduationCap, Settings2, CheckSquare, MessageCircle, LayoutDashboard, Settings, Info } from 'lucide-react';
 import ActivityBar from './ActivityBar';
 import BottomPanel from './BottomPanel';
 import FileExplorer from './FileExplorer';
 import MenuBar from './MenuBar';
 import Tooltip from '../Tooltip';
 import './VSLayout.css';
+
+const ACTIVITY_ICON_PROPS = { size: 18, strokeWidth: 1.5 as const };
+const ACTIVITY_ICON_BY_TYPE: Record<ActivityType, React.ReactNode> = {
+  fileResources: <FolderOpen {...ACTIVITY_ICON_PROPS} />,
+  knowledgeBase: <BookOpen {...ACTIVITY_ICON_PROPS} />,
+  datacenter: <Database {...ACTIVITY_ICON_PROPS} />,
+  training: <GraduationCap {...ACTIVITY_ICON_PROPS} />,
+  production: <Settings2 {...ACTIVITY_ICON_PROPS} />,
+  evaluation: <CheckSquare {...ACTIVITY_ICON_PROPS} />,
+  chat: <MessageCircle {...ACTIVITY_ICON_PROPS} />,
+  dashboard: <LayoutDashboard {...ACTIVITY_ICON_PROPS} />,
+  settings: <Settings {...ACTIVITY_ICON_PROPS} />,
+  explorer: <FolderOpen {...ACTIVITY_ICON_PROPS} />
+};
 
 export type ActivityType = 'dashboard' | 'datacenter' | 'fileResources' | 'knowledgeBase' | 'training' | 'production' | 'evaluation' | 'chat' | 'settings' | 'explorer';
 export type SidebarViewType = 'files' | 'knowledge';
@@ -296,11 +311,15 @@ const VSLayout: React.FC<VSLayoutProps> = ({
             height: bottomPanelVisible ? `calc(100% - ${bottomPanelHeight}px)` : '100%' 
           }}>
             <div className="vs-editor-tabs">
-              <div className="vs-tab vs-tab-active">
-                <span className="vs-tab-icon">&#128196;</span>
-                <span className="vs-tab-title">{t(NAV_TITLE_KEY_BY_ACTIVITY[activeActivity])}</span>
-                <button className="vs-tab-close">&#x2715;</button>
-              </div>
+              <Tooltip title={t(NAV_TITLE_KEY_BY_ACTIVITY[activeActivity])}>
+                <div className="vs-tab vs-tab-active">
+                  <span className="vs-tab-icon">{ACTIVITY_ICON_BY_TYPE[activeActivity]}</span>
+                  <span className="vs-tab-title">{t(NAV_TITLE_KEY_BY_ACTIVITY[activeActivity])}</span>
+                  <span className="vs-tab-tooltip-icon" aria-hidden>
+                    <Info {...ACTIVITY_ICON_PROPS} size={14} />
+                  </span>
+                </div>
+              </Tooltip>
               {['training', 'production', 'evaluation'].includes(activeActivity) && (
                 <Tooltip title={t('trainingLab.configHint')}>
                   <span className="vs-tab-help">?</span>
