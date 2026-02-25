@@ -1,6 +1,8 @@
 # BioForger
 
-BioForger（应用名称：AiForger Pro）是一款将 **RAG（检索增强生成）** 与 **专业微调** 结合在一起的桌面工具。其核心用途是：管理本地专业知识与文档，并基于这些知识对大语言模型进行微调，最终通过 **模板** 生成符合领域规范的专业文本内容。无需自备本地 GPU，数据与 API 密钥均可由用户自行掌控。
+BioForger是初始名称，主要目标是生物医学专业文献编制等工作设计开发的专业微调Agent，后程序实现具有RAG管理和文献编制的普适型，所以修改应用名称：AiForger Pro。
+
+AiForger pro是一款将 **RAG（检索增强生成）** 与 **专业微调** 结合在一起的桌面工具。其核心用途是：管理本地专业知识与文档，并基于这些知识对大语言模型进行微调，最终通过 **模板** 生成符合领域规范的专业文本内容。无需自备本地 GPU，数据与 API 密钥均可由用户自行掌控。
 
 **English:** BioForger (app name: AiForger Pro) is a desktop tool that combines **RAG (Retrieval-Augmented Generation)** and **professional fine-tuning**. It manages local professional knowledge and documents, fine-tunes LLMs with that knowledge, and generates domain-standard professional text via **templates**. No local GPU required; data and API keys stay under your control.
 
