@@ -166,6 +166,12 @@ const ResourceSidebar: React.FC<ResourceSidebarProps> = ({
           default:
             return <div className="sidebar-empty">{t('sidebar.comingSoon')}</div>;
         }
+      case 'skills':
+        return (
+          <div className="sidebar-section">
+            <div className="sidebar-empty">{t('skills.sidebarHint')}</div>
+          </div>
+        );
       default:
         return <FileExplorer />;
     }

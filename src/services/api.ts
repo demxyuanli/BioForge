@@ -319,6 +319,238 @@ export async function deleteAllMountPoints(): Promise<{ deleted: number }> {
   return { deleted: data?.deleted ?? 0 };
 }
 
+export interface Skill {
+  id: number;
+  name: string;
+  description: string;
+  type: string;
+  config: Record<string, unknown>;
+  rule: string | null;
+  trigger_conditions: string | null;
+  steps: string | null;
+  output_description: string | null;
+  example: string | null;
+  rule_ids: number[];
+  enabled: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export async function getSkills(): Promise<Skill[]> {
+  try {
+    const response = await invoke<string>('get_skills');
+    const data = await parsePythonResponse(response);
+    const arr = Array.isArray(data) ? data : [];
+    return arr.map((s: Record<string, unknown>) => ({
+      id: Number(s.id),
+      name: String(s.name ?? ''),
+      description: String(s.description ?? ''),
+      type: String(s.type ?? 'custom'),
+      config: (s.config && typeof s.config === 'object' && !Array.isArray(s.config)) ? s.config as Record<string, unknown> : {},
+      rule: s.rule != null && String(s.rule).trim() !== '' ? String(s.rule).trim() : null,
+      trigger_conditions: s.trigger_conditions != null && String(s.trigger_conditions).trim() !== '' ? String(s.trigger_conditions).trim() : null,
+      steps: s.steps != null && String(s.steps).trim() !== '' ? String(s.steps).trim() : null,
+      output_description: s.output_description != null && String(s.output_description).trim() !== '' ? String(s.output_description).trim() : null,
+      example: s.example != null && String(s.example).trim() !== '' ? String(s.example).trim() : null,
+      rule_ids: Array.isArray(s.rule_ids) ? (s.rule_ids as unknown[]).map((x) => Number(x)).filter((n) => !Number.isNaN(n)) : [],
+      enabled: Boolean(s.enabled),
+      created_at: s.created_at != null ? String(s.created_at) : null,
+      updated_at: s.updated_at != null ? String(s.updated_at) : null
+    }));
+  } catch (error) {
+    console.error('Get skills error:', error);
+    return [];
+  }
+}
+
+export async function createSkill(params: {
+  name: string;
+  description?: string;
+  type?: string;
+  config?: Record<string, unknown>;
+  enabled?: boolean;
+  rule?: string | null;
+  trigger_conditions?: string | null;
+  steps?: string | null;
+  output_description?: string | null;
+  example?: string | null;
+  rule_ids?: number[];
+}): Promise<Skill> {
+  const body: Record<string, unknown> = {
+    name: params.name.trim(),
+    description: (params.description ?? '').trim() || undefined,
+    type: params.type ?? 'custom',
+    config: params.config ?? {},
+    enabled: params.enabled ?? true,
+    rule: (params.rule ?? '').trim() || undefined,
+    trigger_conditions: (params.trigger_conditions ?? '').trim() || undefined,
+    steps: (params.steps ?? '').trim() || undefined,
+    output_description: (params.output_description ?? '').trim() || undefined,
+    example: (params.example ?? '').trim() || undefined,
+    rule_ids: params.rule_ids ?? []
+  };
+  const response = await invoke<string>('create_skill', { body });
+  const data = await parsePythonResponse(response);
+  if (!data?.id) throw new Error((data as { error?: string })?.error ?? 'Create skill failed');
+  return {
+    id: data.id,
+    name: data.name ?? params.name,
+    description: data.description ?? '',
+    type: data.type ?? 'custom',
+    config: (data.config && typeof data.config === 'object') ? data.config : {},
+    rule: data.rule != null && String(data.rule).trim() !== '' ? String(data.rule).trim() : null,
+    trigger_conditions: data.trigger_conditions != null && String(data.trigger_conditions).trim() !== '' ? String(data.trigger_conditions).trim() : null,
+    steps: data.steps != null && String(data.steps).trim() !== '' ? String(data.steps).trim() : null,
+    output_description: data.output_description != null && String(data.output_description).trim() !== '' ? String(data.output_description).trim() : null,
+    example: data.example != null && String(data.example).trim() !== '' ? String(data.example).trim() : null,
+    rule_ids: Array.isArray(data.rule_ids) ? (data.rule_ids as unknown[]).map((x) => Number(x)).filter((n) => !Number.isNaN(n)) : [],
+    enabled: Boolean(data.enabled),
+    created_at: data.created_at ?? null,
+    updated_at: data.updated_at ?? null
+  };
+}
+
+export async function updateSkill(
+  id: number,
+  updates: {
+    name?: string;
+    description?: string;
+    type?: string;
+    config?: Record<string, unknown>;
+    enabled?: boolean;
+    rule?: string | null;
+    trigger_conditions?: string | null;
+    steps?: string | null;
+    output_description?: string | null;
+    example?: string | null;
+    rule_ids?: number[];
+  }
+): Promise<Skill> {
+  const body: Record<string, unknown> = {};
+  if (updates.name !== undefined) body.name = updates.name;
+  if (updates.description !== undefined) body.description = updates.description;
+  if (updates.type !== undefined) body.type = updates.type;
+  if (updates.config !== undefined) body.config = updates.config;
+  if (updates.enabled !== undefined) body.enabled = updates.enabled;
+  if (updates.rule !== undefined) body.rule = updates.rule?.trim() ?? null;
+  if (updates.trigger_conditions !== undefined) body.trigger_conditions = updates.trigger_conditions?.trim() ?? null;
+  if (updates.steps !== undefined) body.steps = updates.steps?.trim() ?? null;
+  if (updates.output_description !== undefined) body.output_description = updates.output_description?.trim() ?? null;
+  if (updates.example !== undefined) body.example = updates.example?.trim() ?? null;
+  if (updates.rule_ids !== undefined) body.rule_ids = updates.rule_ids;
+  const response = await invoke<string>('update_skill', {
+    skillId: Number(id),
+    body
+  });
+  const data = await parsePythonResponse(response);
+  if (!data?.id) throw new Error((data as { error?: string })?.error ?? 'Update skill failed');
+  return {
+    id: data.id,
+    name: data.name ?? '',
+    description: data.description ?? '',
+    type: data.type ?? 'custom',
+    config: (data.config && typeof data.config === 'object') ? data.config : {},
+    rule: data.rule != null && String(data.rule).trim() !== '' ? String(data.rule).trim() : null,
+    trigger_conditions: data.trigger_conditions != null && String(data.trigger_conditions).trim() !== '' ? String(data.trigger_conditions).trim() : null,
+    steps: data.steps != null && String(data.steps).trim() !== '' ? String(data.steps).trim() : null,
+    output_description: data.output_description != null && String(data.output_description).trim() !== '' ? String(data.output_description).trim() : null,
+    example: data.example != null && String(data.example).trim() !== '' ? String(data.example).trim() : null,
+    rule_ids: Array.isArray(data.rule_ids) ? (data.rule_ids as unknown[]).map((x) => Number(x)).filter((n) => !Number.isNaN(n)) : [],
+    enabled: Boolean(data.enabled),
+    created_at: data.created_at ?? null,
+    updated_at: data.updated_at ?? null
+  };
+}
+
+export async function deleteSkill(id: number): Promise<void> {
+  const response = await invoke<string>('delete_skill', { skillId: id });
+  await parsePythonResponse(response);
+}
+
+export interface Rule {
+  id: number;
+  name: string;
+  category: string | null;
+  content: string | null;
+  enabled: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export async function getRules(): Promise<Rule[]> {
+  try {
+    const response = await invoke<string>('get_rules');
+    const data = await parsePythonResponse(response);
+    const arr = Array.isArray(data) ? data : [];
+    return arr.map((r: Record<string, unknown>) => ({
+      id: Number(r.id),
+      name: String(r.name ?? ''),
+      category: r.category != null && String(r.category).trim() !== '' ? String(r.category).trim() : null,
+      content: r.content != null && String(r.content).trim() !== '' ? String(r.content).trim() : null,
+      enabled: Boolean(r.enabled),
+      created_at: r.created_at != null ? String(r.created_at) : null,
+      updated_at: r.updated_at != null ? String(r.updated_at) : null
+    }));
+  } catch (error) {
+    console.error('Get rules error:', error);
+    return [];
+  }
+}
+
+export async function createRule(params: {
+  name: string;
+  category?: string | null;
+  content?: string | null;
+  enabled?: boolean;
+}): Promise<Rule> {
+  const body: Record<string, unknown> = {
+    name: params.name.trim(),
+    category: (params.category ?? '').trim() || undefined,
+    content: (params.content ?? '').trim() || undefined,
+    enabled: params.enabled ?? true
+  };
+  const response = await invoke<string>('create_rule', { body });
+  const data = await parsePythonResponse(response);
+  if (!data?.id) throw new Error((data as { error?: string })?.error ?? 'Create rule failed');
+  return {
+    id: data.id,
+    name: data.name ?? params.name,
+    category: data.category != null && String(data.category).trim() !== '' ? String(data.category).trim() : null,
+    content: data.content != null && String(data.content).trim() !== '' ? String(data.content).trim() : null,
+    enabled: Boolean(data.enabled),
+    created_at: data.created_at ?? null,
+    updated_at: data.updated_at ?? null
+  };
+}
+
+export async function updateRule(
+  id: number,
+  updates: { name?: string; category?: string | null; content?: string | null; enabled?: boolean }
+): Promise<Rule> {
+  const body: Record<string, unknown> = {};
+  if (updates.name !== undefined) body.name = updates.name;
+  if (updates.category !== undefined) body.category = updates.category?.trim() ?? null;
+  if (updates.content !== undefined) body.content = updates.content?.trim() ?? null;
+  if (updates.enabled !== undefined) body.enabled = updates.enabled;
+  const response = await invoke<string>('update_rule', { ruleId: Number(id), body });
+  const data = await parsePythonResponse(response);
+  if (!data?.id) throw new Error((data as { error?: string })?.error ?? 'Update rule failed');
+  return {
+    id: data.id,
+    name: data.name ?? '',
+    category: data.category != null && String(data.category).trim() !== '' ? String(data.category).trim() : null,
+    content: data.content != null && String(data.content).trim() !== '' ? String(data.content).trim() : null,
+    enabled: Boolean(data.enabled),
+    created_at: data.created_at ?? null,
+    updated_at: data.updated_at ?? null
+  };
+}
+
+export async function deleteRule(id: number): Promise<void> {
+  const response = await invoke<string>('delete_rule', { ruleId: id });
+  await parsePythonResponse(response);
+}
+
 export interface MountPointDocumentStats {
   total: number;
   by_type: Record<string, number>;
@@ -731,21 +963,26 @@ export async function generateAnnotations(
   model: string = 'deepseek-chat',
   baseUrl?: string,
   platform?: string,
-  candidateCount: number = 1
+  candidateCount: number = 1,
+  skillIds?: number[]
 ): Promise<Annotation[]> {
   const kpContents = knowledgePoints.map(kp =>
     typeof kp === 'string' ? kp : kp.content
   );
   const safeCandidateCount = Math.max(1, Math.min(10, Number(candidateCount) || 1));
   try {
-    const response = await invoke<string>('generate_annotations', {
+    const payload: Record<string, unknown> = {
       knowledgePoints: kpContents,
       apiKey: apiKeyOrPlatform,
       model,
       baseUrl: baseUrl ?? null,
       platform: platform ?? null,
       candidateCount: safeCandidateCount
-    });
+    };
+    if (skillIds != null && skillIds.length > 0) {
+      payload.skillIds = skillIds;
+    }
+    const response = await invoke<string>('generate_annotations', payload);
     const data = await parsePythonResponse(response);
     if (data?.error) {
       throw new Error(data.error);

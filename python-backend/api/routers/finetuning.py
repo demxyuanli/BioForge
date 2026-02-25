@@ -7,11 +7,11 @@ import tempfile
 from datetime import datetime
 from typing import Dict, Any, List
 
-from fastapi import APIRouter, HTTPException, Body
+from fastapi import APIRouter, HTTPException, Body, Depends
 from sqlalchemy.orm import Session
 
 from database.models import FinetuningJob, TrainingAnnotation, TrainingAnnotationFinetuningLink
-from api.db import get_db_session
+from api.db import get_db
 from api.helpers import resolve_api_key
 
 router = APIRouter()
@@ -104,7 +104,7 @@ async def estimate_cost(request: Dict[str, Any]):
 
 
 @router.post("/finetuning/submit")
-async def submit_finetuning_job(body: Dict[str, Any] = Body(...)):
+async def submit_finetuning_job(body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
     """Submit fine-tuning job."""
     from services.finetuning_service import FineTuningService
 
@@ -119,75 +119,71 @@ async def submit_finetuning_job(body: Dict[str, Any] = Body(...)):
     if not isinstance(annotations, list):
         annotations = []
 
-    db = get_db_session()
-    try:
-        submitted_ids: List[int] = []
-        for ann in annotations:
-            if not isinstance(ann, dict):
-                continue
-            ann_id = ann.get("id")
-            if ann_id is None:
-                continue
+    submitted_ids: List[int] = []
+    for ann in annotations:
+        if not isinstance(ann, dict):
+            continue
+        ann_id = ann.get("id")
+        if ann_id is None:
+            continue
+        try:
+            ann_id_int = int(ann_id)
+        except Exception:
+            continue
+        if ann_id_int > 0:
+            submitted_ids.append(ann_id_int)
+    if submitted_ids:
+        submitted_ids = list(dict.fromkeys(submitted_ids))
+
+    tuned_ids: set = set()
+    if submitted_ids:
+        tuned_rows = db.query(TrainingAnnotationFinetuningLink.training_annotation_id).filter(
+            TrainingAnnotationFinetuningLink.training_annotation_id.in_(submitted_ids)
+        ).all()
+        tuned_ids = {int(row[0]) for row in tuned_rows}
+
+    tuned_pairs: set = set()
+    tuned_pair_rows = (
+        db.query(TrainingAnnotation.instruction, TrainingAnnotation.response)
+        .join(
+            TrainingAnnotationFinetuningLink,
+            TrainingAnnotation.id == TrainingAnnotationFinetuningLink.training_annotation_id,
+        )
+        .all()
+    )
+    for instruction_text, response_text in tuned_pair_rows:
+        tuned_pairs.add((
+            _normalize_annotation_text(instruction_text),
+            _normalize_annotation_text(response_text),
+        ))
+
+    filtered_annotations: List[Dict[str, Any]] = []
+    filtered_annotation_ids: List[int] = []
+    for ann in annotations:
+        if not isinstance(ann, dict):
+            continue
+        instruction = ann.get("instruction", ann.get("question", ""))
+        response = ann.get("response", ann.get("answer", ""))
+        norm_pair = (
+            _normalize_annotation_text(instruction),
+            _normalize_annotation_text(response),
+        )
+        if not norm_pair[0] or not norm_pair[1]:
+            continue
+        ann_id = ann.get("id")
+        ann_id_int = None
+        if ann_id is not None:
             try:
                 ann_id_int = int(ann_id)
             except Exception:
-                continue
-            if ann_id_int > 0:
-                submitted_ids.append(ann_id_int)
-        if submitted_ids:
-            submitted_ids = list(dict.fromkeys(submitted_ids))
-
-        tuned_ids: set = set()
-        if submitted_ids:
-            tuned_rows = db.query(TrainingAnnotationFinetuningLink.training_annotation_id).filter(
-                TrainingAnnotationFinetuningLink.training_annotation_id.in_(submitted_ids)
-            ).all()
-            tuned_ids = {int(row[0]) for row in tuned_rows}
-
-        tuned_pairs: set = set()
-        tuned_pair_rows = (
-            db.query(TrainingAnnotation.instruction, TrainingAnnotation.response)
-            .join(
-                TrainingAnnotationFinetuningLink,
-                TrainingAnnotation.id == TrainingAnnotationFinetuningLink.training_annotation_id,
-            )
-            .all()
-        )
-        for instruction_text, response_text in tuned_pair_rows:
-            tuned_pairs.add((
-                _normalize_annotation_text(instruction_text),
-                _normalize_annotation_text(response_text),
-            ))
-
-        filtered_annotations: List[Dict[str, Any]] = []
-        filtered_annotation_ids: List[int] = []
-        for ann in annotations:
-            if not isinstance(ann, dict):
-                continue
-            instruction = ann.get("instruction", ann.get("question", ""))
-            response = ann.get("response", ann.get("answer", ""))
-            norm_pair = (
-                _normalize_annotation_text(instruction),
-                _normalize_annotation_text(response),
-            )
-            if not norm_pair[0] or not norm_pair[1]:
-                continue
-            ann_id = ann.get("id")
-            ann_id_int = None
-            if ann_id is not None:
-                try:
-                    ann_id_int = int(ann_id)
-                except Exception:
-                    ann_id_int = None
-            if ann_id_int is not None and ann_id_int in tuned_ids:
-                continue
-            if norm_pair in tuned_pairs:
-                continue
-            filtered_annotations.append(ann)
-            if ann_id_int is not None and ann_id_int > 0:
-                filtered_annotation_ids.append(ann_id_int)
-    finally:
-        db.close()
+                ann_id_int = None
+        if ann_id_int is not None and ann_id_int in tuned_ids:
+            continue
+        if norm_pair in tuned_pairs:
+            continue
+        filtered_annotations.append(ann)
+        if ann_id_int is not None and ann_id_int > 0:
+            filtered_annotation_ids.append(ann_id_int)
 
     if not filtered_annotations:
         raise HTTPException(status_code=400, detail="No untuned annotations available for submission")
@@ -224,7 +220,6 @@ async def submit_finetuning_job(body: Dict[str, Any] = Body(...)):
     )
 
     annotation_ids = list(dict.fromkeys([x for x in filtered_annotation_ids if x > 0]))
-    db = get_db_session()
     try:
         job_db = FinetuningJob(
             job_id=job_info["job_id"],
@@ -252,8 +247,6 @@ async def submit_finetuning_job(body: Dict[str, Any] = Body(...)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 
     out = dict(job_info)
     out["id"] = job_info.get("job_id", "")
@@ -261,21 +254,19 @@ async def submit_finetuning_job(body: Dict[str, Any] = Body(...)):
 
 
 @router.get("/finetuning/jobs")
-async def list_finetuning_jobs():
+async def list_finetuning_jobs(db: Session = Depends(get_db)):
     """List all fine-tuning jobs."""
     from services.monitoring_service import MonitoringService
 
-    db = None
     try:
         monitor = MonitoringService()
-        db = get_db_session()
         jobs = db.query(FinetuningJob).all()
         changed = False
         for job in jobs:
             changed = _sync_placeholder_finetuning_job_state(db, job, monitor) or changed
         if changed:
             db.commit()
-        result = [
+        return [
             {
                 "id": job.job_id,
                 "platform": job.platform,
@@ -287,11 +278,7 @@ async def list_finetuning_jobs():
             }
             for job in jobs
         ]
-        db.close()
-        return result
     except Exception as e:
-        if db:
-            db.close()
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -304,37 +291,26 @@ async def get_job_logs(job_id: str, limit: int = 100):
 
 
 @router.get("/finetuning/jobs/{job_id}/status")
-async def get_job_status(job_id: str):
+async def get_job_status(job_id: str, db: Session = Depends(get_db)):
     """Get detailed status for a job."""
     from services.monitoring_service import MonitoringService
 
     service = MonitoringService()
-    db = None
-    try:
-        db = get_db_session()
-        job = db.query(FinetuningJob).filter(FinetuningJob.job_id == job_id).first()
-        if not job:
-            raise HTTPException(status_code=404, detail="Job not found")
+    job = db.query(FinetuningJob).filter(FinetuningJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
 
-        changed = _sync_placeholder_finetuning_job_state(db, job, service)
-        if changed:
-            db.commit()
+    changed = _sync_placeholder_finetuning_job_state(db, job, service)
+    if changed:
+        db.commit()
 
-        normalized_progress = _normalize_progress_for_monitor(job.progress)
-        estimated_time = service.estimate_remaining_time(job_id, normalized_progress)
-        cost_tracking = service.get_cost_tracking(job_id)
-        result = {
-            "job_id": job.job_id,
-            "status": job.status,
-            "progress": job.progress,
-            "estimated_time_remaining": estimated_time,
-            "cost_tracking": cost_tracking,
-        }
-        db.close()
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        if db:
-            db.close()
-        raise HTTPException(status_code=500, detail=str(e))
+    normalized_progress = _normalize_progress_for_monitor(job.progress)
+    estimated_time = service.estimate_remaining_time(job_id, normalized_progress)
+    cost_tracking = service.get_cost_tracking(job_id)
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "progress": job.progress,
+        "estimated_time_remaining": estimated_time,
+        "cost_tracking": cost_tracking,
+    }

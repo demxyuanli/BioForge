@@ -7,6 +7,7 @@ import TrainingLab from "./components/TrainingLab";
 import ProductionTuning from "./components/ProductionTuning";
 import Dashboard from "./components/Dashboard";
 import Evaluation from "./components/Evaluation";
+import SkillsWorkspace from "./components/SkillsWorkspace";
 import ChatAssistant from "./components/ChatAssistant";
 import { ChatProvider } from "./contexts/ChatContext";
 import Settings, { SettingsTab } from "./components/Settings";
@@ -150,6 +151,8 @@ function App() {
         return <ProductionTuning activeSubItem={sidebarSubItem} />;
       case "evaluation":
         return <Evaluation />;
+      case "skills":
+        return <SkillsWorkspace />;
       case "chat":
         return <ChatAssistant />;
       case "settings":
@@ -165,6 +168,7 @@ function App() {
     training: 'knowledgePoints',
     production: 'datasetAndCost',
     evaluation: 'templates',
+    skills: 'skillList',
     chat: 'conversation'
   };
   useEffect(() => {

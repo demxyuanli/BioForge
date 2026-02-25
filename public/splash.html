@@ -3,41 +3,32 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Starting PrivateTune Pro</title>
+    <title>Starting AiForger Pro</title>
     <style>
       :root {
-        color-scheme: light dark;
+        color-scheme: dark;
+        --bg: #0d1117;
+        --fg: #e6edf3;
+        --muted: #8b949e;
+        --accent: #58a6ff;
+        --glow: rgba(88, 166, 255, 0.35);
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
         margin: 0;
-        font-family: "Segoe UI", Arial, sans-serif;
-        background: #111827;
-        color: #f9fafb;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
         overflow: hidden;
       }
       .bg {
         position: fixed;
         inset: 0;
         background:
-          radial-gradient(900px 500px at 12% 15%, rgba(59, 130, 246, 0.28), transparent 65%),
-          radial-gradient(700px 420px at 88% 78%, rgba(147, 51, 234, 0.24), transparent 70%),
-          linear-gradient(160deg, #0b1220 0%, #111827 55%, #0f172a 100%);
-      }
-      .bg::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background-image:
-          linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-        background-size: 32px 32px;
-        mask-image: radial-gradient(circle at center, black 20%, transparent 85%);
-      }
-      .bg::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(circle at center, transparent 45%, rgba(0, 0, 0, 0.45) 100%);
+          radial-gradient(ellipse 80% 50% at 50% 0%, var(--glow), transparent 50%),
+          linear-gradient(180deg, #0d1117 0%, #161b22 100%);
       }
       .wrap {
         position: relative;
@@ -47,37 +38,51 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 14px;
+        gap: 24px;
+        padding: 24px;
       }
-      .spinner {
-        width: 34px;
-        height: 34px;
-        border: 3px solid rgba(255, 255, 255, 0.22);
-        border-top-color: #60a5fa;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
+      .logo-text {
+        font-size: 28px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        color: var(--fg);
+        text-shadow: 0 0 40px var(--glow);
       }
-      .title {
-        font-size: 17px;
-        font-weight: 600;
+      .logo-text span {
+        color: var(--accent);
+      }
+      .bar-wrap {
+        width: 200px;
+        height: 4px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+      .bar {
+        height: 100%;
+        width: 40%;
+        background: linear-gradient(90deg, var(--accent), #79c0ff);
+        border-radius: 2px;
+        animation: load 1.2s ease-in-out infinite;
       }
       .hint {
         font-size: 13px;
-        opacity: 0.8;
+        color: var(--muted);
       }
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
+      @keyframes load {
+        0%, 100% { transform: translateX(-100%); }
+        50% { transform: translateX(350%); }
       }
     </style>
   </head>
   <body>
     <div class="bg"></div>
     <div class="wrap">
-      <div class="spinner"></div>
-      <div class="title">PrivateTune Pro is starting</div>
-      <div class="hint">Preparing backend services...</div>
+      <div class="logo-text">AiForger <span>Pro</span></div>
+      <div class="bar-wrap">
+        <div class="bar"></div>
+      </div>
+      <div class="hint">Starting services...</div>
     </div>
   </body>
-  </html>
+</html>

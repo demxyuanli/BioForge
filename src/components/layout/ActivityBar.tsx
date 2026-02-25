@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { LayoutDashboard, Database, GraduationCap, Settings2, CheckSquare, Settings, FolderOpen, BookOpen, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, Database, GraduationCap, Settings2, CheckSquare, Settings, FolderOpen, BookOpen, MessageCircle, Sparkles } from 'lucide-react';
 import { ActivityType } from './VSLayout';
 import Tooltip from '../Tooltip';
 
@@ -24,6 +24,7 @@ const activities: ActivityItem[] = [
   { id: 'training', icon: <GraduationCap size={18} strokeWidth={1.5} />, titleKey: 'nav.trainingLab' },
   { id: 'production', icon: <Settings2 size={18} strokeWidth={1.5} />, titleKey: 'nav.productionTuning' },
   { id: 'evaluation', icon: <CheckSquare size={18} strokeWidth={1.5} />, titleKey: 'nav.evaluation' },
+  { id: 'skills', icon: <Sparkles size={18} strokeWidth={1.5} />, titleKey: 'nav.skills' },
   { id: 'chat', icon: <MessageCircle size={18} strokeWidth={1.5} />, titleKey: 'nav.chat' }
 ];
 

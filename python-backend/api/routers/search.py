@@ -1,11 +1,12 @@
 """
 Full-text search over indexed document/knowledge point content.
 """
-from fastapi import APIRouter, Query
-from api.db import engine
+from fastapi import APIRouter, Query, Depends
+from sqlalchemy.orm import Session
+
+from api.db import engine, get_db
 from services.fulltext_service import search as fts_search, rebuild_fts_index
 from database.models import Document
-from api.db import get_db_session
 
 router = APIRouter()
 
@@ -18,7 +19,7 @@ async def rebuild_fulltext_index():
 
 
 @router.get("/fulltext-search")
-async def search_fulltext(q: str = Query(..., min_length=1, max_length=500)):
+async def search_fulltext(q: str = Query(..., min_length=1, max_length=500), db: Session = Depends(get_db)):
     """
     Full-text search over parsed content (knowledge points).
     Returns document_id, knowledge_point_id, snippet, and filename.
@@ -27,12 +28,8 @@ async def search_fulltext(q: str = Query(..., min_length=1, max_length=500)):
     if not hits:
         return {"query": q, "results": []}
     doc_ids = list({h["document_id"] for h in hits})
-    db = get_db_session()
-    try:
-        docs = db.query(Document).filter(Document.id.in_(doc_ids)).all()
-        filename_by_id = {d.id: d.filename or "" for d in docs}
-    finally:
-        db.close()
+    docs = db.query(Document).filter(Document.id.in_(doc_ids)).all()
+    filename_by_id = {d.id: d.filename or "" for d in docs}
     for h in hits:
         h["filename"] = filename_by_id.get(h["document_id"], "")
     return {"query": q, "results": hits}

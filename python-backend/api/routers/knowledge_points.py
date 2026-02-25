@@ -5,11 +5,12 @@ import json
 import logging
 from typing import Dict, Any, Optional
 
-from fastapi import APIRouter, HTTPException, Body, Query
+from fastapi import APIRouter, HTTPException, Body, Query, Depends
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from database.models import Document, KnowledgePoint
-from api.db import get_db_session
+from api.db import get_db
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -43,15 +44,14 @@ def _serialize_kp(kp: KnowledgePoint, doc: Document) -> Dict[str, Any]:
 
 @router.get("/documents/knowledge-points")
 async def list_knowledge_points(
+    db: Session = Depends(get_db),
     page: int = 1,
     page_size: int = 50,
     document_id: Optional[int] = Query(None),
     min_weight: Optional[float] = Query(None, description="Min weight 1-5"),
 ):
     """List knowledge points with pagination. Filter by document_id and/or min_weight when provided."""
-    db = None
     try:
-        db = get_db_session()
         query = db.query(KnowledgePoint, Document).join(Document, KnowledgePoint.document_id == Document.id)
 
         if document_id is not None:
@@ -68,16 +68,13 @@ async def list_knowledge_points(
 
         result = [_serialize_kp(kp, doc) for kp, doc in points if kp.content]
 
-        db.close()
         return {"knowledge_points": result, "total": total, "page": page, "page_size": page_size}
     except Exception as e:
-        if db:
-            db.close()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/documents/knowledge-points")
-async def create_manual_knowledge_point(body: Dict[str, Any] = Body(...)):
+async def create_manual_knowledge_point(body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
     """Create a manual (user-added) knowledge point for a document."""
     document_id = body.get("document_id")
     content = (body.get("content") or "").strip()
@@ -85,12 +82,9 @@ async def create_manual_knowledge_point(body: Dict[str, Any] = Body(...)):
         raise HTTPException(status_code=400, detail="document_id is required")
     if not content:
         raise HTTPException(status_code=400, detail="content is required")
-    db = None
     try:
-        db = get_db_session()
         doc = db.query(Document).filter(Document.id == document_id).first()
         if not doc:
-            db.close()
             raise HTTPException(status_code=404, detail="Document not found")
         max_idx = db.query(func.coalesce(func.max(KnowledgePoint.chunk_index), -1)).filter(
             KnowledgePoint.document_id == document_id
@@ -109,29 +103,23 @@ async def create_manual_knowledge_point(body: Dict[str, Any] = Body(...)):
         db.refresh(kp)
         out = _serialize_kp(kp, doc)
         out["is_manual"] = True
-        db.close()
         return out
     except HTTPException:
         raise
     except Exception as e:
-        if db:
-            db.rollback()
-            db.close()
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/documents/knowledge-points/batch")
-async def delete_knowledge_points_batch(body: Dict[str, Any] = Body(...)):
+async def delete_knowledge_points_batch(body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
     """Batch delete knowledge points by ids. Removes from DB and vector store."""
     ids = body.get("ids", [])
     if not ids or not isinstance(ids, list):
         raise HTTPException(status_code=400, detail="ids must be a non-empty list")
-    db = None
     try:
-        db = get_db_session()
         points = db.query(KnowledgePoint).filter(KnowledgePoint.id.in_(ids)).all()
         if not points:
-            db.close()
             return {"deleted": 0, "message": "No matching knowledge points"}
         doc_chunks = {}
         for kp in points:
@@ -141,7 +129,6 @@ async def delete_knowledge_points_batch(body: Dict[str, Any] = Body(...)):
             doc_chunks[doc_id].append(kp.chunk_index)
             db.delete(kp)
         db.commit()
-        db.close()
         try:
             from services.rag_service import RAGService
             rag = RAGService()
@@ -152,14 +139,12 @@ async def delete_knowledge_points_batch(body: Dict[str, Any] = Body(...)):
             logger.warning("Failed to delete chunks from vector store: %s", e)
         return {"deleted": len(points)}
     except Exception as e:
-        if db:
-            db.rollback()
-            db.close()
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.patch("/documents/knowledge-points/{kp_id}")
-async def update_knowledge_point_weight(kp_id: int, body: Dict[str, Any] = Body(...)):
+async def update_knowledge_point_weight(kp_id: int, body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
     """Update knowledge point weight."""
     weight = body.get("weight")
     if weight is None or not isinstance(weight, (int, float)):
@@ -167,64 +152,49 @@ async def update_knowledge_point_weight(kp_id: int, body: Dict[str, Any] = Body(
     weight = float(weight)
     if weight < 1 or weight > 5:
         raise HTTPException(status_code=400, detail="weight must be between 1 and 5 (star rating)")
-    db = None
     try:
-        db = get_db_session()
         kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
         if not kp:
-            db.close()
             raise HTTPException(status_code=404, detail="Knowledge point not found")
         kp.weight = weight
         db.commit()
-        db.close()
         return {"id": kp_id, "weight": weight}
     except HTTPException:
         raise
     except Exception as e:
-        if db:
-            db.rollback()
-            db.close()
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.patch("/documents/knowledge-points/{kp_id}/excluded")
-async def update_knowledge_point_excluded(kp_id: int, body: Dict[str, Any] = Body(...)):
+async def update_knowledge_point_excluded(kp_id: int, body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
     """Update knowledge point excluded (soft delete) state."""
     excluded = body.get("excluded")
     if excluded is None or not isinstance(excluded, bool):
         raise HTTPException(status_code=400, detail="excluded must be a boolean")
-    db = None
     try:
-        db = get_db_session()
         kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
         if not kp:
-            db.close()
             raise HTTPException(status_code=404, detail="Knowledge point not found")
         kp.excluded = excluded
         db.commit()
-        db.close()
         return {"id": kp_id, "excluded": excluded}
     except HTTPException:
         raise
     except Exception as e:
-        if db:
-            db.rollback()
-            db.close()
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/documents/knowledge-points/{kp_id}/keywords")
-async def add_knowledge_point_keyword(kp_id: int, body: Dict[str, Any] = Body(...)):
+async def add_knowledge_point_keyword(kp_id: int, body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
     """Add a keyword to a knowledge point."""
     keyword = (body.get("keyword") or "").strip()
     if not keyword:
         raise HTTPException(status_code=400, detail="keyword is required")
-    db = None
     try:
-        db = get_db_session()
         kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
         if not kp:
-            db.close()
             raise HTTPException(status_code=404, detail="Knowledge point not found")
 
         keywords_list = _kp_keywords_list(kp)
@@ -233,29 +203,23 @@ async def add_knowledge_point_keyword(kp_id: int, body: Dict[str, Any] = Body(..
             kp.keywords = json.dumps(keywords_list, ensure_ascii=False)
             db.commit()
 
-        db.close()
         return {"id": kp_id, "keywords": keywords_list}
     except HTTPException:
         raise
     except Exception as e:
-        if db:
-            db.rollback()
-            db.close()
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.delete("/documents/knowledge-points/{kp_id}/keywords")
-async def remove_knowledge_point_keyword(kp_id: int, body: Dict[str, Any] = Body(...)):
+async def remove_knowledge_point_keyword(kp_id: int, body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
     """Remove a keyword from a knowledge point."""
     keyword = (body.get("keyword") or "").strip()
     if not keyword:
         raise HTTPException(status_code=400, detail="keyword is required")
-    db = None
     try:
-        db = get_db_session()
         kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
         if not kp:
-            db.close()
             raise HTTPException(status_code=404, detail="Knowledge point not found")
 
         keywords_list = _kp_keywords_list(kp)
@@ -264,33 +228,19 @@ async def remove_knowledge_point_keyword(kp_id: int, body: Dict[str, Any] = Body
             kp.keywords = json.dumps(keywords_list, ensure_ascii=False) if keywords_list else None
             db.commit()
 
-        db.close()
         return {"id": kp_id, "keywords": keywords_list}
     except HTTPException:
         raise
     except Exception as e:
-        if db:
-            db.rollback()
-            db.close()
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/documents/knowledge-points/{kp_id}/keywords")
-async def get_knowledge_point_keywords(kp_id: int):
+async def get_knowledge_point_keywords(kp_id: int, db: Session = Depends(get_db)):
     """Get keywords for a knowledge point."""
-    db = None
-    try:
-        db = get_db_session()
-        kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
-        if not kp:
-            db.close()
-            raise HTTPException(status_code=404, detail="Knowledge point not found")
-        keywords_list = _kp_keywords_list(kp)
-        db.close()
-        return {"id": kp_id, "keywords": keywords_list}
-    except HTTPException:
-        raise
-    except Exception as e:
-        if db:
-            db.close()
-        raise HTTPException(status_code=500, detail=str(e))
+    kp = db.query(KnowledgePoint).filter(KnowledgePoint.id == kp_id).first()
+    if not kp:
+        raise HTTPException(status_code=404, detail="Knowledge point not found")
+    keywords_list = _kp_keywords_list(kp)
+    return {"id": kp_id, "keywords": keywords_list}

@@ -4,6 +4,7 @@ import { chatQuery } from '../services/api';
 import { getAIConfig } from '../utils/aiConfig';
 import { useChat } from '../contexts/ChatContext';
 import type { Message } from '../contexts/ChatContext';
+import SkillSelector from './SkillSelector';
 import './ChatAssistant.css';
 
 const CHAT_UNTITLED = 'chat.untitled';
@@ -15,6 +16,7 @@ const ChatAssistant: React.FC = () => {
   const { messages, updateConversation, appendUserMessage } = useChat();
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedSkillIds, setSelectedSkillIds] = useState<number[]>([]);
   const aiConfig = useMemo(() => getAIConfig(), []);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -206,6 +208,7 @@ const ChatAssistant: React.FC = () => {
           </div>
         </div>
         <div className="chat-input-area">
+          <SkillSelector selectedIds={selectedSkillIds} onChange={setSelectedSkillIds} />
           <div className="chat-input-wrap">
             <textarea
               ref={inputRef}

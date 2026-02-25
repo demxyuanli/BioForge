@@ -11,6 +11,7 @@ pub async fn generate_annotations(
     base_url: Option<String>,
     platform: Option<String>,
     candidate_count: Option<i32>,
+    skill_ids: Option<Vec<i32>>,
 ) -> Result<String, String> {
     let base_url_val = base_url.unwrap_or_default();
     let platform_val = platform.unwrap_or_default();
@@ -26,6 +27,11 @@ pub async fn generate_annotations(
     }
     if !platform_val.is_empty() {
         payload["platform"] = serde_json::json!(platform_val);
+    }
+    if let Some(ids) = skill_ids {
+        if !ids.is_empty() {
+            payload["skill_ids"] = serde_json::json!(ids);
+        }
     }
 
     backend_json(&app, Method::POST, "/annotations/generate", None, Some(payload)).await

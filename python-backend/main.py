@@ -9,8 +9,9 @@ import os
 import sys
 import uvicorn
 
-if sys.platform == "win32" and sys.version_info < (3, 13):
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from fastapi import FastAPI
 
 # Load storage config from system config dir or local fallback before importing routes
@@ -48,6 +49,26 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+
+def _suppress_connection_reset_handler(loop, context):
+    exc = context.get("exception")
+    if isinstance(exc, ConnectionResetError) and sys.platform == "win32":
+        msg = context.get("message", "")
+        if "_call_connection_lost" in msg or (getattr(exc, "winerror", None) == 10054):
+            return
+    if hasattr(loop, "default_exception_handler") and loop.default_exception_handler:
+        loop.default_exception_handler(context)
+
+
+@app.on_event("startup")
+async def _install_asyncio_exception_handler():
+    try:
+        loop = asyncio.get_running_loop()
+        loop.set_exception_handler(_suppress_connection_reset_handler)
+    except Exception:
+        pass
+
 
 @app.get("/health")
 async def health_check():

@@ -12,8 +12,8 @@
   gap: 8px;
   margin: 10px 4px;
   padding: 8px 12px;
-  background-color: var(--vs-accent);
-  color: var(--vs-accent-fg);
+  background: transparent !important;
+  color: var(--vs-fg);
   border: none;
   border-radius: 6px;
   font-size: 12px;
@@ -22,7 +22,8 @@
 }
 
 .chat-history-sidebar-new:hover {
-  filter: brightness(1.05);
+  background: var(--vs-list-hover) !important;
+  color: var(--vs-fg);
 }
 
 .chat-history-sidebar-new-icon {

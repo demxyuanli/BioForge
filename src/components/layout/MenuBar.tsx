@@ -1,8 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import ReactMarkdown from 'react-markdown';
 import { ActivityType } from './VSLayout';
 import Tooltip from '../Tooltip';
 import './MenuBar.css';
+
+const HELP_BASE = '/help';
+function getHelpLocale(language: string): 'en' | 'zh' {
+  if (typeof language !== 'string') return 'en';
+  return language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
+}
+async function fetchHelpMarkdown(locale: 'en' | 'zh'): Promise<string> {
+  const res = await fetch(`${HELP_BASE}/help-${locale}.md`);
+  if (!res.ok) throw new Error(`Failed to load help: ${res.status}`);
+  return res.text();
+}
 
 interface MenuBarProps {
   activeActivity: ActivityType;
@@ -39,12 +51,26 @@ const MenuBar: React.FC<MenuBarProps> = ({
   onLanguageChange,
   currentLanguage = 'en'
 }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const [dropdownPos, setDropdownPos] = useState({ left: 0, top: 32 });
   const [showDocumentation, setShowDocumentation] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+  const [helpDocContent, setHelpDocContent] = useState<string>('');
+  const [helpDocLoading, setHelpDocLoading] = useState(false);
+  const [helpDocError, setHelpDocError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showDocumentation) return;
+    const locale = getHelpLocale(i18n.language || currentLanguage);
+    setHelpDocLoading(true);
+    setHelpDocError(null);
+    fetchHelpMarkdown(locale)
+      .then(setHelpDocContent)
+      .catch((err) => setHelpDocError(err instanceof Error ? err.message : String(err)))
+      .finally(() => setHelpDocLoading(false));
+  }, [showDocumentation, i18n.language, currentLanguage]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -84,13 +110,13 @@ const MenuBar: React.FC<MenuBarProps> = ({
   ];
 
   const handleNavBack = () => {
-    const order: ActivityType[] = ['dashboard', 'fileResources', 'knowledgeBase', 'datacenter', 'training', 'production', 'evaluation', 'chat'];
+    const order: ActivityType[] = ['dashboard', 'fileResources', 'knowledgeBase', 'datacenter', 'training', 'production', 'evaluation', 'skills', 'chat'];
     const idx = order.indexOf(activeActivity);
     if (idx > 0) onActivityChange(order[idx - 1]);
   };
 
   const handleNavForward = () => {
-    const order: ActivityType[] = ['dashboard', 'fileResources', 'knowledgeBase', 'datacenter', 'training', 'production', 'evaluation', 'chat'];
+    const order: ActivityType[] = ['dashboard', 'fileResources', 'knowledgeBase', 'datacenter', 'training', 'production', 'evaluation', 'skills', 'chat'];
     const idx = order.indexOf(activeActivity);
     if (idx >= 0 && idx < order.length - 1) onActivityChange(order[idx + 1]);
   };
@@ -100,28 +126,28 @@ const MenuBar: React.FC<MenuBarProps> = ({
       case 'file':
         return [
           { key: 'openWizard', action: () => window.dispatchEvent(new CustomEvent('open-wizard')) },
-          { key: 'uploadDocument', action: () => {} },
-          { key: 'importKnowledge', action: () => {} },
-          { key: 'exportData', action: () => {} }
+          { key: 'uploadDocument', action: () => onActivityChange('fileResources') },
+          { key: 'importKnowledge', action: () => onActivityChange('knowledgeBase') },
+          { key: 'exportData', action: () => onActivityChange('training') }
         ];
       case 'knowledge':
         return [
-          { key: 'createKnowledgePoint', action: () => {} },
+          { key: 'createKnowledgePoint', action: () => onActivityChange('datacenter') },
           { key: 'manageKnowledgeBase', action: () => onActivityChange('knowledgeBase') },
-          { key: 'knowledgeGraph', action: () => {} },
+          { key: 'knowledgeGraph', action: () => onActivityChange('knowledgeBase') },
           { key: 'dataCenter', action: () => onActivityChange('datacenter') }
         ];
       case 'training':
         return [
-          { key: 'startTraining', action: () => {} },
+          { key: 'startTraining', action: () => onActivityChange('training') },
           { key: 'trainingJobs', action: () => onActivityChange('training') },
-          { key: 'exportDataset', action: () => {} }
+          { key: 'exportDataset', action: () => onActivityChange('training') }
         ];
       case 'production':
         return [
-          { key: 'deployModel', action: () => {} },
+          { key: 'deployModel', action: () => onActivityChange('production') },
           { key: 'productionJobs', action: () => onActivityChange('production') },
-          { key: 'monitor', action: () => {} }
+          { key: 'monitor', action: () => onActivityChange('production') }
         ];
       case 'view':
         return [
@@ -132,7 +158,12 @@ const MenuBar: React.FC<MenuBarProps> = ({
           { key: 'trainingLab', action: () => onActivityChange('training') },
           { key: 'productionTuning', action: () => onActivityChange('production') },
           { key: 'evaluation', action: () => onActivityChange('evaluation') },
-          { key: 'chat', action: () => onActivityChange('chat') }
+          { key: 'skills', action: () => onActivityChange('skills') },
+          { key: 'chat', action: () => onActivityChange('chat') },
+          { key: 'privacyCenter', action: () => {
+            onActivityChange('settings');
+            window.dispatchEvent(new CustomEvent('settings-tab-change', { detail: 'privacy' }));
+          } }
         ];
       case 'layout':
         return [
@@ -316,113 +347,23 @@ const MenuBar: React.FC<MenuBarProps> = ({
             className="menubar-help-dialog"
             role="dialog"
             aria-modal="true"
-            aria-label={t('helpDocs.title')}
+            aria-label={t('menu.documentation')}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="menubar-help-header">
               <div>
-                <h3>{t('helpDocs.title')}</h3>
-                <p>{t('helpDocs.subtitle')}</p>
+                <h3>{t('menu.documentation')}</h3>
               </div>
               <button type="button" onClick={() => setShowDocumentation(false)}>
                 {t('common.close')}
               </button>
             </div>
-            <div className="menubar-help-body">
-              <section>
-                <h4>{t('helpDocs.quickStartTitle')}</h4>
-                <ol>
-                  <li>{t('helpDocs.quickStart1')}</li>
-                  <li>{t('helpDocs.quickStart2')}</li>
-                  <li>{t('helpDocs.quickStart3')}</li>
-                  <li>{t('helpDocs.quickStart4')}</li>
-                  <li>{t('helpDocs.quickStart5')}</li>
-                </ol>
-              </section>
-
-              <section>
-                <h4>{t('helpDocs.setupDetailTitle')}</h4>
-                <ul>
-                  <li>{t('helpDocs.setupDetail1')}</li>
-                  <li>{t('helpDocs.setupDetail2')}</li>
-                  <li>{t('helpDocs.setupDetail3')}</li>
-                  <li>{t('helpDocs.setupDetail4')}</li>
-                </ul>
-              </section>
-
-              <section>
-                <h4>{t('helpDocs.workspaceTitle')}</h4>
-                <ul>
-                  <li>{t('helpDocs.workspaceFileResources')}</li>
-                  <li>{t('helpDocs.workspaceKnowledgeBase')}</li>
-                  <li>{t('helpDocs.workspaceDataCenter')}</li>
-                  <li>{t('helpDocs.workspaceTrainingLab')}</li>
-                  <li>{t('helpDocs.workspaceProduction')}</li>
-                  <li>{t('helpDocs.workspaceEvaluation')}</li>
-                  <li>{t('helpDocs.workspaceChat')}</li>
-                </ul>
-              </section>
-
-              <section>
-                <h4>{t('helpDocs.operationTitle')}</h4>
-                <ol>
-                  <li>{t('helpDocs.operationDocument')}</li>
-                  <li>{t('helpDocs.operationKnowledge')}</li>
-                  <li>{t('helpDocs.operationAnnotation')}</li>
-                  <li>{t('helpDocs.operationFinetuning')}</li>
-                  <li>{t('helpDocs.operationEvaluation')}</li>
-                </ol>
-              </section>
-
-              <section>
-                <h4>{t('helpDocs.acceptanceTitle')}</h4>
-                <ul>
-                  <li>{t('helpDocs.acceptance1')}</li>
-                  <li>{t('helpDocs.acceptance2')}</li>
-                  <li>{t('helpDocs.acceptance3')}</li>
-                  <li>{t('helpDocs.acceptance4')}</li>
-                  <li>{t('helpDocs.acceptance5')}</li>
-                </ul>
-              </section>
-
-              <section>
-                <h4>{t('helpDocs.retryTitle')}</h4>
-                <ul>
-                  <li>{t('helpDocs.retry1')}</li>
-                  <li>{t('helpDocs.retry2')}</li>
-                  <li>{t('helpDocs.retry3')}</li>
-                  <li>{t('helpDocs.retry4')}</li>
-                </ul>
-              </section>
-
-              <section>
-                <h4>{t('helpDocs.shortcutTitle')}</h4>
-                <ul>
-                  <li>{t('helpDocs.shortcutOpenHelp')}</li>
-                  <li>{t('helpDocs.shortcutMenu')}</li>
-                  <li>{t('helpDocs.shortcutEscape')}</li>
-                  <li>{t('helpDocs.shortcutLanguage')}</li>
-                </ul>
-              </section>
-
-              <section>
-                <h4>{t('helpDocs.troubleshootTitle')}</h4>
-                <ul>
-                  <li>{t('helpDocs.troubleshootBackend')}</li>
-                  <li>{t('helpDocs.troubleshootModel')}</li>
-                  <li>{t('helpDocs.troubleshootGenerate')}</li>
-                  <li>{t('helpDocs.troubleshootJob')}</li>
-                </ul>
-              </section>
-
-              <section>
-                <h4>{t('helpDocs.dataSafetyTitle')}</h4>
-                <ul>
-                  <li>{t('helpDocs.dataSafety1')}</li>
-                  <li>{t('helpDocs.dataSafety2')}</li>
-                  <li>{t('helpDocs.dataSafety3')}</li>
-                </ul>
-              </section>
+            <div className="menubar-help-body menubar-help-body-markdown">
+              {helpDocLoading && <p className="menubar-help-loading">{t('sidebar.loading')}</p>}
+              {helpDocError && <p className="menubar-help-error">{helpDocError}</p>}
+              {!helpDocLoading && !helpDocError && helpDocContent && (
+                <ReactMarkdown>{helpDocContent}</ReactMarkdown>
+              )}
             </div>
           </div>
         </div>

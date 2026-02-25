@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { FolderOpen, BookOpen, Database, GraduationCap, Settings2, CheckSquare, MessageCircle, LayoutDashboard, Settings, Info } from 'lucide-react';
+import { FolderOpen, BookOpen, Database, GraduationCap, Settings2, CheckSquare, MessageCircle, LayoutDashboard, Settings, Info, Sparkles } from 'lucide-react';
 import ActivityBar from './ActivityBar';
 import BottomPanel from './BottomPanel';
 import FileExplorer from './FileExplorer';
@@ -18,12 +18,13 @@ const ACTIVITY_ICON_BY_TYPE: Record<ActivityType, React.ReactNode> = {
   production: <Settings2 {...ACTIVITY_ICON_PROPS} />,
   evaluation: <CheckSquare {...ACTIVITY_ICON_PROPS} />,
   chat: <MessageCircle {...ACTIVITY_ICON_PROPS} />,
+  skills: <Sparkles {...ACTIVITY_ICON_PROPS} />,
   dashboard: <LayoutDashboard {...ACTIVITY_ICON_PROPS} />,
   settings: <Settings {...ACTIVITY_ICON_PROPS} />,
   explorer: <FolderOpen {...ACTIVITY_ICON_PROPS} />
 };
 
-export type ActivityType = 'dashboard' | 'datacenter' | 'fileResources' | 'knowledgeBase' | 'training' | 'production' | 'evaluation' | 'chat' | 'settings' | 'explorer';
+export type ActivityType = 'dashboard' | 'datacenter' | 'fileResources' | 'knowledgeBase' | 'training' | 'production' | 'evaluation' | 'chat' | 'skills' | 'settings' | 'explorer';
 export type SidebarViewType = 'files' | 'knowledge';
 export type BottomPanelTab = 'output' | 'logs' | 'problems';
 export type RightPanelTab = 'details' | 'chat';
@@ -37,6 +38,7 @@ const NAV_TITLE_KEY_BY_ACTIVITY: Record<ActivityType, string> = {
   production: 'nav.productionTuning',
   evaluation: 'nav.evaluation',
   chat: 'nav.chat',
+  skills: 'nav.skills',
   settings: 'nav.settings',
   explorer: 'nav.fileResources'
 };

@@ -42,7 +42,8 @@ class AnnotationService:
         knowledge_point: str,
         candidate_index: int = 1,
         candidate_total: int = 1,
-        existing_candidates: List[Dict[str, str]] = None
+        existing_candidates: List[Dict[str, str]] = None,
+        skills_context: str = None,
     ) -> Dict[str, Any]:
         """
         Generate instruction pair from knowledge point using DeepSeek API
@@ -69,9 +70,13 @@ class AnnotationService:
                     + "\n".join(samples)
                 )
 
+        skills_block = ""
+        if skills_context and (skills_context := (skills_context or "").strip()):
+            skills_block = skills_context + "\n"
+
         prompt = f"""Based on the following knowledge point, generate a high-quality instruction-response pair for fine-tuning.
 The output MUST be in Chinese (Simplified).
-{candidate_hint}
+{skills_block}{candidate_hint}
 {existing_hint}
 
 If the input includes a "Keywords:" line (or equivalent keyword hints), you MUST treat those keywords as core terms and reflect them explicitly in both the instruction and the response.
@@ -107,7 +112,7 @@ Response: [response text in Chinese]"""
             logger.warning("AnnotationService: DeepSeek API error: %s", e)
             return {"error": str(e)}
 
-    def generate_instruction_candidates(self, knowledge_point: str, candidate_count: int = 1) -> Dict[str, Any]:
+    def generate_instruction_candidates(self, knowledge_point: str, candidate_count: int = 1, skills_context: str = None) -> Dict[str, Any]:
         """
         Generate multiple instruction-response candidates for one knowledge point,
         then deduplicate them automatically.
@@ -125,7 +130,8 @@ Response: [response text in Chinese]"""
                 knowledge_point=knowledge_point,
                 candidate_index=len(annotations) + 1,
                 candidate_total=target_count,
-                existing_candidates=annotations
+                existing_candidates=annotations,
+                skills_context=skills_context,
             )
             if "error" in result:
                 errors.append(str(result.get("error", "")))

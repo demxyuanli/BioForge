@@ -227,11 +227,6 @@
   padding: 10px 12px;
 }
 
-.menubar-help-body h4 {
-  margin: 0 0 8px 0;
-  font-size: 13px;
-}
-
 .menubar-help-body p,
 .menubar-help-body li {
   font-size: 12px;
@@ -242,4 +237,68 @@
 .menubar-help-body ol {
   margin: 0;
   padding-left: 18px;
+}
+
+.menubar-help-loading {
+  margin: 0;
+  color: var(--vs-muted);
+}
+
+.menubar-help-error {
+  margin: 0;
+  color: var(--vs-error, #c53030);
+}
+
+.menubar-help-body-markdown {
+  padding-top: 8px;
+}
+
+.menubar-help-body-markdown h1 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.menubar-help-body-markdown h2 {
+  margin: 14px 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--vs-border-subtle, rgba(128, 128, 128, 0.2));
+}
+
+.menubar-help-body-markdown h3 {
+  margin: 12px 0 6px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.menubar-help-body-markdown h1:first-child,
+.menubar-help-body-markdown h2:first-child,
+.menubar-help-body-markdown h3:first-child {
+  margin-top: 0;
+}
+
+.menubar-help-body-markdown p {
+  margin: 0 0 8px 0;
+}
+
+.menubar-help-body-markdown ul,
+.menubar-help-body-markdown ol {
+  margin: 0 0 10px 0;
+  padding-left: 20px;
+}
+
+.menubar-help-body-markdown li {
+  margin: 2px 0;
+}
+
+.menubar-help-body-markdown hr {
+  margin: 12px 0;
+  border: none;
+  border-top: 1px solid var(--vs-border-subtle, rgba(128, 128, 128, 0.2));
+}
+
+.menubar-help-body-markdown strong {
+  font-weight: 600;
 }

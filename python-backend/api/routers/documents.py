@@ -8,11 +8,12 @@ import tempfile
 import threading
 from datetime import datetime
 
-from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import Response
+from sqlalchemy.orm import Session
 
 from database.models import Document, KnowledgePoint
-from api.db import get_db_session
+from api.db import get_db, get_db_session
 from api.shared import get_random_storage_dir, file_version, preview_cache_path
 from services.libreoffice_parser import is_office_extension, convert_to_pdf
 
@@ -130,10 +131,13 @@ def _process_document_impl(document_id: int, file_path: str, file_type: str):
 
 
 @router.post("/documents/upload")
-async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def upload_document(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
     """Upload a document and start processing in background."""
     tmp_path = None
-    db = None
     try:
         file_extension = os.path.splitext(file.filename)[1]
         safe_filename = "".join(c for c in file.filename if c.isalnum() or c in "._- ")
@@ -148,7 +152,6 @@ async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = 
 
         file_type = os.path.splitext(file.filename)[1][1:].lower()
 
-        db = get_db_session()
         try:
             doc = Document(
                 filename=file.filename,
@@ -169,8 +172,6 @@ async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = 
             if tmp_path and os.path.exists(tmp_path):
                 os.remove(tmp_path)
             raise HTTPException(status_code=500, detail=f"Failed to save document to database: {str(e)}")
-        finally:
-            db.close()
     except HTTPException:
         raise
     except Exception as e:
@@ -180,12 +181,10 @@ async def upload_document(background_tasks: BackgroundTasks, file: UploadFile = 
 
 
 @router.get("/documents")
-async def list_documents():
+async def list_documents(db: Session = Depends(get_db)):
     """List all documents with knowledge point counts via SQL JOIN."""
-    db = None
     try:
         from sqlalchemy import func
-        db = get_db_session()
         kp_subq = (
             db.query(
                 KnowledgePoint.document_id,
@@ -200,7 +199,7 @@ async def list_documents():
             .outerjoin(kp_subq, Document.id == kp_subq.c.document_id)
             .all()
         )
-        result = [
+        return [
             {
                 "id": doc.id,
                 "filename": doc.filename,
@@ -213,109 +212,78 @@ async def list_documents():
             }
             for doc, kp_count in rows
         ]
-        db.close()
-        return result
     except Exception as e:
-        if db:
-            db.close()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/documents/{document_id}/summary")
-async def get_document_summary_by_id(document_id: int):
+async def get_document_summary_by_id(document_id: int, db: Session = Depends(get_db)):
     """Placeholder for document summary by id. Returns text_content snippet."""
-    db = get_db_session()
-    try:
-        doc = db.query(Document).filter(Document.id == document_id).first()
-        if not doc:
-            db.close()
-            raise HTTPException(status_code=404, detail="Document not found")
-        summary = ""
-        if doc.text_content:
-            summary = (doc.text_content[:500] + "..." if len(doc.text_content) > 500 else doc.text_content)
-        db.close()
-        return {"summary": summary}
-    except HTTPException:
-        raise
-    except Exception as e:
-        if db:
-            db.close()
-        raise HTTPException(status_code=500, detail=str(e))
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    summary = ""
+    if doc.text_content:
+        summary = (doc.text_content[:500] + "..." if len(doc.text_content) > 500 else doc.text_content)
+    return {"summary": summary}
 
 
 @router.get("/documents/{document_id}/preview")
-async def get_document_preview_by_id(document_id: int):
+async def get_document_preview_by_id(document_id: int, db: Session = Depends(get_db)):
     """Generate document preview by document id. Returns PDF with X-Preview-Version. Uses cache when unchanged."""
-    db = get_db_session()
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    full_path = (doc.file_path or "").strip()
+    if not full_path or not os.path.isfile(full_path):
+        raise HTTPException(status_code=404, detail="File not found")
+    version = file_version(full_path)
+    ext = (os.path.splitext(full_path)[1] or "").lstrip(".").lower()
+    if ext == "jpeg":
+        ext = "jpg"
+    if ext == "pdf":
+        with open(full_path, "rb") as f:
+            data = f.read()
+        return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
+    if not is_office_extension(ext):
+        raise HTTPException(status_code=400, detail="Preview not supported for this file type")
+    cache_key = "doc_{}".format(document_id)
+    cache_path = preview_cache_path(cache_key, version)
+    if os.path.isfile(cache_path):
+        with open(cache_path, "rb") as f:
+            data = f.read()
+        return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
+    out_dir = tempfile.mkdtemp()
     try:
-        doc = db.query(Document).filter(Document.id == document_id).first()
-        if not doc:
-            db.close()
-            raise HTTPException(status_code=404, detail="Document not found")
-        full_path = (doc.file_path or "").strip()
-        if not full_path or not os.path.isfile(full_path):
-            db.close()
-            raise HTTPException(status_code=404, detail="File not found")
-        version = file_version(full_path)
-        ext = (os.path.splitext(full_path)[1] or "").lstrip(".").lower()
-        if ext == "jpeg":
-            ext = "jpg"
-        if ext == "pdf":
-            with open(full_path, "rb") as f:
-                data = f.read()
-            db.close()
-            return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
-        if not is_office_extension(ext):
-            db.close()
-            raise HTTPException(status_code=400, detail="Preview not supported for this file type")
-        cache_key = "doc_{}".format(document_id)
-        cache_path = preview_cache_path(cache_key, version)
-        if os.path.isfile(cache_path):
-            with open(cache_path, "rb") as f:
-                data = f.read()
-            db.close()
-            return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
-        out_dir = tempfile.mkdtemp()
+        pdf_path = convert_to_pdf(full_path, out_dir)
+        if not pdf_path or not os.path.isfile(pdf_path):
+            raise HTTPException(status_code=502, detail="LibreOffice conversion failed")
+        with open(pdf_path, "rb") as f:
+            data = f.read()
         try:
-            pdf_path = convert_to_pdf(full_path, out_dir)
-            if not pdf_path or not os.path.isfile(pdf_path):
-                raise HTTPException(status_code=502, detail="LibreOffice conversion failed")
-            with open(pdf_path, "rb") as f:
-                data = f.read()
-            try:
-                with open(cache_path, "wb") as cf:
-                    cf.write(data)
-            except OSError:
-                pass
-            return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
-        finally:
-            try:
-                shutil.rmtree(out_dir, ignore_errors=True)
-            except OSError:
-                pass
-    except HTTPException:
-        raise
-    except Exception as e:
-        if db:
-            db.close()
-        raise HTTPException(status_code=500, detail=str(e))
+            with open(cache_path, "wb") as cf:
+                cf.write(data)
+        except OSError:
+            pass
+        return Response(content=data, media_type="application/pdf", headers={"X-Preview-Version": version})
+    finally:
+        try:
+            shutil.rmtree(out_dir, ignore_errors=True)
+        except OSError:
+            pass
 
 
 @router.delete("/documents/{document_id}")
-async def delete_document(document_id: int):
+async def delete_document(document_id: int, db: Session = Depends(get_db)):
     """Delete a document and its associated data."""
     from database.models import Annotation as AnnotationModel
-    db = None
+
+    doc = db.query(Document).filter(Document.id == document_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path = doc.file_path
     try:
-        db = get_db_session()
-        doc = db.query(Document).filter(Document.id == document_id).first()
-
-        if not doc:
-            db.close()
-            raise HTTPException(status_code=404, detail="Document not found")
-
-        file_path = doc.file_path
-
         knowledge_points = db.query(KnowledgePoint).filter(KnowledgePoint.document_id == document_id).all()
         for kp in knowledge_points:
             db.delete(kp)
@@ -355,7 +323,6 @@ async def delete_document(document_id: int):
 
         db.delete(doc)
         db.commit()
-        db.close()
 
         if file_path:
             file_path = file_path.strip()
@@ -384,11 +351,7 @@ async def delete_document(document_id: int):
 
         return {"success": True, "message": "Document deleted successfully"}
     except HTTPException:
-        if db:
-            db.close()
         raise
     except Exception as e:
-        if db:
-            db.rollback()
-            db.close()
+        db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to delete document: {str(e)}")

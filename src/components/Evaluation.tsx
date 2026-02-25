@@ -31,6 +31,7 @@ import {
   blobToBase64
 } from '../utils/evaluationExport';
 import { VariableHighlight } from './Evaluation/VariableHighlight';
+import SkillSelector from './SkillSelector';
 import './Evaluation.css';
 
 interface EvaluationResult {
@@ -62,6 +63,7 @@ const Evaluation: React.FC = () => {
   const [evaluationResult, setEvaluationResult] = useState<EvaluationResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatingStep, setGeneratingStep] = useState<{ current: number; total: number } | null>(null);
+  const [selectedSkillIds, setSelectedSkillIds] = useState<number[]>([]);
 
   const locale = getTemplateLocale(i18n.language);
 
@@ -320,7 +322,6 @@ const Evaluation: React.FC = () => {
       <div className="evaluation-layout">
         <aside className="evaluation-sidebar">
           <div className="evaluation-sidebar-header">
-            <span className="evaluation-sidebar-title">{t('evaluation.templateList')}</span>
             <div className="evaluation-sidebar-actions">
               <button
                 type="button"
@@ -482,6 +483,8 @@ const Evaluation: React.FC = () => {
                   className="evaluation-textarea"
                 />
               </div>
+
+              <SkillSelector selectedIds={selectedSkillIds} onChange={setSelectedSkillIds} />
 
               <button
                 onClick={handleGenerate}

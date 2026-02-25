@@ -6,10 +6,11 @@ import json
 import logging
 from typing import Dict, Any, List, Optional
 
-from fastapi import APIRouter, HTTPException, Body, Query
+from fastapi import APIRouter, HTTPException, Body, Query, Depends
+from sqlalchemy.orm import Session
 
 from database.models import TrainingItem, TrainingAnnotation, TrainingAnnotationFinetuningLink, FinetuningJob
-from api.db import get_db_session
+from api.db import get_db
 from api.shared import TRAINING_SET_PATH
 
 router = APIRouter()
@@ -80,18 +81,14 @@ def _serialize_training_annotation(row: TrainingAnnotation, links: List[Dict[str
 
 
 @router.get("/training-items")
-async def list_training_items():
+async def list_training_items(db: Session = Depends(get_db)):
     """List persisted training items."""
-    db = get_db_session()
-    try:
-        items = db.query(TrainingItem).order_by(TrainingItem.updated_at.desc(), TrainingItem.id.desc()).all()
-        return {"items": [_serialize_training_item(item) for item in items]}
-    finally:
-        db.close()
+    items = db.query(TrainingItem).order_by(TrainingItem.updated_at.desc(), TrainingItem.id.desc()).all()
+    return {"items": [_serialize_training_item(item) for item in items]}
 
 
 @router.post("/training-items")
-async def save_training_item(body: Dict[str, Any] = Body(...)):
+async def save_training_item(body: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
     """Create or update training item by unique name."""
     name = (body.get("name") or "").strip()
     if not name:
@@ -111,7 +108,6 @@ async def save_training_item(body: Dict[str, Any] = Body(...)):
     if not prompt_template:
         raise HTTPException(status_code=400, detail="prompt_template is required")
 
-    db = get_db_session()
     try:
         existing = db.query(TrainingItem).filter(TrainingItem.name == name).first()
         if existing:
@@ -133,14 +129,11 @@ async def save_training_item(body: Dict[str, Any] = Body(...)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 
 
 @router.delete("/training-items/{item_id}")
-async def delete_training_item(item_id: int):
+async def delete_training_item(item_id: int, db: Session = Depends(get_db)):
     """Delete a training item by id."""
-    db = get_db_session()
     try:
         item = db.query(TrainingItem).filter(TrainingItem.id == item_id).first()
         if not item:
@@ -153,12 +146,10 @@ async def delete_training_item(item_id: int):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 
 
 @router.post("/training-set")
-async def save_training_set(request: Dict[str, Any]):
+async def save_training_set(request: Dict[str, Any], db: Session = Depends(get_db)):
     """Save current annotations for fine-tuning into database."""
     annotations = request.get("annotations", [])
     training_item_id = request.get("training_item_id")
@@ -168,7 +159,6 @@ async def save_training_set(request: Dict[str, Any]):
         except Exception:
             raise HTTPException(status_code=400, detail="training_item_id must be integer")
 
-    db = get_db_session()
     try:
         if training_item_id is not None:
             item = db.query(TrainingItem).filter(TrainingItem.id == training_item_id).first()
@@ -206,57 +196,51 @@ async def save_training_set(request: Dict[str, Any]):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
 
 
 @router.get("/training-set")
-async def get_training_set(training_item_id: Optional[int] = Query(None)):
+async def get_training_set(training_item_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
     """Get saved training set from database, optionally by training item."""
-    db = get_db_session()
-    try:
-        if training_item_id is None:
-            existing_count = db.query(TrainingAnnotation).count()
-            if existing_count == 0 and os.path.exists(TRAINING_SET_PATH):
-                try:
-                    with open(TRAINING_SET_PATH, "r", encoding="utf-8") as f:
-                        legacy_data = json.load(f)
-                    legacy_annotations = legacy_data.get("annotations", []) if isinstance(legacy_data, dict) else []
-                    for ann in legacy_annotations:
-                        if not isinstance(ann, dict):
-                            continue
-                        instruction = (ann.get("instruction") or "").strip()
-                        response = (ann.get("response") or "").strip()
-                        if not instruction or not response:
-                            continue
-                        score_val = ann.get("score")
-                        score = None
-                        if score_val is not None and str(score_val).strip() != "":
-                            try:
-                                score = int(score_val)
-                            except Exception:
-                                score = None
-                        db.add(TrainingAnnotation(
-                            training_item_id=None,
-                            instruction=instruction,
-                            response=response,
-                            score=score,
-                        ))
-                    db.commit()
-                except Exception:
-                    db.rollback()
+    if training_item_id is None:
+        existing_count = db.query(TrainingAnnotation).count()
+        if existing_count == 0 and os.path.exists(TRAINING_SET_PATH):
+            try:
+                with open(TRAINING_SET_PATH, "r", encoding="utf-8") as f:
+                    legacy_data = json.load(f)
+                legacy_annotations = legacy_data.get("annotations", []) if isinstance(legacy_data, dict) else []
+                for ann in legacy_annotations:
+                    if not isinstance(ann, dict):
+                        continue
+                    instruction = (ann.get("instruction") or "").strip()
+                    response = (ann.get("response") or "").strip()
+                    if not instruction or not response:
+                        continue
+                    score_val = ann.get("score")
+                    score = None
+                    if score_val is not None and str(score_val).strip() != "":
+                        try:
+                            score = int(score_val)
+                        except Exception:
+                            score = None
+                    db.add(TrainingAnnotation(
+                        training_item_id=None,
+                        instruction=instruction,
+                        response=response,
+                        score=score,
+                    ))
+                db.commit()
+            except Exception:
+                db.rollback()
 
-        query = db.query(TrainingAnnotation)
-        if training_item_id is not None:
-            query = query.filter(TrainingAnnotation.training_item_id == training_item_id)
+    query = db.query(TrainingAnnotation)
+    if training_item_id is not None:
+        query = query.filter(TrainingAnnotation.training_item_id == training_item_id)
 
-        rows = query.order_by(TrainingAnnotation.created_at.desc(), TrainingAnnotation.id.desc()).all()
-        row_ids = [row.id for row in rows if row.id is not None]
-        link_map = _collect_training_annotation_link_info(db, row_ids)
-        annotations_out = [
-            _serialize_training_annotation(row, link_map.get(row.id, []))
-            for row in rows
-        ]
-        return {"annotations": annotations_out, "count": len(annotations_out)}
-    finally:
-        db.close()
+    rows = query.order_by(TrainingAnnotation.created_at.desc(), TrainingAnnotation.id.desc()).all()
+    row_ids = [row.id for row in rows if row.id is not None]
+    link_map = _collect_training_annotation_link_info(db, row_ids)
+    annotations_out = [
+        _serialize_training_annotation(row, link_map.get(row.id, []))
+        for row in rows
+    ]
+    return {"annotations": annotations_out, "count": len(annotations_out)}

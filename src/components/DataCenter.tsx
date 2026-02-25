@@ -13,16 +13,12 @@ import {
   selectFile,
   selectFiles,
   uploadDocument,
-  getDocuments,
-  getKnowledgePoints,
   updateKnowledgePointWeight,
   updateKnowledgePointExcluded,
   getDocumentSummaryByDocumentId,
   getDocumentPreviewByDocumentId,
   searchFulltext,
   type FulltextSearchHit,
-  Document,
-  getDirectories,
   createDirectory,
   moveDocument,
   deleteDocument,
@@ -30,58 +26,55 @@ import {
   KnowledgePoint,
   addKnowledgePointKeyword,
   removeKnowledgePointKeyword,
-  getKnowledgePointKeywords,
 } from '../services/api';
 import { loadFileMeta, saveFileMeta, type FileMetaItem } from '../utils/fileMeta';
-import { DOCUMENTS_CHANGED_EVENT } from './layout/FileExplorer';
+import {
+  loadExcludedDirs,
+  saveExcludedDirs,
+  flattenFileNodes,
+  highlightKeywords,
+} from '../utils/dataCenterUtils';
+import { useDataCenterDocuments } from '../hooks/useDataCenterDocuments';
+import { useDataCenterKnowledgePoints } from '../hooks/useDataCenterKnowledgePoints';
 import './DataCenter.css';
 
-const DC_EXCLUDED_DIRS_KEY = 'dc_excluded_dirs';
 const UPPER_MIN = 40;
 const UPPER_MAX_OFFSET = 40;
 const LEFT_PANEL_MIN = 280;
 
-function loadExcludedDirs(): Set<number> {
-  try {
-    const raw = localStorage.getItem(DC_EXCLUDED_DIRS_KEY);
-    if (!raw) return new Set();
-    const arr = JSON.parse(raw) as number[];
-    return new Set(Array.isArray(arr) ? arr.filter((n) => typeof n === 'number') : []);
-  } catch {
-    return new Set();
-  }
-}
-
-function saveExcludedDirs(ids: Set<number>): void {
-  try {
-    localStorage.setItem(DC_EXCLUDED_DIRS_KEY, JSON.stringify([...ids]));
-  } catch {
-    /* ignore */
-  }
-}
-
-function flattenFileNodes(nodes: DirectoryNode[]): DirectoryNode[] {
-  const out: DirectoryNode[] = [];
-  for (const n of nodes) {
-    if (n.type === 'file') out.push(n);
-    if (n.children) out.push(...flattenFileNodes(n.children));
-  }
-  return out;
-}
-
 const DataCenter: React.FC = () => {
   const { t } = useTranslation();
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [directoryTree, setDirectoryTree] = useState<DirectoryNode[]>([]);
+  const pollCallbackRef = useRef<(() => void) | null>(null);
+  const { documents, directoryTree, loadData, loadDirectories } = useDataCenterDocuments(pollCallbackRef);
+
   const [currentDirId, setCurrentDirId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDocId, setSelectedDocId] = useState<number | null>(null);
-  const [knowledgePoints, setKnowledgePoints] = useState<KnowledgePoint[]>([]);
-  const [kpPage, setKpPage] = useState(1);
-  const [kpTotal, setKpTotal] = useState(0);
+  const selectedDocIdRef = useRef<number | null>(selectedDocId);
   const [kpPageSize] = useState(50);
   const [selectedKp, setSelectedKp] = useState<KnowledgePoint | null>(null);
-  const [highlightedKeywords, setHighlightedKeywords] = useState<string[]>([]);
+
+  const {
+    knowledgePoints,
+    setKnowledgePoints,
+    kpPage,
+    setKpPage,
+    kpTotal,
+    loadKnowledgePoints,
+    highlightedKeywords,
+    setHighlightedKeywords,
+  } = useDataCenterKnowledgePoints(selectedDocId, selectedDocIdRef, selectedKp?.id, kpPageSize);
+
+  useEffect(() => {
+    selectedDocIdRef.current = selectedDocId;
+  }, [selectedDocId]);
+
+  useEffect(() => {
+    pollCallbackRef.current = loadKnowledgePoints;
+    return () => {
+      pollCallbackRef.current = null;
+    };
+  }, [loadKnowledgePoints]);
   const [selectionToolbar, setSelectionToolbar] = useState<{ visible: boolean; x: number; y: number; text: string } | null>(null);
   const kpDetailContentRef = useRef<HTMLDivElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -183,95 +176,12 @@ const DataCenter: React.FC = () => {
     saveExcludedDirs(excludedDirIds);
   }, [excludedDirIds]);
 
-  const documentsRef = useRef<Document[]>(documents);
-  useEffect(() => { documentsRef.current = documents; }, [documents]);
-
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(() => {
-      const processing = documentsRef.current.filter(
-        (d) => d.processingStatus === 'pending' || d.processingStatus === 'processing'
-      );
-      if (processing.length > 0) {
-        loadDocuments();
-        loadDirectories();
-        if (selectedDocIdRef.current != null) loadKnowledgePoints();
-      }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    const handler = () => {
-      loadData();
-      if (selectedDocIdRef.current != null) loadKnowledgePoints();
-    };
-    window.addEventListener(DOCUMENTS_CHANGED_EVENT, handler);
-    return () => window.removeEventListener(DOCUMENTS_CHANGED_EVENT, handler);
-  }, []);
-
-  const selectedDocIdRef = useRef<number | null>(selectedDocId);
-  const kpPageRef = useRef(kpPage);
-
-  // Keep refs in sync via effects (order matters: refs update before dependent effects)
-  useEffect(() => {
-    selectedDocIdRef.current = selectedDocId;
-  }, [selectedDocId]);
-
-  useEffect(() => {
-    kpPageRef.current = kpPage;
-  }, [kpPage]);
-
   useEffect(() => {
     if (selectedDocId == null) {
-      setKnowledgePoints([]);
-      setKpTotal(0);
-      setKpPage(1);
-      kpPageRef.current = 1;
       setSelectedKp(null);
-      setHighlightedKeywords([]);
       setSelectionToolbar(null);
-      return;
     }
-    setKnowledgePoints([]);
-    setKpTotal(0);
-    setKpPage(1);
-    kpPageRef.current = 1;
-    setSelectedKp(null);
-    setHighlightedKeywords([]);
-    setSelectionToolbar(null);
-    const docId = selectedDocId;
-    getKnowledgePoints(1, kpPageSize, docId)
-      .then((data) => {
-        if (selectedDocIdRef.current !== docId) return;
-        const raw = data.knowledge_points ?? [];
-        setKnowledgePoints(raw);
-        setKpTotal(data.total ?? 0);
-      })
-      .catch(() => {
-        if (selectedDocIdRef.current !== docId) return;
-        setKnowledgePoints([]);
-        setKpTotal(0);
-      });
-  }, [selectedDocId, kpPageSize]);
-
-  useEffect(() => {
-    if (selectedKp?.id != null) {
-      loadKeywords(selectedKp.id);
-    } else {
-      setHighlightedKeywords([]);
-    }
-  }, [selectedKp?.id]);
-
-  const loadKeywords = async (kpId: number) => {
-    try {
-      const data = await getKnowledgePointKeywords(kpId);
-      setHighlightedKeywords(data.keywords ?? []);
-    } catch (error) {
-      console.error('Load keywords error:', error);
-      setHighlightedKeywords([]);
-    }
-  };
+  }, [selectedDocId]);
 
   const handleSelectKnowledgePoint = useCallback((kp: KnowledgePoint) => {
     setSelectedKp((prev) => {
@@ -283,50 +193,6 @@ const DataCenter: React.FC = () => {
     setHighlightedKeywords([]);
     setSelectionToolbar(null);
   }, []);
-
-  useEffect(() => {
-    loadKnowledgePoints();
-  }, [kpPage]);
-
-  const loadData = async () => {
-    await Promise.all([loadDocuments(), loadDirectories()]);
-  };
-
-  const loadDirectories = async () => {
-    try {
-      const tree = await getDirectories();
-      setDirectoryTree(tree);
-    } catch (e) {
-      console.error('Failed to load directories:', e);
-    }
-  };
-
-  const loadDocuments = async () => {
-    try {
-      const docs = await getDocuments();
-      setDocuments(docs);
-    } catch (e) {
-      console.error('Failed to load documents:', e);
-    }
-  };
-
-  const loadKnowledgePoints = async () => {
-    const docId = selectedDocIdRef.current;
-    if (docId == null) return;
-    const page = kpPageRef.current;
-    try {
-      const data = await getKnowledgePoints(page, kpPageSize, docId);
-      if (selectedDocIdRef.current !== docId) return;
-      const raw = data.knowledge_points ?? [];
-      setKnowledgePoints(raw);
-      setKpTotal(data.total ?? 0);
-    } catch (e) {
-      if (selectedDocIdRef.current !== docId) return;
-      console.error('Failed to load knowledge points:', e);
-      setKnowledgePoints([]);
-      setKpTotal(0);
-    }
-  };
 
   function getMeta(docId: number): FileMetaItem {
     return fileMeta[docId] ?? { weight: 0, note: '', tags: [], excluded: false };
@@ -685,58 +551,6 @@ const DataCenter: React.FC = () => {
     } catch (error) {
       console.error('Remove keyword error:', error);
     }
-  };
-
-  const highlightKeywords = (content: string, keywords: string[]): React.ReactNode => {
-    if (!content || keywords.length === 0) return content;
-    
-    const parts: Array<{ text: string; isKeyword: boolean }> = [];
-    const sortedKeywords = [...keywords].filter(kw => kw && kw.trim().length > 0).sort((a, b) => b.length - a.length);
-    
-    if (sortedKeywords.length === 0) return content;
-    
-    const findNextKeyword = (startIndex: number): { keyword: string; index: number } | null => {
-      let found: { keyword: string; index: number } | null = null;
-      for (const kw of sortedKeywords) {
-        const index = content.indexOf(kw, startIndex);
-        if (index !== -1 && (!found || index < found.index)) {
-          found = { keyword: kw, index };
-        }
-      }
-      return found;
-    };
-    
-    let currentIndex = 0;
-    while (currentIndex < content.length) {
-      const found = findNextKeyword(currentIndex);
-      if (!found) {
-        if (currentIndex < content.length) {
-          parts.push({ text: content.substring(currentIndex), isKeyword: false });
-        }
-        break;
-      }
-      
-      if (found.index > currentIndex) {
-        parts.push({ text: content.substring(currentIndex, found.index), isKeyword: false });
-      }
-      
-      parts.push({ text: found.keyword, isKeyword: true });
-      currentIndex = found.index + found.keyword.length;
-    }
-    
-    if (parts.length === 0) return content;
-    
-    return (
-      <>
-        {parts.map((part, idx) =>
-          part.isKeyword ? (
-            <mark key={idx} className="dc-kp-keyword-highlight">{part.text}</mark>
-          ) : (
-            <span key={idx}>{part.text}</span>
-          )
-        )}
-      </>
-    );
   };
 
   const kpTotalPages = Math.max(1, Math.ceil(kpTotal / kpPageSize));

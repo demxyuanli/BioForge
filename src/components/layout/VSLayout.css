@@ -857,7 +857,11 @@
 
 /* Workspace unified icon buttons: no background, small icon style */
 .vs-editor-content .kb-workspace button,
-.vs-editor-content .fr-workspace button {
+.vs-editor-content .fr-workspace button,
+.vs-editor-content .skills-workspace button,
+.vs-editor-content .production-tuning button,
+.vs-editor-content .skill-selector button,
+.vs-editor-content .evaluation button {
   padding: 4px 8px;
   min-width: 20px;
   min-height: 20px;
@@ -871,20 +875,44 @@
 }
 
 .vs-editor-content .kb-workspace button:hover:not(:disabled),
-.vs-editor-content .fr-workspace button:hover:not(:disabled) {
+.vs-editor-content .fr-workspace button:hover:not(:disabled),
+.vs-editor-content .skills-workspace button:hover:not(:disabled),
+.vs-editor-content .production-tuning button:hover:not(:disabled),
+.vs-editor-content .skill-selector button:hover:not(:disabled),
+.vs-editor-content .evaluation button:hover:not(:disabled) {
   background: var(--vs-list-hover) !important;
   color: var(--vs-fg);
 }
 
 .vs-editor-content .kb-workspace button:focus,
-.vs-editor-content .fr-workspace button:focus {
+.vs-editor-content .fr-workspace button:focus,
+.vs-editor-content .skills-workspace button:focus,
+.vs-editor-content .production-tuning button:focus,
+.vs-editor-content .skill-selector button:focus,
+.vs-editor-content .evaluation button:focus {
   outline: none;
 }
 
 .vs-editor-content .kb-workspace button:disabled,
-.vs-editor-content .fr-workspace button:disabled {
+.vs-editor-content .fr-workspace button:disabled,
+.vs-editor-content .skills-workspace button:disabled,
+.vs-editor-content .production-tuning button:disabled,
+.vs-editor-content .skill-selector button:disabled,
+.vs-editor-content .evaluation button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Chat history sidebar: no blue background on "start new chat" */
+.chat-history-sidebar-in-menu .chat-history-sidebar-new,
+.vs-editor-content .chat-history-sidebar-in-menu .chat-history-sidebar-new {
+  background: transparent !important;
+  color: var(--vs-fg);
+}
+.chat-history-sidebar-in-menu .chat-history-sidebar-new:hover,
+.vs-editor-content .chat-history-sidebar-in-menu .chat-history-sidebar-new:hover {
+  background: var(--vs-list-hover) !important;
+  color: var(--vs-fg);
 }
 
 /* Form Elements */

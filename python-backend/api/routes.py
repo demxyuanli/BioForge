@@ -18,6 +18,8 @@ from api.routers import finetuning as finetuning_router
 from api.routers import training as training_router
 from api.routers import config as config_router
 from api.routers import search as search_router
+from api.routers import skills as skills_router
+from api.routers import rules as rules_router
 
 router = APIRouter()
 router.include_router(config_router.router)
@@ -26,6 +28,8 @@ router.include_router(logs_router.router)
 router.include_router(api_keys_router.router)
 router.include_router(directories_router.router)
 router.include_router(mount_points_router.router)
+router.include_router(skills_router.router)
+router.include_router(rules_router.router)
 router.include_router(evaluation_router.router)
 router.include_router(chat_router.router)
 router.include_router(misc_router.router)

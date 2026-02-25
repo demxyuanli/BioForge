@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use crate::backend_url::get_backend_base_url;
 
-fn json_result(success: bool, data: Value, error: Option<String>) -> Result<String, String> {
+pub(crate) fn json_result(success: bool, data: Value, error: Option<String>) -> Result<String, String> {
     serde_json::to_string(&serde_json::json!({
         "success": success,
         "data": data,

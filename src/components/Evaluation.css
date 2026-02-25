@@ -13,7 +13,8 @@
 }
 
 .evaluation-sidebar {
-  width: 220px;
+  width: 280px;
+  min-width: 280px;
   flex-shrink: 0;
   background: var(--vs-panel-bg);
   border-radius: 4px;
@@ -26,7 +27,7 @@
 .evaluation-sidebar-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   padding: 8px 12px;
   border-bottom: 1px solid var(--vs-border-subtle);
 }
@@ -35,6 +36,16 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.evaluation-sidebar-actions .evaluation-btn-icon {
+  background: transparent !important;
+  color: var(--vs-muted);
+}
+
+.evaluation-sidebar-actions .evaluation-btn-icon:hover {
+  background: var(--vs-list-hover) !important;
+  color: var(--vs-fg);
 }
 
 .evaluation-sidebar-title {
@@ -48,15 +59,16 @@
   align-items: center;
   justify-content: center;
   padding: 4px;
-  border: none;
+  border: none !important;
   border-radius: 3px;
-  background: transparent;
+  background: transparent !important;
   color: var(--vs-fg);
   cursor: pointer;
+  box-shadow: none !important;
 }
 
 .evaluation-btn-icon:hover {
-  background: var(--vs-dropdown-hover);
+  background: var(--vs-list-hover) !important;
   color: var(--vs-accent);
 }
 
@@ -108,23 +120,28 @@
 }
 
 .evaluation-template-item.selected {
-  background: var(--vs-dropdown-hover);
+  background: var(--vs-list-hover);
+}
+
+.evaluation-template-item.selected .evaluation-template-item-label {
+  background: transparent !important;
 }
 
 .evaluation-template-item-label {
   flex: 1;
   text-align: left;
   padding: 4px 0;
-  border: none;
-  background: none;
+  border: none !important;
+  background: transparent !important;
   color: var(--vs-fg);
   cursor: pointer;
   font-size: 12px;
   border-radius: 3px;
+  box-shadow: none !important;
 }
 
 .evaluation-template-item-label:hover {
-  background: var(--vs-dropdown-hover);
+  background: var(--vs-list-hover) !important;
 }
 
 .evaluation-template-item-actions {

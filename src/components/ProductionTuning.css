@@ -5,11 +5,12 @@
   height: 100%;
   min-height: 0;
   width: 100%;
+  box-sizing: border-box;
 }
 
 .vs-editor-content .production-tuning.production-tuning-split {
-  margin: 0 !important;
-  padding: 6px;
+  margin: 0;
+  padding: 16px;
   box-sizing: border-box;
 }
 
@@ -64,42 +65,48 @@
 .production-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
+  background: var(--vs-panel-bg);
+  border: 1px solid var(--vs-border-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
 }
 
 .vs-editor-content .production-tuning .jobs-list.production-section {
-  margin-bottom: 8px;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  margin-bottom: 16px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .production-section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vs-border-subtle);
+  background: var(--vs-panel-bg);
 }
 
-.production-inline-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.production-section-header h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vs-fg);
 }
 
 .production-title-group {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
 }
 
 .production-title-group h3 {
   margin: 0;
-}
-
-.production-title-meta {
-  color: var(--vs-muted);
-  font-size: var(--font-size-11);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vs-fg);
 }
 
 .production-title-meta-grid {
@@ -115,14 +122,14 @@
   gap: 8px;
   border: 1px solid var(--vs-border-subtle);
   border-radius: 4px;
-  padding: 3px 8px;
+  padding: 4px 8px;
   background: var(--vs-sidebar-bg);
   min-width: 0;
 }
 
 .production-meta-label {
   color: var(--vs-muted);
-  font-size: var(--font-size-11);
+  font-size: 11px;
   white-space: nowrap;
 }
 
@@ -130,6 +137,32 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 12px;
+}
+
+.production-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.production-section > .production-config-row,
+.production-section > .production-filter-row,
+.production-section > .production-table-wrap,
+.production-section > .production-pagination-actions,
+.production-section > .actions,
+.production-section > p {
+  padding: 8px 12px;
+  margin: 0;
+}
+
+.production-section > .production-notice {
+  margin: 8px 12px;
+}
+
+.production-section .production-jobs {
+  padding: 8px 12px;
 }
 
 .production-config-row {
@@ -138,6 +171,47 @@
   gap: 8px;
   flex-wrap: nowrap;
   overflow-x: auto;
+}
+
+.production-tuning button {
+  padding: 4px 8px;
+  min-height: 20px;
+  min-width: 20px;
+  background: transparent !important;
+  color: var(--vs-fg);
+  border: 1px solid var(--vs-border-subtle) !important;
+  border-radius: 3px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.vs-editor-content .production-tuning button:hover:not(:disabled) {
+  background: var(--vs-dropdown-hover) !important;
+  color: var(--vs-accent-fg);
+  border-color: var(--vs-border-subtle) !important;
+}
+
+.vs-editor-content .production-tuning button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vs-editor-content .production-tuning button.production-btn-primary {
+  background: var(--vs-accent) !important;
+  color: var(--vs-accent-fg) !important;
+  border-color: var(--vs-accent) !important;
+}
+
+.vs-editor-content .production-tuning button.production-btn-primary:hover:not(:disabled) {
+  background: var(--vs-dropdown-hover) !important;
+  color: var(--vs-accent-fg) !important;
+  border-color: var(--vs-accent) !important;
+}
+
+.production-tuning .production-checkbox {
+  color: var(--vs-fg);
+  font-size: 12px;
 }
 
 .production-inline-field {

@@ -2,7 +2,9 @@
 Database Models
 SQLAlchemy models for SQLite database
 """
+import json
 import os
+from typing import TYPE_CHECKING
 from sqlalchemy import create_engine, Column, Integer, String, Text, Float, DateTime, Boolean, ForeignKey, UniqueConstraint
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.declarative import declarative_base
@@ -106,6 +108,48 @@ class Annotation(Base):
     
     document = relationship("Document", back_populates="annotations")
     knowledge_point = relationship("KnowledgePoint", back_populates="annotations")
+
+
+class Skill(Base):
+    """Skill: executable capability - answers 'how to do'. Has optional link to Rules (constraints)."""
+    __tablename__ = "skills"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text)  # What this skill does (function description)
+    type = Column(String(64), nullable=False, default="custom")  # api_call, knowledge_retrieval, custom
+    config = Column(Text)  # JSON: e.g. {"api_url": "...", "knowledge_base_id": 1}
+    rule = Column(Text)  # Legacy inline rule text (optional); prefer linked rules via skill_rules
+    trigger_conditions = Column(Text)  # When to use this skill
+    steps = Column(Text)  # Execution steps (brief)
+    output_description = Column(Text)  # Expected output
+    example = Column(Text)  # Optional usage example
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Rule(Base):
+    """Rule: constraint or policy - answers 'what is allowed / not allowed'. Reusable across skills."""
+    __tablename__ = "rules"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(255), nullable=False)
+    category = Column(String(128))  # e.g. naming, architecture, security
+    content = Column(Text)  # Must/must not, naming, architecture constraints, verification
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SkillRule(Base):
+    """Many-to-many: which rules apply when using a skill."""
+    __tablename__ = "skill_rules"
+    __table_args__ = (UniqueConstraint("skill_id", "rule_id", name="uq_skill_rule"),)
+
+    id = Column(Integer, primary_key=True)
+    skill_id = Column(Integer, ForeignKey("skills.id", ondelete="CASCADE"), nullable=False)
+    rule_id = Column(Integer, ForeignKey("rules.id", ondelete="CASCADE"), nullable=False)
 
 
 class FinetuningJob(Base):
@@ -222,4 +266,116 @@ def init_database(db_path: str = "aiforger.db"):
             conn.commit()
     except Exception:
         pass
+    # Add missing columns to skills if missing (migration)
+    if "skills" in insp.get_table_names():
+        skill_cols = [c["name"] for c in insp.get_columns("skills")]
+        if "rule" not in skill_cols:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN rule TEXT"))
+                conn.commit()
+        for col in ("trigger_conditions", "steps", "output_description", "example"):
+            if col not in skill_cols:
+                with engine.connect() as conn:
+                    conn.execute(text(f"ALTER TABLE skills ADD COLUMN {col} TEXT"))
+                    conn.commit()
+                skill_cols.append(col)
+    # Ensure rules and skill_rules tables exist (create_all already ran; they are new models)
+    try:
+        Base.metadata.create_all(engine, checkfirst=True)
+    except OperationalError:
+        pass
+    # Seed default skills when table exists and is empty
+    _seed_default_skills(engine)
     return engine
+
+
+if TYPE_CHECKING:
+    from sqlalchemy.orm import Session
+
+
+def _seed_default_skills(engine):
+    """Insert default skills based on system features when the skills table is empty."""
+    from sqlalchemy import inspect
+    from sqlalchemy.orm import sessionmaker
+    insp = inspect(engine)
+    if "skills" not in insp.get_table_names():
+        return
+    session_factory = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    db = session_factory()
+    try:
+        if db.query(Skill).count() > 0:
+            return
+        for d in _default_skill_definitions():
+            s = Skill(
+                name=d["name"],
+                description=d["description"],
+                type=d["type"],
+                config=json.dumps(d["config"]) if d.get("config") is not None else None,
+                enabled=d.get("enabled", True),
+            )
+            db.add(s)
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
+
+def _default_skill_definitions():
+    """Return the list of default skill definitions (dicts with name, description, type, config, enabled)."""
+    return [
+        {
+            "name": "Knowledge retrieval",
+            "description": "Retrieve relevant knowledge from the knowledge base for chat or evaluation.",
+            "type": "knowledge_retrieval",
+            "config": {},
+            "enabled": True,
+        },
+        {
+            "name": "API call",
+            "description": "Call external APIs or services (e.g. search, tools).",
+            "type": "api_call",
+            "config": {},
+            "enabled": True,
+        },
+        {
+            "name": "Document summary",
+            "description": "Generate or use document summaries for file resources.",
+            "type": "custom",
+            "config": {},
+            "enabled": True,
+        },
+        {
+            "name": "Training data export",
+            "description": "Export annotations or JSONL for fine-tuning in Training Lab.",
+            "type": "custom",
+            "config": {},
+            "enabled": True,
+        },
+        {
+            "name": "Evaluation compare",
+            "description": "Compare model output before and after fine-tuning in Evaluation.",
+            "type": "custom",
+            "config": {},
+            "enabled": True,
+        },
+    ]
+
+
+def ensure_default_skills(db: "Session") -> None:
+    """If the skills table is empty, insert default skills. Safe to call on every list."""
+    if db.query(Skill).count() > 0:
+        return
+    for d in _default_skill_definitions():
+        s = Skill(
+            name=d["name"],
+            description=d["description"],
+            type=d["type"],
+            config=json.dumps(d["config"]) if d.get("config") is not None else None,
+            enabled=d.get("enabled", True),
+        )
+        db.add(s)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
