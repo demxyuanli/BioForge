@@ -90,8 +90,8 @@ Fine-tuned model + templates → Professional text generation
 
 **English: Stage summary**
 
-- **导入与分块**：文档上传后经解析（PDF/Word/MD 等）、可选 OCR（图片）、文本清洗与分块，写入 SQLite 并可选同步到向量库（Chroma），供全文与语义检索。
-- **English:** Documents are parsed, optionally OCR’d, cleaned, and chunked; stored in SQLite and optionally synced to Chroma for full-text and semantic search.
+- **导入与分块**：文档上传后经解析（PDF/Word/MD 等；Word/Office 需本机 LibreOffice）、可选 OCR（图片，需 Tesseract）、文本清洗与分块，写入 SQLite 并可选同步到向量库（Chroma），供全文与语义检索。
+- **English:** Documents are parsed (Word/Office via LibreOffice on the host), optionally OCR’d, cleaned, and chunked; stored in SQLite and optionally synced to Chroma for full-text and semantic search.
 
 - **知识库（RAG）**：用户或应用在问答/写作时，可先根据问题或上下文检索相关片段，再将片段与问题一并交给模型，实现“检索增强”的生成，减少编造。
 - **English:** At query or writing time, retrieve relevant chunks from the knowledge base and pass them with the question to the model for retrieval-augmented generation, reducing fabrication.
@@ -115,8 +115,8 @@ Fine-tuned model + templates → Professional text generation
 
 ### 本地知识与文档管理
 
-- 支持上传并整理 **PDF、Word、Markdown、图片** 等格式；支持对图片类文档进行 **OCR** 识别，并可选文本清洗与去噪。
-- **English:** Upload and organize PDF, Word, Markdown, images; OCR for image-based docs; optional text cleaning and denoising.
+- 支持上传并整理 **PDF、Word、Markdown、图片** 等格式；**Word/Office 类文档**（.doc、.docx、.odt、.xls、.ppt 等）的解析与预览依赖本机安装 **LibreOffice**（无头模式）；支持对图片类文档进行 **OCR** 识别（需 Tesseract），并可选文本清洗与去噪。
+- **English:** Upload and organize PDF, Word, Markdown, images; parsing and preview of **Word/Office** (.doc, .docx, .odt, .xls, .ppt, etc.) require **LibreOffice** (headless) on the machine; OCR for image-based docs (Tesseract); optional text cleaning and denoising.
 
 - 文档经 **分块** 后存入本地数据库，并可同步到向量库（Chroma），便于按语义检索；同时支持 **全文检索**，适合精确关键词查找。
 - **English:** Chunked documents are stored locally and optionally in Chroma for semantic search; full-text search is also supported for keyword lookup.
@@ -231,19 +231,37 @@ Fine-tuned model + templates → Professional text generation
 
   **English:** Required for Tauri. Install via [rustup](https://rustup.rs/); verify with `cargo -v`.
 
-- **Tesseract OCR**（可选）  
-  若需对 **图片类文档** 做文字识别，请在本机安装 Tesseract 并在系统路径中可用；后端通过 `pytesseract` 调用。未安装时，图片文档将无法提取文字，仅可作附件或需手动录入。
+除上述运行与构建环境外，**文档解析、图片识别与后端打包** 等能力依赖本机安装的第三方程序与工具；其要求与配置见下节 **「第三方程序与工具要求」**。
 
-  **English:** Optional; required for image OCR. Backend uses `pytesseract`; without Tesseract on PATH, image text cannot be extracted.
-
-- **PyInstaller**（可选）  
-  仅当需要将 Python 后端 **打包为独立 exe** 并随桌面应用分发时才需要。可通过 `pip install pyinstaller` 安装；若只做开发或后端单独部署，可不安装。
-
-  **English:** Optional; required only to bundle the backend as a standalone exe. Install with `pip install pyinstaller`.
+**English:** In addition to the above, **document parsing, image OCR, and backend packaging** depend on third-party programs installed on the host; see the next section **「Third-party programs and tools」** for requirements and configuration.
 
 **建议**：首次构建前在仓库根目录依次执行 `npm install`、`cd python-backend && pip install -r requirements.txt`，并完成数据库初始化（见下节），再执行 Tauri 构建，可减少因依赖缺失导致的构建失败。
 
 **English:** Before first build, run `npm install`, then `cd python-backend && pip install -r requirements.txt`, initialize the database (see below), then run the Tauri build to avoid dependency-related failures.
+
+---
+
+## 第三方程序与工具要求
+
+本程序在 **文档解析与转换**、**图片文字识别**、**本地大模型推理**、**后端打包分发** 等环节会调用本机已安装的第三方程序或服务；未安装或未配置时，对应功能将不可用或报错。下表列出这些依赖及其要求，便于部署与排错。
+
+**English:** The application relies on **third-party programs or services** on the host for document parsing/conversion, image OCR, **local LLM inference**, and backend packaging. If not installed or configured, the corresponding features will be unavailable or fail. The table below lists these dependencies and their requirements for deployment and troubleshooting.
+
+| 程序 / Program | 用途 / Purpose | 是否必需 / Required | 安装与配置说明 / Install & configuration |
+|----------------|----------------|---------------------|------------------------------------------|
+| **LibreOffice** | 对 **Office 类文档**（.doc、.docx、.odt、.xls、.ppt 等）进行 **文本提取** 与 **预览转 PDF**。后端以无头模式调用 `soffice --headless`。 | **是**（若需解析或预览 Office 文档） | 安装 [LibreOffice](https://www.libreoffice.org/)，确保 **`soffice`** 在系统 PATH 中。Windows 若未加入 PATH，可设置环境变量 **`SOFFICE_PATH`** 指向 `soffice.exe`（如 `C:\Program Files\LibreOffice\program\soffice.exe`）。 |
+| **Tesseract OCR** | 对 **图片类文档** 进行文字识别（OCR）。后端通过 `pytesseract` 调用。 | **否**（可选） | 若需 OCR，请安装 [Tesseract](https://github.com/tesseract-ocr/tesseract) 并置于系统 PATH。未安装时，图片文档无法提取文字。 |
+| **Ollama** | 在本地运行 **大语言模型**（推理、标注、对话等）。应用通过 **OpenAI 兼容接口** 与 Ollama 通信。 | **否**（可选） | 若需使用本地模型，请安装并启动 [Ollama](https://ollama.com/)，在应用 **设置** 中配置 Ollama 的 base URL（如 `http://localhost:11434`），并拉取所需模型。适合内网或数据不出境场景。 |
+| **PyInstaller** | 将 Python 后端 **打包为独立 exe**，随 Tauri 桌面应用一起分发。 | **否**（仅打包时需要） | 仅当需要产出“含后端 exe”的完整安装包时使用。在 Python 环境中执行 `pip install pyinstaller`；若仅开发或单独跑后端，可不安装。 |
+
+**简要对照 / Summary**
+
+- **LibreOffice**：处理 Word/Excel/PPT 等 Office 格式的 **必备外部程序**；缺则 Office 文档无法解析或无法生成预览。
+- **Tesseract**：仅在使用 **图片 OCR** 时需要；不做图片文字识别可不安。
+- **Ollama**：仅在使用 **本地大模型**（推理、标注、对话）时需要；使用云端 API 或仅做知识库/训练集管理可不安。
+- **PyInstaller**：仅在做 **完整桌面安装包（含后端 exe）** 时需要；仅开发或单独跑后端可不安。
+
+**English (summary):** **LibreOffice** is required for parsing/previewing Office documents; **Tesseract** is optional for image OCR; **Ollama** is optional for local LLM inference (conversation, annotation); **PyInstaller** is optional when building a full desktop package that includes the backend exe.
 
 ---
 
