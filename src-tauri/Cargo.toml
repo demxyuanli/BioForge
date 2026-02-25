@@ -1,6 +1,6 @@
 [package]
 name = "aiforger-pro"
-version = "1.0.0"
+version = "1.0.1"
 description = "AiForger Pro - RAG and fine-tuning desktop app"
 authors = ["you"]
 edition = "2021"

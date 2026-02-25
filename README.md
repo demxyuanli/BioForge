@@ -29,6 +29,11 @@ BioForger 面向需要将 **自有专业资料**（如手册、报告、标准�
 - 对数据出境或第三方 API 有顾虑的团队，希望文档与标注数据留在本地，仅将“微调任务”提交到自选的云厂商，并在本地或自有环境中调用微调后的模型。
 - **English:** Teams concerned about data leaving the region (数据出境) or third-party APIs prefer to keep documents and annotations local, submit only the “fine-tuning job” to a chosen cloud provider, and run the fine-tuned model locally or in their own environment.
 
+**版本与更新 / Version and updates**
+
+- 当前发布版本：**1.0.1**。版本更新与功能说明见 [RELEASE_NOTES.md](RELEASE_NOTES.md)。
+- **English:** Current release: **1.0.1**. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for version history and feature notes.
+
 **整体流程分为三步：**
 
 **English: The workflow is in three steps:**
@@ -131,6 +136,17 @@ Fine-tuned model + templates → Professional text generation
 - 知识库数据存于本地（SQLite + Chroma），不依赖外网即可完成检索与展示，适合内网或离线环境。
 - **English:** Knowledge base data is stored locally (SQLite + Chroma); retrieval works without internet, suitable for air-gapped or offline environments.
 
+### 技能与规则（Skills & Rules）
+
+- **技能（Skill）** 描述 AI 可执行的**具体能力与步骤**（“怎么做”）：支持类型如自定义、API 调用、知识检索等；可配置触发条件、步骤说明、输出描述与示例，并关联多条**规则**。在训练、微调、对话或评估中**选择技能**后，其描述、步骤及关联规则会注入到提示中，统一约束模型行为。
+- **English:** **Skills** define executable capabilities and steps (“how to do it”): types include custom, api_call, knowledge_retrieval; each skill has trigger conditions, steps, output description, example, and can link to multiple **rules**. When you select skills for training, fine-tuning, chat, or evaluation, their description, steps, and linked rules are injected into the prompt to steer the model.
+
+- **规则（Rule）** 描述**允许/禁止的约束与策略**（“什么能做、什么不能做”）：独立维护名称、分类与内容，可被多个技能复用。技能与规则为多对多关系；选择某技能时，其关联规则内容一并注入，便于统一合规与风格。
+- **English:** **Rules** define constraints and policies (what is allowed or not); they are first-class entities (name, category, content) and can be linked by many skills. When a skill is selected, all linked rules’ content is injected with it for consistent compliance and style.
+
+- 应用内提供 **技能工作区**：集中管理技能与规则的增删改查；在对话、训练实验室、评估等场景中通过 **技能选择器** 按会话选用所需技能，实现能力可配置、可复用。
+- **English:** The **Skills workspace** in the app manages skills and rules (CRUD); the **skill selector** lets you choose which skills apply per session in chat, training lab, or evaluation for configurable, reusable capabilities.
+
 ### 标注与训练集
 
 - 提供 **智能标注助手**（基于云端大模型）自动或半自动生成 **指令对** 与 **问答对**：可从文档片段、知识库检索结果或用户输入中生成“问题/指令 + 标准回答”，用于微调训练。
@@ -172,8 +188,8 @@ Fine-tuned model + templates → Professional text generation
 - **后端可完全在本地运行**：文档、知识库与业务逻辑均可在本机或内网完成；仅微调与部分推理依赖云端时，可自选厂商与区域。
 - **English:** Backend can run entirely locally; only fine-tuning and optional inference need the cloud, with your choice of provider and region.
 
-- **桌面端采用 Tauri 构建**：可将 Python 后端与前端一起打包为单一桌面应用（含后端 exe），便于在内网或离线环境中分发与部署，无需单独安装 Python 或 Node。
-- **English:** Desktop app is built with Tauri; the Python backend can be bundled as a single app (including backend exe) for distribution without installing Python or Node.
+- **桌面端采用 Tauri 构建**：可将 Python 后端与前端一起打包为单一桌面应用（含后端 exe），便于在内网或离线环境中分发与部署，无需单独安装 Python 或 Node。启动时展示 **AiForger Pro** 启动画面（进度条与深色主题）。
+- **English:** Desktop app is built with Tauri; the Python backend can be bundled as a single app (including backend exe) for distribution without installing Python or Node. Startup shows an **AiForger Pro** splash screen with progress bar and dark theme.
 
 ---
 
@@ -181,14 +197,14 @@ Fine-tuned model + templates → Professional text generation
 
 | 层级     | 技术 | 说明 |
 |----------|------|------|
-| 桌面壳   | Tauri 2.x (Rust) | 提供跨平台窗口、系统集成与后端进程管理；通过 HTTP 与本地 Python 后端通信。 |
-| 前端     | React + TypeScript + Vite | 界面与交互；Vite 负责开发热更新与生产构建。 |
-| 后端     | Python 3 + FastAPI | 文档解析、知识库、RAG、标注、微调提交与训练集管理等 API；可独立部署或打包为 exe。 |
+| 桌面壳   | Tauri 2.x (Rust) | 提供跨平台窗口、系统集成与后端进程管理；通过 HTTP 与本地 Python 后端通信。Rust 侧将命令按模块拆分（commands/*.rs），HTTP 请求由 reqwest 统一发起。 |
+| 前端     | React + TypeScript + Vite | 界面与交互；主要工作区（知识库、文件资源、技能与规则、生产微调、训练实验室等）采用 layout/data hooks 与子组件拆分，单文件控制在约 400 行内便于维护；Vite 负责开发热更新与生产构建。 |
+| 后端     | Python 3 + FastAPI | 文档解析、知识库、RAG、技能与规则、标注、微调提交与训练集管理等 API；路由使用 `Depends(get_db)` 管理数据库会话；可独立部署或打包为 exe。 |
 | 文档处理 | LangChain / LlamaIndex | 文档加载、分块与向量化等；与后端服务协同完成知识库构建与检索。 |
 | 数据库   | SQLite + Chroma | SQLite 存元数据与业务数据；Chroma 作向量库，支持语义检索。 |
 | API      | LiteLLM、OpenAI 兼容接口 | 统一对接多种云厂商与本地模型（如 Ollama），便于切换推理与微调端点。 |
 
-**English:** Desktop: Tauri 2.x (Rust)—windows, system integration, backend process management, HTTP to local Python. Frontend: React + TypeScript + Vite. Backend: Python 3 + FastAPI—doc parsing, knowledge base, RAG, annotation, fine-tuning, training sets; deployable or packaged as exe. Document: LangChain / LlamaIndex. DB: SQLite + Chroma (vector store). API: LiteLLM, OpenAI-compatible for multiple providers and local models (e.g. Ollama).
+**English:** Desktop: Tauri 2.x (Rust)—windows, system integration, backend process management, HTTP to local Python; commands split into modules (commands/*.rs), HTTP via reqwest. Frontend: React + TypeScript + Vite; main workspaces (knowledge base, file resources, skills & rules, production tuning, training lab) use layout/data hooks and subcomponents (~400 lines per file). Backend: Python 3 + FastAPI with `Depends(get_db)`; doc parsing, knowledge base, RAG, skills & rules, annotation, fine-tuning, training sets; deployable or packaged as exe. Document: LangChain / LlamaIndex. DB: SQLite + Chroma (vector store). API: LiteLLM, OpenAI-compatible for multiple providers and local models (e.g. Ollama).
 
 前端与后端通过 **HTTP（本地端口）** 通信；桌面端负责启动/停止后端进程、解析配置中的端口与资源路径，并将用户操作转发到后端 API。构建时可将后端打包为单文件 exe，随 Tauri 应用一起分发。
 
@@ -421,14 +437,23 @@ npm run tauri dev
 .
 ├── src/                      # React 前端
 │   ├── components/           # UI 组件（布局、列表、表单、设置等）
+│   │   ├── KnowledgeBaseWorkspace/   # 知识库工作区子组件
+│   │   ├── FileResourcesWorkspace/  # 文件资源工作区子组件
+│   │   ├── ProductionTuning/        # 生产微调子组件
+│   │   ├── TrainingLab/             # 训练实验室子组件
+│   │   ├── SkillsWorkspace.tsx       # 技能与规则工作区（技能/规则 CRUD、关联）
+│   │   ├── SkillSelector.tsx         # 技能选择器（会话级选用技能）
+│   │   └── ...
+│   ├── hooks/                # 工作区 layout/data hooks（如 useKnowledgeBaseWorkspaceLayout 等）
+│   ├── utils/                # 共享工具（如 dataCenterUtils、productionTuningUtils、trainingLabUtils）
 │   ├── i18n/                 # 国际化文案（如中文、英文）
 │   └── App.tsx               # 根组件与路由
 ├── src-tauri/                # Tauri 桌面壳
 │   ├── src/
-│   │   ├── lib.rs             # Tauri 命令注册、后端进程启动/停止
+│   │   ├── lib.rs             # Tauri 入口：mod/use、run()、命令注册
 │   │   ├── backend_url.rs     # 后端端口与 URL 解析、配置读写
-│   │   └── commands/         # 对 Python 后端的 HTTP 封装（文档、标注、微调等）
-│   └── tauri.conf.json        # Tauri 构建与打包配置
+│   │   └── commands/          # 命令模块（api_keys, config, search, documents, annotations, mount_points, skills, rules, chat, chat_history, evaluation, finetuning, training, backend_lifecycle, ollama, misc, storage, logs 等）
+│   └── tauri.conf.json        # Tauri 构建与打包配置（含启动画面 splash.html）
 ├── python-backend/
 │   ├── main.py               # FastAPI 入口（独立运行）
 │   ├── backend_gui_host.py   # PyInstaller 打包入口（无控制台窗口）
@@ -441,11 +466,11 @@ npm run tauri dev
 └── package.json              # npm 脚本（dev、build、tauri、build:backend）
 ```
 
-**English:** `src/`: React frontend (components, i18n, App). `src-tauri/`: Tauri shell (lib.rs, backend_url.rs, commands, tauri.conf.json). `python-backend/`: FastAPI app (main.py, backend_gui_host.py), api, database, services, requirements.txt, dist (exe), aiforger.db (legacy privatetune.db). Root: package.json.
+**English:** `src/`: React frontend (components including workspace subcomponent folders, hooks, utils, i18n, App). `src-tauri/`: Tauri shell (lib.rs, backend_url.rs, commands/*.rs modules, tauri.conf.json with splash). `python-backend/`: FastAPI app (main.py, backend_gui_host.py), api, database, services, requirements.txt, dist (exe), aiforger.db (legacy privatetune.db). Root: package.json, RELEASE_NOTES.md.
 
-**扩展与二次开发**：前端可修改 `src` 下组件与路由；后端可扩展 `api` 下路由与 `services` 下业务；数据库模型在 `python-backend/database/models.py`，新增表或字段后需在迁移或初始化逻辑中体现。Tauri 侧新增命令需在 `lib.rs` 与对应 `commands` 模块中注册并实现 HTTP 转发。
+**扩展与二次开发**：前端可修改 `src` 下组件与路由，工作区相关逻辑可在 `hooks/` 与各工作区子组件目录中扩展；后端可扩展 `api` 下路由与 `services` 下业务；数据库模型在 `python-backend/database/models.py`，新增表或字段后需在迁移或初始化逻辑中体现。Tauri 侧新增命令需在 `lib.rs` 中注册并在 `commands/` 下新增或修改对应模块，实现 HTTP 转发（reqwest）。
 
-**English:** Extend: edit components/routes in `src`; add routes in `api` and logic in `services`; update models in `python-backend/database/models.py` and migrations/init; register new Tauri commands in `lib.rs` and `commands`, and implement HTTP forwarding.
+**English:** Extend: edit components/routes in `src`, and workspace logic in `hooks/` and workspace subcomponent folders; add routes in `api` and logic in `services`; update models in `python-backend/database/models.py` and migrations/init; register new Tauri commands in `lib.rs` and add or edit modules under `commands/`, implementing HTTP forwarding (reqwest).
 
 ---
 
