@@ -62,12 +62,17 @@ def _suppress_connection_reset_handler(loop, context):
 
 
 @app.on_event("startup")
-async def _install_asyncio_exception_handler():
+async def _startup():
     try:
         loop = asyncio.get_running_loop()
         loop.set_exception_handler(_suppress_connection_reset_handler)
     except Exception:
         pass
+    try:
+        from services.background_jobs import start_finetuning_background_sync
+        start_finetuning_background_sync()
+    except Exception as e:
+        logging.getLogger(__name__).warning("Failed to start finetuning background sync: %s", e)
 
 
 @app.get("/health")

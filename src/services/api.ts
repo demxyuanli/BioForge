@@ -994,6 +994,47 @@ export async function generateAnnotations(
   }
 }
 
+export interface AnnotationGenerationJobSummary {
+  job_id: string;
+  status: string;
+  progress: number;
+  created_at: string | null;
+  error_message: string | null;
+}
+
+export interface AnnotationGenerationJobStatus {
+  job_id: string;
+  status: string;
+  progress: number;
+  created_at: string | null;
+  updated_at: string | null;
+  error_message: string | null;
+  annotations?: Annotation[];
+}
+
+export async function submitAnnotationGenerationJob(payload: Record<string, unknown>): Promise<{ job_id: string }> {
+  const response = await invoke<string>('submit_annotation_generation_job', { payload });
+  const data = await parsePythonResponse(response);
+  if (!data?.job_id) throw new Error(data?.error ?? 'Submit job failed');
+  return { job_id: data.job_id };
+}
+
+export async function getAnnotationGenerationJobs(limit: number = 50): Promise<AnnotationGenerationJobSummary[]> {
+  try {
+    const response = await invoke<string>('get_annotation_generation_jobs', { limit });
+    const data = await parsePythonResponse(response);
+    return Array.isArray(data) ? data : [];
+  } catch (error) {
+    console.error('Get annotation generation jobs error:', error);
+    return [];
+  }
+}
+
+export async function getAnnotationGenerationJobStatus(jobId: string): Promise<AnnotationGenerationJobStatus> {
+  const response = await invoke<string>('get_annotation_generation_job_status', { jobId });
+  return await parsePythonResponse(response);
+}
+
 export async function estimateFinetuningCost(
   datasetSize: number,
   model: string,
@@ -1096,7 +1137,7 @@ export async function saveTrainingSet(
 ): Promise<{ count: number }> {
   const response = await invoke<string>('save_training_set', {
     annotations,
-    trainingItemId: trainingItemId ?? null
+    training_item_id: trainingItemId ?? null
   });
   const data = await parsePythonResponse(response);
   return { count: data?.count ?? annotations.length };
@@ -1104,7 +1145,7 @@ export async function saveTrainingSet(
 
 export async function getTrainingSet(trainingItemId?: number): Promise<{ annotations: Annotation[]; count: number }> {
   try {
-    const response = await invoke<string>('get_training_set', { trainingItemId: trainingItemId ?? null });
+    const response = await invoke<string>('get_training_set', { training_item_id: trainingItemId ?? null });
     const data = await parsePythonResponse(response);
     return {
       annotations: data?.annotations ?? [],

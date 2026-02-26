@@ -36,3 +36,37 @@ pub async fn generate_annotations(
 
     backend_json(&app, Method::POST, "/annotations/generate", None, Some(payload)).await
 }
+
+#[tauri::command]
+pub async fn submit_annotation_generation_job(
+    app: tauri::AppHandle,
+    payload: serde_json::Value,
+) -> Result<String, String> {
+    backend_json(
+        &app,
+        Method::POST,
+        "/annotations/generate-job",
+        None,
+        Some(payload),
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn get_annotation_generation_jobs(
+    app: tauri::AppHandle,
+    limit: Option<i32>,
+) -> Result<String, String> {
+    let limit_val = limit.unwrap_or(50).clamp(1, 100);
+    let query = vec![("limit".to_string(), limit_val.to_string())];
+    backend_json(&app, Method::GET, "/annotations/jobs", Some(query), None).await
+}
+
+#[tauri::command]
+pub async fn get_annotation_generation_job_status(
+    app: tauri::AppHandle,
+    job_id: String,
+) -> Result<String, String> {
+    let path = format!("/annotations/jobs/{}", job_id);
+    backend_json(&app, Method::GET, &path, None, None).await
+}

@@ -17,7 +17,12 @@ use commands::documents::{
     delete_document, get_document_preview_by_id, get_document_summary_by_id, get_documents,
     upload_document,
 };
-use commands::annotations::generate_annotations;
+use commands::annotations::{
+    generate_annotations,
+    get_annotation_generation_job_status,
+    get_annotation_generation_jobs,
+    submit_annotation_generation_job,
+};
 use commands::knowledge_points::{
     add_knowledge_point_keyword, create_knowledge_point, delete_knowledge_points_batch,
     get_knowledge_point_keywords, get_knowledge_points, get_knowledge_points_for_graph,
@@ -207,6 +212,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             upload_document,
             generate_annotations,
+            submit_annotation_generation_job,
+            get_annotation_generation_jobs,
+            get_annotation_generation_job_status,
             estimate_finetuning_cost,
             submit_finetuning_job,
             get_documents,

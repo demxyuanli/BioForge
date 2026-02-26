@@ -18,6 +18,7 @@ export interface TrainingLabRightPaneProps {
   generationPointCount: number;
   annotations: Annotation[];
   isGenerating: boolean;
+  generationProgress: number;
   savingForFinetuning: boolean;
   candidateCount: number;
   setCandidateCount: React.Dispatch<React.SetStateAction<number>>;
@@ -45,6 +46,7 @@ export const TrainingLabRightPane: React.FC<TrainingLabRightPaneProps> = ({
   generationPointCount,
   annotations,
   isGenerating,
+  generationProgress = 0,
   savingForFinetuning,
   candidateCount,
   setCandidateCount,
@@ -108,7 +110,9 @@ export const TrainingLabRightPane: React.FC<TrainingLabRightPaneProps> = ({
       <div className="actions">
         <button onClick={onLoadKnowledgePoints}>{t('trainingLab.refreshKnowledgePoints')}</button>
         <button onClick={onGenerateAnnotations} disabled={isGenerating}>
-          {isGenerating ? t('trainingLab.generating') : t('trainingLab.generateInstructionPairs')}
+          {isGenerating
+            ? (generationProgress > 0 ? `${t('trainingLab.generating')} ${Math.round(generationProgress)}%` : t('trainingLab.generating'))
+            : t('trainingLab.generateInstructionPairs')}
         </button>
         <button
           onClick={onSaveForFinetuning}

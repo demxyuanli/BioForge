@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  generateAnnotations,
   getKnowledgePoints,
   saveTrainingSet,
   getTrainingSet,
@@ -9,6 +8,9 @@ import {
   getTrainingItems as getTrainingItemsApi,
   saveTrainingItem as saveTrainingItemApi,
   deleteTrainingItem as deleteTrainingItemApi,
+  submitAnnotationGenerationJob,
+  getAnnotationGenerationJobs,
+  getAnnotationGenerationJobStatus,
   type Annotation,
   type KnowledgePoint,
   type TrainingItem,
@@ -69,6 +71,8 @@ export interface UseTrainingLabDataReturn {
   activeTrainingItem: TrainingItem | null;
   generationSource: GenerationSource;
   generationPointCount: number;
+  generationJobId: string | null;
+  generationProgress: number;
   loadKnowledgePoints: () => Promise<void>;
   loadTrainingItems: () => Promise<void>;
   fetchLocalModels: () => Promise<void>;
@@ -97,6 +101,8 @@ export function useTrainingLabData(): UseTrainingLabDataReturn {
 
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationJobId, setGenerationJobId] = useState<string | null>(null);
+  const [generationProgress, setGenerationProgress] = useState(0);
   const [availableLocalModels, setAvailableLocalModels] = useState<string[]>([]);
   const [isFetchingModels, setIsFetchingModels] = useState(false);
   const [knowledgePoints, setKnowledgePoints] = useState<KnowledgePoint[]>([]);
@@ -181,6 +187,59 @@ export function useTrainingLabData(): UseTrainingLabDataReturn {
     loadKnowledgePoints();
     loadTrainingItems();
   }, [loadKnowledgePoints, loadTrainingItems]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      const jobs = await getAnnotationGenerationJobs(20);
+      const running = jobs.find((j) => j.status === 'running' || j.status === 'pending');
+      if (!cancelled && running) {
+        setGenerationJobId(running.job_id);
+        setIsGenerating(true);
+        setGenerationProgress(running.progress ?? 0);
+      }
+    };
+    check();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!generationJobId) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const status = await getAnnotationGenerationJobStatus(generationJobId!);
+        if (cancelled) return;
+        setGenerationProgress(status.progress ?? 0);
+        if (status.status === 'completed' && Array.isArray(status.annotations)) {
+          setAnnotations(status.annotations);
+          setGenerationJobId(null);
+          setIsGenerating(false);
+          return;
+        }
+        if (status.status === 'failed') {
+          alert(`${t('trainingLab.failedToGenerate')}: ${status.error_message || 'Unknown error'}`);
+          setGenerationJobId(null);
+          setIsGenerating(false);
+          return;
+        }
+        setTimeout(() => {
+          if (!cancelled) void poll();
+        }, 2000);
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Poll generation job error:', err);
+          setTimeout(() => void poll(), 2000);
+        }
+      }
+    };
+    void poll();
+    return () => {
+      cancelled = true;
+    };
+  }, [generationJobId, t]);
 
   const keywordTokens = useMemo(
     () =>
@@ -270,25 +329,32 @@ export function useTrainingLabData(): UseTrainingLabDataReturn {
       return;
     }
     setIsGenerating(true);
+    setGenerationProgress(0);
     try {
       const template = activeTrainingItem?.prompt_template || promptTemplate;
       const promptInputs = points.map((kp) =>
         buildPromptFromTemplate(template, kp, defaultPromptTemplate)
       );
-      const generated = await generateAnnotations(
-        promptInputs,
-        cfg.useLocalModel ? 'ollama' : '',
-        cfg.useLocalModel ? cfg.localModelName : cfg.defaultCloudModel,
-        cfg.useLocalModel ? cfg.localBaseUrl : undefined,
-        cfg.useLocalModel ? undefined : cfg.defaultPlatform,
-        candidateCount,
-        selectedSkillIds.length > 0 ? selectedSkillIds : undefined
-      );
-      setAnnotations(generated);
+      const payload: Record<string, unknown> = {
+        knowledge_points: promptInputs,
+        api_key: cfg.useLocalModel ? 'ollama' : '',
+        model: cfg.useLocalModel ? cfg.localModelName : cfg.defaultCloudModel,
+        candidate_count: candidateCount,
+      };
+      if (cfg.useLocalModel && cfg.localBaseUrl) {
+        payload.base_url = cfg.localBaseUrl;
+      }
+      if (!cfg.useLocalModel && cfg.defaultPlatform) {
+        payload.platform = cfg.defaultPlatform;
+      }
+      if (selectedSkillIds.length > 0) {
+        payload.skill_ids = selectedSkillIds;
+      }
+      const { job_id } = await submitAnnotationGenerationJob(payload);
+      setGenerationJobId(job_id);
     } catch (error) {
       console.error('Generation error:', error);
       alert(`${t('trainingLab.failedToGenerate')}: ${error}`);
-    } finally {
       setIsGenerating(false);
     }
   }, [
@@ -481,6 +547,8 @@ export function useTrainingLabData(): UseTrainingLabDataReturn {
     annotations,
     setAnnotations,
     isGenerating,
+    generationJobId,
+    generationProgress,
     availableLocalModels,
     isFetchingModels,
     knowledgePoints,

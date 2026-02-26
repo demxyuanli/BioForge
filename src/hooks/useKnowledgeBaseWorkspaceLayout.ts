@@ -10,8 +10,7 @@ export const LEFT_PANEL_HANDLE_WIDTH = 4;
 export const RIGHT_PANEL_MIN = 200;
 export const KP_LIST_MIN_HEIGHT = 100;
 export const KP_DETAIL_MIN_HEIGHT = 100;
-export const KP_RESIZE_HANDLE_HEIGHT = 4;
-const RIGHT_SIDE_RESERVED = 280;
+export const KP_RESIZE_HANDLE_HEIGHT = 8;
 
 export interface UseKnowledgeBaseWorkspaceLayoutReturn {
   lowerVisible: boolean;
@@ -57,7 +56,10 @@ export function useKnowledgeBaseWorkspaceLayout(): UseKnowledgeBaseWorkspaceLayo
 
   useEffect(() => {
     if (!resizing) return;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
     const onMove = (e: MouseEvent) => {
+      e.preventDefault();
       const delta = e.clientY - startYRef.current;
       let next = startHeightRef.current + delta;
       const el = workspaceRef.current;
@@ -67,6 +69,7 @@ export function useKnowledgeBaseWorkspaceLayout(): UseKnowledgeBaseWorkspaceLayo
       setUpperHeight(next);
     };
     const onUp = () => {
+      document.body.style.userSelect = prevUserSelect;
       const el = workspaceRef.current;
       const threshold = el ? el.clientHeight - UPPER_MAX_OFFSET - 4 : 0;
       if (lowerVisible && currentUpperHeightRef.current >= threshold) {
@@ -75,9 +78,10 @@ export function useKnowledgeBaseWorkspaceLayout(): UseKnowledgeBaseWorkspaceLayo
       }
       setResizing(false);
     };
-    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mousemove', onMove, { passive: false });
     window.addEventListener('mouseup', onUp);
     return () => {
+      document.body.style.userSelect = prevUserSelect;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
@@ -93,20 +97,27 @@ export function useKnowledgeBaseWorkspaceLayout(): UseKnowledgeBaseWorkspaceLayo
 
   useEffect(() => {
     if (!resizingHorizontal) return;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
     const onMove = (e: MouseEvent) => {
+      e.preventDefault();
       const delta = e.clientX - startXRef.current;
       let next = startWidthRef.current + delta;
       const el = upperBodyRef.current;
       const maxW = el
-        ? el.clientWidth - RIGHT_SIDE_RESERVED - LEFT_PANEL_HANDLE_WIDTH - RIGHT_PANEL_MIN
+        ? el.clientWidth - LEFT_PANEL_HANDLE_WIDTH - RIGHT_PANEL_MIN
         : next + 1;
       next = Math.max(LEFT_PANEL_MIN, Math.min(maxW, next));
       setLeftPanelWidth(next);
     };
-    const onUp = () => setResizingHorizontal(false);
-    window.addEventListener('mousemove', onMove);
+    const onUp = () => {
+      document.body.style.userSelect = prevUserSelect;
+      setResizingHorizontal(false);
+    };
+    window.addEventListener('mousemove', onMove, { passive: false });
     window.addEventListener('mouseup', onUp);
     return () => {
+      document.body.style.userSelect = prevUserSelect;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
@@ -114,7 +125,10 @@ export function useKnowledgeBaseWorkspaceLayout(): UseKnowledgeBaseWorkspaceLayo
 
   useEffect(() => {
     if (!resizingKpVertical) return;
+    const prevUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
     const onMove = (e: MouseEvent) => {
+      e.preventDefault();
       const delta = e.clientY - startYKpRef.current;
       let next = startHeightKpRef.current + delta;
       const el = upperLeftRightRef.current;
@@ -124,10 +138,14 @@ export function useKnowledgeBaseWorkspaceLayout(): UseKnowledgeBaseWorkspaceLayo
       next = Math.max(KP_LIST_MIN_HEIGHT, Math.min(maxTop, next));
       setKpListHeight(next);
     };
-    const onUp = () => setResizingKpVertical(false);
-    window.addEventListener('mousemove', onMove);
+    const onUp = () => {
+      document.body.style.userSelect = prevUserSelect;
+      setResizingKpVertical(false);
+    };
+    window.addEventListener('mousemove', onMove, { passive: false });
     window.addEventListener('mouseup', onUp);
     return () => {
+      document.body.style.userSelect = prevUserSelect;
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
     };
@@ -144,7 +162,21 @@ export function useKnowledgeBaseWorkspaceLayout(): UseKnowledgeBaseWorkspaceLayo
   const onResizeKpVerticalStart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const currentTop = kpListHeight ?? (kpTopPanelRef.current?.offsetHeight ?? 200);
+    let currentTop: number;
+    if (kpListHeight != null) {
+      currentTop = kpListHeight;
+    } else {
+      const topEl = kpTopPanelRef.current;
+      const containerEl = upperLeftRightRef.current;
+      if (topEl) {
+        const rect = topEl.getBoundingClientRect();
+        currentTop = rect.height;
+      } else if (containerEl) {
+        currentTop = Math.max(KP_LIST_MIN_HEIGHT, (containerEl.clientHeight - KP_RESIZE_HANDLE_HEIGHT) / 2);
+      } else {
+        currentTop = 200;
+      }
+    }
     startYKpRef.current = e.clientY;
     startHeightKpRef.current = currentTop;
     setKpListHeight(currentTop);

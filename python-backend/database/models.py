@@ -213,6 +213,21 @@ class TrainingAnnotationFinetuningLink(Base):
     used_at = Column(DateTime, default=datetime.utcnow)
 
 
+class AnnotationGenerationJob(Base):
+    """Long-running annotation generation job; progress and result persisted for recovery after refresh."""
+    __tablename__ = "annotation_generation_jobs"
+
+    id = Column(Integer, primary_key=True)
+    job_id = Column(String(64), unique=True, nullable=False)
+    status = Column(String(32), nullable=False, default="pending")
+    progress = Column(Float, default=0.0)
+    request_json = Column(Text)
+    result_json = Column(Text)
+    error_message = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 def init_database(db_path: str = "aiforger.db"):
     """Initialize database and create tables"""
     db_dir = os.path.dirname(db_path)

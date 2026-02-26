@@ -62,6 +62,7 @@ const TrainingLab: React.FC = () => {
         generationPointCount={data.generationPointCount}
         annotations={data.annotations}
         isGenerating={data.isGenerating}
+        generationProgress={data.generationProgress}
         savingForFinetuning={data.savingForFinetuning}
         candidateCount={data.candidateCount}
         setCandidateCount={data.setCandidateCount}

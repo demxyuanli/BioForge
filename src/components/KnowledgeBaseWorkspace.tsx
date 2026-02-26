@@ -159,10 +159,17 @@ const KnowledgeBaseWorkspace: React.FC = () => {
             </span>
           </div>
           <div className="kb-upper-body" ref={upperBodyRef}>
-            <div className="kb-upper-left">
+            <div
+              className="kb-upper-left"
+              style={{
+                width: leftPanelWidth,
+                minWidth: LEFT_PANEL_MIN,
+                flex: '0 0 auto',
+              }}
+            >
               <div
                 className="kb-upper-left-filelist kb-cli-panel"
-                style={{ width: leftPanelWidth, minWidth: LEFT_PANEL_MIN }}
+                style={{ width: '100%', minWidth: 0 }}
               >
                 <KnowledgeBaseWorkspaceFileList
                   displayFileList={displayFileList}

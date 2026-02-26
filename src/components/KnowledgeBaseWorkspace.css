@@ -160,7 +160,7 @@
 }
 
 .kb-upper-body .kb-upper-left {
-  flex: 1;
+  flex: 0 0 auto;
   min-width: 0;
   display: flex;
   flex-direction: row;
@@ -368,8 +368,8 @@
 
 .kb-resize-handle-v {
   flex-shrink: 0;
-  height: 4px;
-  min-height: 4px;
+  height: 8px;
+  min-height: 8px;
   cursor: row-resize;
   background: var(--vs-border-subtle);
   user-select: none;
@@ -386,8 +386,8 @@
   position: absolute;
   left: 0;
   right: 0;
-  top: -4px;
-  bottom: -4px;
+  top: 0;
+  bottom: 0;
 }
 
 .kb-upper-left-filelist .kb-section-title {
